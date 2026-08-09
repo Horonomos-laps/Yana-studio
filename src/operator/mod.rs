@@ -51,9 +51,7 @@ impl OperatorCore {
 
         let (journal_kind, summary) = match &decision {
             GuardDecision::Allow => (JournalKind::Decide, "action allowed"),
-            GuardDecision::RequireApproval(_) => {
-                (JournalKind::Warning, "action awaiting approval")
-            }
+            GuardDecision::RequireApproval(_) => (JournalKind::Warning, "action awaiting approval"),
             GuardDecision::Deny(_) => (JournalKind::Warning, "action denied"),
         };
 
