@@ -27,12 +27,13 @@ const PANEL: Color = Color::Rgb(47, 55, 68);
 
 pub fn draw(frame: &mut Frame, app: &App) {
     let area = frame.area();
+    let composer_height = estimate_composer_height(app, area.width);
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
             Constraint::Min(8),
-            Constraint::Length(3),
+            Constraint::Length(composer_height),
             Constraint::Length(1),
         ])
         .split(area);
@@ -431,13 +432,20 @@ fn render_approval_panel(frame: &mut Frame, area: Rect, app: &App) {
     );
 }
 
-fn render_composer(frame: &mut Frame, area: Rect, app: &App) {
+struct ComposerContent {
+    left_spans: Vec<Span<'static>>,
+    left_len: usize,
+    right_text: String,
+    right_len: usize,
+}
+
+fn build_composer_content(app: &App) -> ComposerContent {
     let provider_name = app.engines.provider.current().name.clone();
     let approval = app.engines.approval.current().label();
     let render_mode = format!("{:?}", app.engines.render.mode());
     let attachments = app.engines.attachment.pending().len();
 
-    let mut left_spans: Vec<Span> = vec![
+    let mut left_spans: Vec<Span<'static>> = vec![
         Span::styled(format!("[{provider_name}]"), Style::default().fg(PURPLE)),
         Span::raw(" "),
         Span::styled(format!("[{approval}]"), Style::default().fg(YELLOW)),
@@ -460,7 +468,7 @@ fn render_composer(frame: &mut Frame, area: Rect, app: &App) {
         ));
     } else {
         left_spans.push(Span::styled(
-            app.input.as_str(),
+            app.input.clone(),
             Style::default().fg(Color::White),
         ));
     }
@@ -471,19 +479,44 @@ fn render_composer(frame: &mut Frame, area: Rect, app: &App) {
         .sum();
     let right_text = format!("{} · {} ", stream_label(app), app.runtime.model);
     let right_len = right_text.chars().count();
+
+    ComposerContent {
+        left_spans,
+        left_len,
+        right_text,
+        right_len,
+    }
+}
+
+/// Grows the composer box to fit the current input on wrap, instead of a
+/// fixed 3-row bar that clips or overlaps long prompts.
+fn estimate_composer_height(app: &App, width: u16) -> u16 {
+    let content = build_composer_content(app);
+    let inner_width = width.saturating_sub(2).max(1) as usize;
+    let total_len = content.left_len + 1 + content.right_len;
+    let lines = (total_len + inner_width - 1) / inner_width;
+    lines.clamp(1, 6) as u16 + 2
+}
+
+fn render_composer(frame: &mut Frame, area: Rect, app: &App) {
+    let content = build_composer_content(app);
     let inner_width = area.width.saturating_sub(2) as usize;
-    let padding = inner_width.saturating_sub(left_len + right_len).max(1);
+    let padding = inner_width
+        .saturating_sub(content.left_len + content.right_len)
+        .max(1);
 
-    let mut line_spans = left_spans;
+    let mut line_spans = content.left_spans;
     line_spans.push(Span::raw(" ".repeat(padding)));
-    line_spans.push(Span::styled(right_text, Style::default().fg(MUTED)));
+    line_spans.push(Span::styled(content.right_text, Style::default().fg(MUTED)));
 
-    let composer = Paragraph::new(Line::from(line_spans)).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(CYAN)),
-    );
+    let composer = Paragraph::new(Line::from(line_spans))
+        .wrap(Wrap { trim: false })
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(CYAN)),
+        );
     frame.render_widget(composer, area);
 }
 
