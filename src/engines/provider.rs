@@ -19,19 +19,24 @@ impl Default for ProviderEngine {
         Self {
             profiles: vec![
                 ProviderProfile {
-                    name: "Mock Bridge".into(),
-                    model: "Yana UI Mock".into(),
-                    local: true,
+                    name: "Claude".into(),
+                    model: "claude-sonnet-5".into(),
+                    local: false,
                 },
                 ProviderProfile {
-                    name: "Yana Core".into(),
-                    model: "Bridge pending".into(),
-                    local: true,
-                },
-                ProviderProfile {
-                    name: "OpenAI-compatible".into(),
+                    name: "OpenAI".into(),
                     model: "Not connected".into(),
                     local: false,
+                },
+                ProviderProfile {
+                    name: "Gemini".into(),
+                    model: "Not connected".into(),
+                    local: false,
+                },
+                ProviderProfile {
+                    name: "Ollama".into(),
+                    model: "Not connected".into(),
+                    local: true,
                 },
             ],
             selected: 0,

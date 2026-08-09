@@ -7,13 +7,47 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::{
     domain::{Activity, ActivityState, Message, PlanStep, Role, RuntimeInfo, ScopedFile},
-    engines::{command::UiCommand, notification::NoticeLevel, workflow::WorkflowState, UiEngines},
+    engines::{
+        approval::ApprovalMode, command::UiCommand, notification::NoticeLevel,
+        workflow::WorkflowState, UiEngines,
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Overlay {
     Scope,
     Plan,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SidebarTab {
+    Activity,
+    Workflow,
+    Memory,
+    Compose,
+    Approval,
+}
+
+impl SidebarTab {
+    pub fn next(self) -> Self {
+        match self {
+            SidebarTab::Activity => SidebarTab::Workflow,
+            SidebarTab::Workflow => SidebarTab::Memory,
+            SidebarTab::Memory => SidebarTab::Compose,
+            SidebarTab::Compose => SidebarTab::Approval,
+            SidebarTab::Approval => SidebarTab::Activity,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            SidebarTab::Activity => "Activity",
+            SidebarTab::Workflow => "Workflow",
+            SidebarTab::Memory => "Memory",
+            SidebarTab::Compose => "Compose",
+            SidebarTab::Approval => "Approval",
+        }
+    }
 }
 
 pub struct App {
@@ -24,7 +58,7 @@ pub struct App {
     pub runtime: RuntimeInfo,
     pub input: String,
     pub status: String,
-    pub sidebar_visible: bool,
+    pub sidebar_tab: SidebarTab,
     pub overlay: Option<Overlay>,
     pub should_quit: bool,
     pub engines: UiEngines,
@@ -33,14 +67,17 @@ pub struct App {
 impl App {
     pub fn demo() -> Self {
         let mut engines = UiEngines::default();
-        engines.context_view.sync(4, true);
-        let provider = engines.provider.current().clone();
+        engines.context_view.sync(4, true, 1_200);
+        engines.layout.set_sidebar(true);
+        let provider_model = engines.provider.current().model.clone();
         Self {
             messages: vec![
                 Message {
                     role: Role::System,
-                    content: "14 UI engines ready. Type /help to inspect the terminal surface."
-                        .into(),
+                    content: format!(
+                        "{} UI engines ready. Type /help to inspect the terminal surface.",
+                        UiEngines::COUNT
+                    ),
                     timestamp: timestamp(),
                 },
                 Message {
@@ -122,14 +159,11 @@ impl App {
                 },
             ],
             runtime: RuntimeInfo {
-                runtime: provider.name,
-                model: provider.model,
-                context: "UI mock".into(),
-                local: provider.local,
+                model: provider_model,
             },
             input: String::new(),
-            status: "14 UI engines ready".into(),
-            sidebar_visible: true,
+            status: format!("{} UI engines ready", UiEngines::COUNT),
+            sidebar_tab: SidebarTab::Activity,
             overlay: None,
             should_quit: false,
             engines,
@@ -142,6 +176,16 @@ impl App {
                 KeyCode::Char('c') => self.should_quit = true,
                 KeyCode::Char('s') => self.toggle_overlay(Overlay::Scope),
                 KeyCode::Char('p') => self.toggle_overlay(Overlay::Plan),
+                // Ctrl+M is unreachable on standard terminals: raw mode sends
+                // byte 0x0D for both Ctrl+M and Enter, so crossterm reports
+                // both as KeyCode::Enter with no way to tell them apart.
+                // Ctrl+E jumps to Memory instead (E as in "Evidence").
+                KeyCode::Char('e') => self.sidebar_tab = SidebarTab::Memory,
+                KeyCode::Char('a') => {
+                    self.engines.approval.cycle();
+                    self.sidebar_tab = SidebarTab::Approval;
+                    self.status = format!("Approval: {}", self.engines.approval.current().label());
+                }
                 _ => {}
             }
             return;
@@ -156,8 +200,7 @@ impl App {
                 }
             }
             KeyCode::Tab => {
-                self.sidebar_visible = !self.sidebar_visible;
-                self.engines.layout.set_sidebar(self.sidebar_visible);
+                self.sidebar_tab = self.sidebar_tab.next();
             }
             KeyCode::Enter => {
                 if self.overlay.is_some() {
@@ -200,7 +243,7 @@ impl App {
             return;
         }
 
-        self.engines.workflow.transition(WorkflowState::Queued);
+        self.engines.workflow.transition(WorkflowState::Planning);
         self.messages.push(Message {
             role: Role::User,
             content: prompt,
@@ -208,14 +251,22 @@ impl App {
         });
         self.engines.chat.record_submission();
         self.engines.storage.mark_dirty();
-        self.engines.workflow.transition(WorkflowState::Rendering);
+
+        self.engines.workflow.transition(WorkflowState::Running);
+        self.engines.compose_stage.advance();
+        self.engines.workflow.transition(WorkflowState::Review);
+        self.engines.compose_stage.advance();
+        self.engines.workflow.transition(WorkflowState::Testing);
+        self.engines.compose_stage.advance();
+
         self.messages.push(Message {
             role: Role::Assistant,
             content: "UI workflow đã nhận yêu cầu qua Mock Bridge. Bước tiếp theo là thay mock event bằng bridge tới Yana Core, không nhân bản runtime ở đây."
                 .into(),
             timestamp: timestamp(),
         });
-        self.engines.workflow.transition(WorkflowState::Complete);
+        self.engines.workflow.transition(WorkflowState::Done);
+        self.engines.compose_stage.advance();
         self.engines.notification.push(
             NoticeLevel::Success,
             format!("Prompt #{} rendered", self.engines.chat.submitted()),
@@ -231,11 +282,13 @@ impl App {
     fn execute_command(&mut self, command: UiCommand) {
         match command {
             UiCommand::Help => self.system_message(
-                "/help  /engines  /clear  /new  /provider <name>  /search <text>  /attach <path>  /theme  /render  /save",
+                "/help  /engines  /clear  /new  /provider <name>  /approval <auto|ask|never>  /search <text>  /attach <path>  /theme  /render  /save",
             ),
-            UiCommand::Engines => {
-                self.system_message(&format!("14 UI engines: {}", UiEngines::names().join(", ")))
-            }
+            UiCommand::Engines => self.system_message(&format!(
+                "{} UI engines: {}",
+                UiEngines::COUNT,
+                UiEngines::names().join(", ")
+            )),
             UiCommand::Clear => {
                 self.messages.clear();
                 self.status = "Transcript cleared".into();
@@ -258,11 +311,24 @@ impl App {
                 } else {
                     match self.engines.provider.select(&name) {
                         Ok(profile) => {
-                            self.runtime.runtime = profile.name.clone();
                             self.runtime.model = profile.model.clone();
-                            self.runtime.local = profile.local;
                             self.status = format!("Provider: {}", profile.name);
                         }
+                        Err(error) => self.warn(error),
+                    }
+                }
+            }
+            UiCommand::Approval(name) => {
+                if name.is_empty() {
+                    let labels = ApprovalMode::ALL
+                        .iter()
+                        .map(|mode| mode.label())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    self.system_message(&format!("Approval modes: {labels}"));
+                } else {
+                    match self.engines.approval.select(&name) {
+                        Ok(mode) => self.status = format!("Approval: {}", mode.label()),
                         Err(error) => self.warn(error),
                     }
                 }

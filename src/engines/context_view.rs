@@ -5,19 +5,22 @@
 pub struct ContextViewEngine {
     visible_items: usize,
     locked: bool,
+    token_estimate: u32,
 }
 
 impl ContextViewEngine {
-    pub fn sync(&mut self, visible_items: usize, locked: bool) {
+    pub fn sync(&mut self, visible_items: usize, locked: bool, token_estimate: u32) {
         self.visible_items = visible_items;
         self.locked = locked;
+        self.token_estimate = token_estimate;
     }
 
     pub fn summary(&self) -> String {
         format!(
-            "{} items · {}",
+            "{} files · {} · ~{} tok",
             self.visible_items,
-            if self.locked { "locked" } else { "open" }
+            if self.locked { "locked" } else { "open" },
+            self.token_estimate
         )
     }
 }
