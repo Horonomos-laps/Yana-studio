@@ -5,6 +5,7 @@ mod app;
 mod atlas;
 mod context;
 mod domain;
+mod engines;
 mod forge;
 mod guard;
 mod harbor;

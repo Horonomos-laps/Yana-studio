@@ -46,8 +46,5 @@ pub struct ScopedFile {
 
 #[derive(Debug, Clone)]
 pub struct RuntimeInfo {
-    pub runtime: String,
     pub model: String,
-    pub context: String,
-    pub local: bool,
 }
