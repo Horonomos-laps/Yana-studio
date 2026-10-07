@@ -11,6 +11,16 @@ pub enum ApprovalMode {
 impl ApprovalMode {
     pub const ALL: [ApprovalMode; 3] = [ApprovalMode::Auto, ApprovalMode::Ask, ApprovalMode::Never];
 
+    pub fn description(self) -> &'static str {
+        match self {
+            ApprovalMode::Auto => "Autonomous execution: tool calls execute without asking",
+            ApprovalMode::Ask => {
+                "Guarded execution: prompts confirmation before modifying files or running commands"
+            }
+            ApprovalMode::Never => "Read-only simulation: prevents all destructive tool execution",
+        }
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             ApprovalMode::Auto => "AUTO",

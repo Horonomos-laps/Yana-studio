@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // SPDX-FileCopyrightText: 2026 Vũ Văn Tâm
 // SPDX-License-Identifier: Apache-2.0
 

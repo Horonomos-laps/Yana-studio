@@ -45,6 +45,10 @@ impl Default for ProviderEngine {
 }
 
 impl ProviderEngine {
+    pub fn profiles(&self) -> &[ProviderProfile] {
+        &self.profiles
+    }
+
     pub fn current(&self) -> &ProviderProfile {
         &self.profiles[self.selected]
     }

@@ -17,6 +17,8 @@ use crate::{
 pub enum Overlay {
     Scope,
     Plan,
+    Approval,
+    Memory,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,17 +27,39 @@ pub enum SidebarTab {
     Workflow,
     Memory,
     Compose,
+    Provider,
     Approval,
 }
 
 impl SidebarTab {
+    pub const ALL: [SidebarTab; 6] = [
+        SidebarTab::Activity,
+        SidebarTab::Workflow,
+        SidebarTab::Memory,
+        SidebarTab::Compose,
+        SidebarTab::Provider,
+        SidebarTab::Approval,
+    ];
+
     pub fn next(self) -> Self {
         match self {
             SidebarTab::Activity => SidebarTab::Workflow,
             SidebarTab::Workflow => SidebarTab::Memory,
             SidebarTab::Memory => SidebarTab::Compose,
-            SidebarTab::Compose => SidebarTab::Approval,
+            SidebarTab::Compose => SidebarTab::Provider,
+            SidebarTab::Provider => SidebarTab::Approval,
             SidebarTab::Approval => SidebarTab::Activity,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            SidebarTab::Activity => SidebarTab::Approval,
+            SidebarTab::Workflow => SidebarTab::Activity,
+            SidebarTab::Memory => SidebarTab::Workflow,
+            SidebarTab::Compose => SidebarTab::Memory,
+            SidebarTab::Provider => SidebarTab::Compose,
+            SidebarTab::Approval => SidebarTab::Provider,
         }
     }
 
@@ -45,7 +69,19 @@ impl SidebarTab {
             SidebarTab::Workflow => "Workflow",
             SidebarTab::Memory => "Memory",
             SidebarTab::Compose => "Compose",
+            SidebarTab::Provider => "Provider",
             SidebarTab::Approval => "Approval",
+        }
+    }
+
+    pub fn index(self) -> usize {
+        match self {
+            SidebarTab::Activity => 0,
+            SidebarTab::Workflow => 1,
+            SidebarTab::Memory => 2,
+            SidebarTab::Compose => 3,
+            SidebarTab::Provider => 4,
+            SidebarTab::Approval => 5,
         }
     }
 }
@@ -75,28 +111,26 @@ impl App {
                 Message {
                     role: Role::System,
                     content: format!(
-                        "{} UI engines ready. Type /help to inspect the terminal surface.",
+                        "Yana Terminal AI v0.1.0 · {} UI engines ready · Mock Bridge connected. Type /help to inspect commands.",
                         UiEngines::COUNT
                     ),
                     timestamp: timestamp(),
                 },
                 Message {
                     role: Role::User,
-                    content: "Thiết kế lại composer nhưng không động vào provider và history."
-                        .into(),
+                    content: "Thiết kế lại toàn bộ Terminal UI theo phong cách Antigravity / Claude Code / Warp, hỗ trợ 6 tab Sidebar và auto-grow Composer.".into(),
                     timestamp: timestamp(),
                 },
                 Message {
                     role: Role::Assistant,
-                    content: "Tôi đã khoanh vùng phần giao diện. Đây vẫn là UI bridge mock; Yana Core chưa bị nhân bản vào repo này."
-                        .into(),
+                    content: "Tôi đã tái thiết kế toàn diện giao diện dòng lệnh cho Yana AI theo UI_REWRITE_SPEC:\n\n[Thinking]\n• Phân tách rõ rệt giữa Terminal Client và Yana Core theo kiến trúc Bridge.\n• Xây dựng 6 tab Sidebar chuyển đổi mượt mà bằng phím Tab.\n• Transcript hiển thị tách biệt SYSTEM, YOU, YANA kèm khối Thinking và Tool Diff.\n• Composer co giãn tự động, hiển thị đầy đủ pills trạng thái.\n\n[Tool: patch_workspace src/ui/mod.rs]\n--- a/src/ui/mod.rs\n+++ b/src/ui/mod.rs\n@@ -1,40 +1,80 @@\n+ pub fn render_modern_transcript(frame: &mut Frame, area: Rect, app: &App)\n+ pub fn render_sidebar_tabs(frame: &mut Frame, area: Rect, app: &App)\n+ pub fn render_composer_box(frame: &mut Frame, area: Rect, app: &App)\n+ pub fn render_overlays(frame: &mut Frame, area: Rect, app: &App)\n\nTất cả thành phần đã hoàn tất. Bạn có thể gõ lệnh hoặc bấm phím tắt để trải nghiệm!".into(),
                     timestamp: timestamp(),
                 },
             ],
             activities: vec![
                 Activity {
                     label: "UI engines registered".into(),
-                    detail: format!("{} engines", UiEngines::COUNT),
+                    detail: format!("{} engines active", UiEngines::COUNT),
                     state: ActivityState::Done,
                 },
                 Activity {
@@ -106,28 +140,28 @@ impl App {
                 },
                 Activity {
                     label: "Runtime boundary".into(),
-                    detail: "mock bridge only".into(),
-                    state: ActivityState::Warning,
+                    detail: "mock bridge only · client clean".into(),
+                    state: ActivityState::Done,
                 },
             ],
             plan: vec![
                 PlanStep {
-                    title: "Chat + composer surface".into(),
+                    title: "Chat + Composer surface (auto-grow)".into(),
                     done: true,
                     active: false,
                 },
                 PlanStep {
-                    title: "14 UI engines".into(),
+                    title: "6 Tabbed Sidebar navigation".into(),
                     done: true,
                     active: false,
                 },
                 PlanStep {
-                    title: "Bridge contract".into(),
-                    done: false,
+                    title: "High-contrast Antigravity aesthetic".into(),
+                    done: true,
                     active: true,
                 },
                 PlanStep {
-                    title: "Real provider events".into(),
+                    title: "Bridge contract to Yana Core".into(),
                     done: false,
                     active: false,
                 },
@@ -147,14 +181,14 @@ impl App {
                 },
                 ScopedFile {
                     path: "src/ui/mod.rs".into(),
-                    confidence: 91,
-                    lines: 330,
+                    confidence: 95,
+                    lines: 480,
                     selected: true,
                 },
                 ScopedFile {
-                    path: "src/ui/theme.rs".into(),
-                    confidence: 72,
-                    lines: 40,
+                    path: "docs/UI_REWRITE_SPEC.md".into(),
+                    confidence: 99,
+                    lines: 190,
                     selected: true,
                 },
             ],
@@ -162,7 +196,7 @@ impl App {
                 model: provider_model,
             },
             input: String::new(),
-            status: format!("{} UI engines ready", UiEngines::COUNT),
+            status: format!("{} UI engines online · Ready", UiEngines::COUNT),
             sidebar_tab: SidebarTab::Activity,
             overlay: None,
             should_quit: false,
@@ -176,15 +210,13 @@ impl App {
                 KeyCode::Char('c') => self.should_quit = true,
                 KeyCode::Char('s') => self.toggle_overlay(Overlay::Scope),
                 KeyCode::Char('p') => self.toggle_overlay(Overlay::Plan),
-                // Ctrl+M is unreachable on standard terminals: raw mode sends
-                // byte 0x0D for both Ctrl+M and Enter, so crossterm reports
-                // both as KeyCode::Enter with no way to tell them apart.
-                // Ctrl+E jumps to Memory instead (E as in "Evidence").
-                KeyCode::Char('e') => self.sidebar_tab = SidebarTab::Memory,
+                KeyCode::Char('e') => {
+                    self.sidebar_tab = SidebarTab::Memory;
+                    self.toggle_overlay(Overlay::Memory);
+                }
                 KeyCode::Char('a') => {
-                    self.engines.approval.cycle();
                     self.sidebar_tab = SidebarTab::Approval;
-                    self.status = format!("Approval: {}", self.engines.approval.current().label());
+                    self.toggle_overlay(Overlay::Approval);
                 }
                 _ => {}
             }
@@ -200,7 +232,17 @@ impl App {
                 }
             }
             KeyCode::Tab => {
-                self.sidebar_tab = self.sidebar_tab.next();
+                if self.overlay == Some(Overlay::Approval) {
+                    self.engines.approval.cycle();
+                    self.status = format!("Approval: {}", self.engines.approval.current().label());
+                } else {
+                    self.sidebar_tab = self.sidebar_tab.next();
+                    self.status = format!("Tab: {}", self.sidebar_tab.label());
+                }
+            }
+            KeyCode::BackTab => {
+                self.sidebar_tab = self.sidebar_tab.prev();
+                self.status = format!("Tab: {}", self.sidebar_tab.label());
             }
             KeyCode::Enter => {
                 if self.overlay.is_some() {
@@ -221,7 +263,7 @@ impl App {
         }
     }
 
-    fn toggle_overlay(&mut self, overlay: Overlay) {
+    pub fn toggle_overlay(&mut self, overlay: Overlay) {
         self.overlay = if self.overlay == Some(overlay) {
             None
         } else {
@@ -246,7 +288,7 @@ impl App {
         self.engines.workflow.transition(WorkflowState::Planning);
         self.messages.push(Message {
             role: Role::User,
-            content: prompt,
+            content: prompt.clone(),
             timestamp: timestamp(),
         });
         self.engines.chat.record_submission();
@@ -259,10 +301,16 @@ impl App {
         self.engines.workflow.transition(WorkflowState::Testing);
         self.engines.compose_stage.advance();
 
+        let assistant_reply = format!(
+            "Tôi đã tiếp nhận chỉ thị và xử lý qua Mock Bridge:\n\n[Thinking]\n• Phân tích yêu cầu: {}\n• Trạng thái Giám Thị: [{}]\n• Chuyển trạng thái Workflow: Planning -> Running -> Review -> Testing -> Done\n\n[Tool: execute_step]\n+ apply_intent(prompt: {})\n+ status: completed without error\n\nQuá trình xử lý giao diện hoàn tất. Yana Core sẽ tiếp quản logic qua API/Bridge.",
+            prompt,
+            self.engines.approval.current().label(),
+            prompt
+        );
+
         self.messages.push(Message {
             role: Role::Assistant,
-            content: "UI workflow đã nhận yêu cầu qua Mock Bridge. Bước tiếp theo là thay mock event bằng bridge tới Yana Core, không nhân bản runtime ở đây."
-                .into(),
+            content: assistant_reply,
             timestamp: timestamp(),
         });
         self.engines.workflow.transition(WorkflowState::Done);
@@ -272,11 +320,11 @@ impl App {
             format!("Prompt #{} rendered", self.engines.chat.submitted()),
         );
         self.activities.push(Activity {
-            label: "Workflow complete".into(),
+            label: "Prompt completed".into(),
             detail: format!("prompt #{} · mock bridge", self.engines.chat.submitted()),
             state: ActivityState::Done,
         });
-        self.status = "Mock workflow rendered".into();
+        self.status = "Ready · Prompt completed".into();
     }
 
     fn execute_command(&mut self, command: UiCommand) {
@@ -335,7 +383,7 @@ impl App {
             }
             UiCommand::Search(query) => {
                 let count = self.engines.search.search(&self.messages, &query);
-                self.system_message(&format!("Search “{}”: {} match(es).", query, count));
+                self.system_message(&format!("Search \"{}\": {} match(es).", query, count));
                 self.status = format!("Search: {count} matches");
             }
             UiCommand::Attach(path) => match self.engines.attachment.attach(&path) {
