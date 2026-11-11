@@ -4,7 +4,16 @@
 	const vscode = acquireVsCodeApi();
 	window.vscode = vscode;
 	const app = document.getElementById('app');
-	const ui = { trace: null, reply: null, approval: null, pendingCall: null, tokens: { input: 0, output: 0 }, busy: false };
+	// lastEnd: cách lượt gần nhất kết thúc ('completed' | 'paused' | 'cancelled' | 'error'); hàng đợi chỉ tự gửi tiếp sau 'completed'.
+	const ui = { trace: null, reply: null, approval: null, pendingCall: null, tokens: { input: 0, output: 0 }, busy: false, lastEnd: null };
+	// Nếu prompt-queue.js không nạp được thì panel vẫn chạy, chỉ mất tính năng xếp hàng (enqueue không thêm gì nên lời nhắc không bị xoá).
+	const promptQueue = window.YanaPromptQueue || {
+		MAX_ITEMS: 0, create: () => ({ items: [], paused: false, note: '' }), enqueue: state => state, remove: state => state, move: state => state,
+		clear: () => ({ items: [], paused: false, note: '' }), pause: state => state, resume: state => state, dropFirst: state => state,
+		first: () => undefined, afterTurn: () => 'idle',
+	};
+	let queue = promptQueue.create();
+	let queueSeq = 0;
 	const editManager = window.yanaEdits ? window.yanaEdits.create({ el, button, append, post: msg => vscode.postMessage(msg) }) : null;
 
 	function el(tag, className, text) {
@@ -75,6 +84,8 @@
 	const composerBox = el('div', 'composer-box');
 	const attachmentsBar = el('div', 'attachments-bar');
 	attachmentsBar.style.display = 'none';
+	const queueBar = el('div', 'queue-bar');
+	queueBar.style.display = 'none';
 
 	const input = el('textarea', 'input');
 	input.rows = 2;
@@ -112,7 +123,7 @@
 	window.addEventListener('keydown', e => {
 		if (e.key === 'Escape') {
 			if (isMenuOpen) closeMenu();
-			else if (ui.busy) vscode.postMessage({ type: 'stop' });
+			else if (ui.busy) stopTurn();
 		}
 	});
 
@@ -299,7 +310,7 @@
 	window.YanaMentions?.init(input);
 
 	composerBox.append(popover, window.YanaVoice ? window.YanaVoice.getIndicatorElement() : el('div'), attachmentsBar, input, composerTools, fileInput);
-	composer.append(composerBox);
+	composer.append(queueBar, composerBox);
 
 	app.append(header, contextRow, policyNote, feed, composer);
 
@@ -625,11 +636,8 @@
 	}, true);
 	window.addEventListener('drop', handleDragDrop, true);
 
-	function submit() {
-		if (ui.busy) {
-			vscode.postMessage({ type: 'stop' });
-			return;
-		}
+	// Gom nội dung đang soạn thành một lời nhắc; không xoá ô nhập, việc xoá do bên gọi quyết định (gửi hay xếp hàng).
+	function collectPayload() {
 		let text = input.value.trim();
 		const imagesToSend = attachedItems.filter(i => i.isImage).map(img => ({
 			mimeType: img.mimeType,
@@ -646,7 +654,7 @@
 			data: f.data
 		}));
 
-		if (!text && imagesToSend.length === 0 && filesToSend.length === 0) return;
+		if (!text && imagesToSend.length === 0 && filesToSend.length === 0) return null;
 
 		if (text.startsWith('/deck ') || text.startsWith('/presentation ') || text.startsWith('/slide ')) {
 			const topic = text.replace(/^\/(deck|presentation|slide)\s+/, '').trim();
@@ -663,18 +671,103 @@
 			}
 		}
 
-		vscode.postMessage({
-			type: 'send',
-			text,
-			images: imagesToSend,
-			files: filesToSend,
-			mode: isPlanMode ? 'plan' : 'act'
-		});
+		return { text, images: imagesToSend, files: filesToSend, mode: isPlanMode ? 'plan' : 'act' };
+	}
+	function clearComposer() {
 		input.value = '';
 		attachedItems = [];
-		attachedImages = [];
 		renderAttachments();
 	}
+	function sendPayload(payload) {
+		ui.lastEnd = null;
+		vscode.postMessage({ type: 'send', text: payload.text, images: payload.images, files: payload.files, mode: payload.mode });
+	}
+	function submit() {
+		const payload = collectPayload();
+		if (ui.busy) {
+			// Đang chạy: có nội dung thì xếp hàng, không có thì là lệnh Dừng. Trước đây Enter ở đây huỷ cả lượt.
+			if (payload) enqueuePayload(payload);
+			else stopTurn();
+			return;
+		}
+		if (!payload) return;
+		sendPayload(payload);
+		clearComposer();
+	}
+
+	// ----- Prompt queue: logic ở media/prompt-queue.js, ở đây chỉ nối vào DOM và vòng đời của lượt -----
+	function enqueuePayload(payload) {
+		queueSeq += 1;
+		const before = queue.items.length;
+		queue = promptQueue.enqueue(queue, { id: `q${Date.now().toString(36)}${queueSeq}`, ...payload });
+		if (queue.items.length === before) {
+			// Hàng đợi đầy: giữ nguyên nội dung đang gõ để không mất lời nhắc.
+			renderQueue(`Queue is full (${promptQueue.MAX_ITEMS}). Wait for it to drain or clear it.`);
+			return;
+		}
+		clearComposer();
+		renderQueue();
+	}
+	function stopTurn() {
+		// Bấm Dừng cũng tạm dừng hàng đợi để người dùng tự quyết định có gửi tiếp hay không.
+		queue = promptQueue.pause(queue, 'stopped');
+		renderQueue();
+		vscode.postMessage({ type: 'stop' });
+	}
+	function sendNextQueued() {
+		const item = promptQueue.first(queue);
+		if (!item) return;
+		queue = promptQueue.dropFirst(queue);
+		renderQueue();
+		sendPayload(item);
+	}
+	function resumeQueue() {
+		queue = promptQueue.resume(queue);
+		renderQueue();
+		// Đang rảnh và không có lời xin duyệt treo thì gửi ngay; còn lại sẽ tự gửi khi lượt hiện tại hoàn tất.
+		if (!ui.busy && ui.lastEnd !== 'paused') sendNextQueued();
+	}
+	function onTurnEnded() {
+		const action = promptQueue.afterTurn(queue, ui.lastEnd);
+		if (action === 'send') {
+			sendNextQueued();
+		} else if (action === 'pause') {
+			queue = promptQueue.pause(queue, ui.lastEnd === 'error' ? 'last turn failed' : 'last turn did not finish');
+			renderQueue();
+		}
+	}
+	function queueRow(item, index) {
+		const row = el('li', 'queue-row');
+		const attached = (item.images?.length || 0) + (item.files?.length || 0);
+		row.append(el('span', 'queue-text ellipsis', item.text || '(attachment)'));
+		if (attached > 0) row.append(el('span', 'muted mono', `+${attached} file${attached === 1 ? '' : 's'}`));
+		const up = button('queue-btn', '↑', () => { queue = promptQueue.move(queue, item.id, -1); renderQueue(); }, 'Move up');
+		const down = button('queue-btn', '↓', () => { queue = promptQueue.move(queue, item.id, 1); renderQueue(); }, 'Move down');
+		const del = button('queue-btn', '✕', () => { queue = promptQueue.remove(queue, item.id); renderQueue(); }, 'Remove from queue');
+		up.disabled = index === 0;
+		down.disabled = index === queue.items.length - 1;
+		for (const [node, label] of [[up, 'Move up'], [down, 'Move down'], [del, 'Remove from queue']]) node.setAttribute('aria-label', label);
+		row.append(up, down, del);
+		return row;
+	}
+	function renderQueue(notice) {
+		queueBar.replaceChildren();
+		if (queue.items.length === 0) {
+			queueBar.style.display = 'none';
+			return;
+		}
+		queueBar.style.display = '';
+		const head = el('div', 'queue-head');
+		const stateText = queue.paused ? `Paused${queue.note ? ` · ${queue.note}` : ''}` : (notice || 'Sends automatically when the current turn finishes');
+		const actions = el('div', 'queue-actions');
+		if (queue.paused) actions.append(button('btn-sm mono', 'Resume', resumeQueue, 'Send the next queued message now'));
+		actions.append(button('btn-sm mono', 'Clear', () => { queue = promptQueue.clear(); renderQueue(); }, 'Remove every queued message'));
+		head.append(el('span', 'queue-title', `Queue (${queue.items.length})`), el('span', 'muted queue-state', stateText), actions);
+		const list = el('ol', 'queue-list');
+		queue.items.forEach((item, index) => list.append(queueRow(item, index)));
+		queueBar.append(head, list);
+	}
+
 	input.addEventListener('keydown', event => {
 		if (event.key === 'Enter') {
 			if (event.isComposing || event.keyCode === 229) return;
@@ -699,7 +792,10 @@
 	}
 
 	function renderState(state) {
+		const wasBusy = ui.busy;
 		ui.busy = state.busy;
+		// Lượt mới bắt đầu thì quên cách lượt trước kết thúc; nếu lượt này tắt mà không có sự kiện kết thúc, hàng đợi tạm dừng thay vì tự gửi.
+		if (!wasBusy && state.busy) ui.lastEnd = null;
 		if (state.capabilities) {
 			window.YanaAssistants?.updateCapabilities(state.capabilities);
 			window.YanaVoice?.updateCapabilities(state.capabilities);
@@ -730,6 +826,7 @@
 		keyBtn.style.display = (state.provider === 'ollama' || !state.provider) ? 'none' : '';
 		sendBtn.textContent = state.busy ? '■' : '↑';
 		sendBtn.className = state.busy ? 'send-btn danger' : 'send-btn primary';
+		if (wasBusy && !state.busy) onTurnEnded();
 	}
 
 	function renderIntent(text, at, images, files) {
@@ -938,6 +1035,11 @@
 	}
 
 	function renderConversation(data) {
+		// Hội thoại đổi (chuyển hoặc tạo mới) thì lời nhắc đang xếp hàng không còn thuộc hội thoại này: tạm dừng, không tự gửi nhầm chỗ.
+		if (queue.items.length > 0) {
+			queue = promptQueue.pause(queue, 'conversation changed');
+			renderQueue();
+		}
 		resetFeed();
 		isUserSelecting = false;
 		renderPending = false;
@@ -1141,16 +1243,20 @@
 		} else if (event.type === 'authority_denied') {
 			traceRow('', '✕', `${event.authority}: ${event.reason}`, 'DENY', 'bad');
 		} else if (event.type === 'awaiting_approval') {
+			ui.lastEnd = 'paused';
 			finishTrace('● Paused — waiting for approval', 'waiting');
 			renderApproval(event);
 		} else if (event.type === 'completed') {
+			ui.lastEnd = 'completed';
 			finishTrace('● Done', 'ok');
 			if (renderPending) { renderPending = false; renderReply(); }
 			if (!ui.replyText && event.message) appendReply(event.message);
 		} else if (event.type === 'cancelled') {
+			ui.lastEnd = 'cancelled';
 			finishTrace('● Cancelled', 'muted');
 			if (renderPending) { renderPending = false; renderReply(); }
 		} else if (event.type === 'error') {
+			ui.lastEnd = 'error';
 			finishTrace('● Failed', 'bad');
 			const msg = event.message || 'Runtime error';
 			const errCard = el('div', 'card error mono');
