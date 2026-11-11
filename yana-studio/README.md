@@ -8,7 +8,7 @@ hoặc nút bấm giả.
 
 ## Tải về
 
-Bản dựng sẵn nằm ở [GitHub Releases](https://github.com/yanacuti1121/Yana-AI/releases),
+Bản dựng sẵn nằm ở [GitHub Releases](https://github.com/Horonomos-laps/Yana-AI/releases),
 thẻ `studio-v*`. Xem danh sách file của từng release để biết hệ điều hành nào
 có bản dựng sẵn: `studio-v1.6.1` có Windows (x64, arm64) và Linux (`.deb`,
 `.AppImage`), chưa có macOS. Trên macOS hãy chạy từ mã nguồn như bên dưới.

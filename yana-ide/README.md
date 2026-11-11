@@ -2,7 +2,7 @@
 
 Thư mục này chỉ chứa phần Yana sửa đè lên VS Code (Code-OSS, MIT), không chứa
 mã VS Code. Mã upstream được kéo về theo đúng commit trong `upstream.lock`.
-Plan đầy đủ: [`.planning/yana-studio-vscode-base/PLAN.md`](https://github.com/yanacuti1121/Yana-AI/blob/main/.planning/yana-studio-vscode-base/PLAN.md) trong repo Yana-AI.
+Plan đầy đủ: [`.planning/yana-studio-vscode-base/PLAN.md`](https://github.com/Horonomos-laps/Yana-AI/blob/main/.planning/yana-studio-vscode-base/PLAN.md) trong repo Yana-AI.
 
 ## Thành phần
 
