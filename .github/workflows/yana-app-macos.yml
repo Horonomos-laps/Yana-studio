@@ -1,0 +1,39 @@
+name: Yana App (macOS)
+
+# The Yana macOS app (yana-app/, SwiftUI) had no CI in Yana-AI; it was built by
+# hand. This builds it on every change under yana-app/. There are no unit tests
+# in yana-app/ yet, so there is no `swift test` step.
+
+on:
+  push:
+    paths:
+      - 'yana-app/**'
+      - '.github/workflows/yana-app-macos.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'yana-app/**'
+      - '.github/workflows/yana-app-macos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (Apple Silicon)
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Show Swift toolchain
+        run: swift --version
+
+      - name: Resolve packages
+        run: swift package --package-path yana-app resolve
+
+      - name: Build debug app
+        run: swift build --package-path yana-app
