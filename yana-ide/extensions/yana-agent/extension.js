@@ -114,6 +114,7 @@ class YanaPanel {
 		const mentionsJs = webview.asWebviewUri(vscode.Uri.joinPath(media, 'mentions.js'));
 		const auditViewJs = webview.asWebviewUri(vscode.Uri.joinPath(media, 'audit-view.js'));
 		const editsJs = webview.asWebviewUri(vscode.Uri.joinPath(media, 'edits.js'));
+		const promptQueueJs = webview.asWebviewUri(vscode.Uri.joinPath(media, 'prompt-queue.js'));
 		const js = webview.asWebviewUri(vscode.Uri.joinPath(media, 'panel.js'));
 		const emblem = webview.asWebviewUri(vscode.Uri.joinPath(media, 'yana-emblem.svg'));
 		const csp = `default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} data: blob: https:; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};`;
@@ -121,7 +122,7 @@ class YanaPanel {
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="${css}"></head>
-<body data-emblem="${emblem}"><div id="app"></div><script nonce="${nonce}" src="${markdown}"></script><script nonce="${nonce}" src="${assistantsJs}"></script><script nonce="${nonce}" src="${voiceJs}"></script><script nonce="${nonce}" src="${mentionsJs}"></script><script nonce="${nonce}" src="${auditViewJs}"></script><script nonce="${nonce}" src="${editsJs}"></script><script nonce="${nonce}" src="${js}"></script></body></html>`;
+<body data-emblem="${emblem}"><div id="app"></div><script nonce="${nonce}" src="${markdown}"></script><script nonce="${nonce}" src="${assistantsJs}"></script><script nonce="${nonce}" src="${voiceJs}"></script><script nonce="${nonce}" src="${mentionsJs}"></script><script nonce="${nonce}" src="${auditViewJs}"></script><script nonce="${nonce}" src="${editsJs}"></script><script nonce="${nonce}" src="${promptQueueJs}"></script><script nonce="${nonce}" src="${js}"></script></body></html>`;
 	}
 
 	async onMessage(message) {
