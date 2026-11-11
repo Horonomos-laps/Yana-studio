@@ -24,7 +24,7 @@ final class AppUpdater: ObservableObject {
 	// "What's new" for the version just installed, shown once after the app starts on it.
 	@Published var whatsNew: Release?
 
-	private static let api = URL(string: "https://api.github.com/repos/yanacuti1121/Yana-AI/releases?per_page=30")!
+	private static let api = URL(string: "https://api.github.com/repos/yanacuti1121/Yana-studio/releases?per_page=30")!
 	private static let tagPrefix = "app-v"
 	private static let skippedKey = "yana.update.skipped"
 	private static let seenKey = "yana.update.lastSeenVersion"

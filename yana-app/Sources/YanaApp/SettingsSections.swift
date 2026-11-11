@@ -248,7 +248,7 @@ struct AboutSettings: View {
 	@EnvironmentObject private var runtime: RuntimeUpdater
 	@EnvironmentObject private var appUpdater: AppUpdater
 	private static let repo = URL(string: "https://github.com/yanacuti1121/Yana-AI")!
-	private static let releases = URL(string: "https://github.com/yanacuti1121/Yana-AI/releases")!
+	private static let releases = URL(string: "https://github.com/yanacuti1121/Yana-studio/releases")!
 	private static let license = URL(string: "https://www.apache.org/licenses/LICENSE-2.0")!
 	private static let contactEmail = "phamlongh230@gmail.com"
 	private static let contactMail = URL(string: "mailto:phamlongh230@gmail.com")!
