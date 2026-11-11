@@ -9,6 +9,19 @@ const ext = process.argv[2] || path.resolve(__dirname, "../extensions/yana-agent
 const dataModule = require(path.join(ext, 'features/control-center-data.js'));
 const { collect, verify } = dataModule;
 
+// Gốc của một bản Yana-AI (có core/hooks): lấy từ biến môi trường, hoặc đi ngược lên từ vị trí tiện ích.
+const MAX_ANCESTOR_LEVELS = 6; // đủ để vượt yana-ide/extensions/yana-agent và vài cấp thư mục chứa repo
+const hasPack = dir => fs.existsSync(path.join(dir, 'core', 'hooks'));
+const findYanaRoot = (fromEnv, start) => {
+	if (fromEnv) return hasPack(path.resolve(fromEnv)) ? path.resolve(fromEnv) : null;
+	let dir = path.resolve(start);
+	for (let level = 0; level < MAX_ANCESTOR_LEVELS; level++) {
+		if (hasPack(dir)) return dir;
+		dir = path.dirname(dir);
+	}
+	return null;
+};
+
 let pass = 0;
 let fail = 0;
 const check = (name, ok, extra = '') => { (ok ? pass++ : fail++); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : extra); };
@@ -125,17 +138,22 @@ const CAPS = JSON.stringify({ capabilities: [{ name: 'repo.read', available: tru
 	r = await verify(withScripts, 'auditChain', { ...realFs, run: fakeRun({ 'verify-audit-chain.sh': { code: 1, stdout: 'CHAIN BROKEN line 4\n' } }) });
 	check('exit 1 is a failure and shows why', r.ok === false && /CHAIN BROKEN/.test(r.message));
 
-	// 9. Một lượt thật trên repo hiện tại, chỉ đọc
-	const repo = path.resolve(ext, '../../../..');
-	const rt = path.join(repo, 'target/debug/yana-rt');
-	const live = await collect(repo, { binary: fs.existsSync(rt) ? rt : '', version: 'live' });
-	check('live: six sections come back', live.sections.length === 6, String(live.sections.length));
-	check('live: every item has a state and a label', live.sections.every(section => section.items.every(entry => entry.label && entry.state)));
-	if (fs.existsSync(rt)) {
-		check('live: the real guard blocks the test command', find(live, 'guards', 'Dangerous-command guard').state === 'ok');
-		check('live: the real runtime lists capabilities', /available of \d+/.test(find(live, 'runtime', 'Capabilities').value), find(live, 'runtime', 'Capabilities').value);
+	// 9. Một lượt thật trên một bản Yana-AI, chỉ đọc. Repo này không chứa core/, nên gốc lấy từ
+	// YANA_ROOT_DIR, hoặc từ thư mục tổ tiên đầu tiên có core/hooks. Không có thì bỏ qua và nói rõ.
+	const repo = findYanaRoot(process.env.YANA_ROOT_DIR, ext);
+	if (!repo) {
+		console.log('SKIP  live checks: no Yana pack found (set YANA_ROOT_DIR to a Yana-AI checkout to run them)');
+	} else {
+		const rt = path.join(repo, 'target/debug/yana-rt');
+		const live = await collect(repo, { binary: fs.existsSync(rt) ? rt : '', version: 'live' });
+		check('live: six sections come back', live.sections.length === 6, String(live.sections.length));
+		check('live: every item has a state and a label', live.sections.every(section => section.items.every(entry => entry.label && entry.state)));
+		if (fs.existsSync(rt)) {
+			check('live: the real guard blocks the test command', find(live, 'guards', 'Dangerous-command guard').state === 'ok');
+			check('live: the real runtime lists capabilities', /available of \d+/.test(find(live, 'runtime', 'Capabilities').value), find(live, 'runtime', 'Capabilities').value);
+		}
+		check('live: this repo has the pack (hook scripts counted)', Number(find(live, 'pack', 'Hook scripts').value) > 0);
 	}
-	check('live: this repo has the pack (hook scripts counted)', Number(find(live, 'pack', 'Hook scripts').value) > 0);
 
 	for (const dir of [empty, pack, broken, noSettings, halted, gt, sandboxed, installedOnly, withScripts]) fs.rmSync(dir, { recursive: true, force: true });
 	console.log(`\n${pass} passed, ${fail} failed`);
