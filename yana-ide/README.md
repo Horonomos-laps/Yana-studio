@@ -2,7 +2,7 @@
 
 Thư mục này chỉ chứa phần Yana sửa đè lên VS Code (Code-OSS, MIT), không chứa
 mã VS Code. Mã upstream được kéo về theo đúng commit trong `upstream.lock`.
-Plan đầy đủ: `.planning/yana-studio-vscode-base/PLAN.md`.
+Plan đầy đủ: [`.planning/yana-studio-vscode-base/PLAN.md`](https://github.com/yanacuti1121/Yana-AI/blob/main/.planning/yana-studio-vscode-base/PLAN.md) trong repo Yana-AI.
 
 ## Thành phần
 
@@ -25,7 +25,7 @@ export PATH="$HOME/yana-ide-upstream/node/bin:$PATH"
 
 # 3. Cài và áp phần Yana
 cd ~/yana-ide-upstream/vscode && npm ci
-/path/to/Yana-AI/tools/yana-ide/scripts/prepare.sh ~/yana-ide-upstream/vscode
+/path/to/Yana-studio/yana-ide/scripts/prepare.sh ~/yana-ide-upstream/vscode
 
 # 4. Build và mở. Dùng compile-client, không dùng `npm run compile`:
 #    lệnh đó còn build extension Copilot mà Yana đã tắt (removed-extensions.txt).

@@ -1,10 +1,33 @@
-# Yana Terminal AI Workspace
+# Yana Studio and Yana app
+
+Source for the Yana desktop apps. They were split out of the main repository,
+[Yana-AI](https://github.com/yanacuti1121/Yana-AI), which keeps the Rust runtime
+(`yana-rt`), the `core/` rules and hooks, and the PyPI and crates.io packages.
+
+## What is here
+
+| Directory | What it is |
+|---|---|
+| `yana-app/` | The native macOS app (SwiftUI). Its updater reads the releases of this repository whose tag starts with `app-v`. |
+| `yana-studio/` | Yana Studio, an Electron app. See its own README. Windows and Linux builds: `.github/workflows/yana-studio-desktop.yml`. The native macOS part (`yana-studio/native-macos`): `.github/workflows/native-macos.yml`. |
+| `yana-ide/` | Yana overrides on top of Code-OSS (VS Code). It holds no upstream code. See its own README. |
+| `src/`, `Cargo.toml`, `docs/`, `reference/` | The earlier terminal prototype, described at the bottom. A copy now lives in Yana-AI as `tools/yana-terminal/`. |
+
+## Status
+
+- The three app directories are copies from Yana-AI (`tools/yana-app`, `tools/yana-studio`, `tools/yana-ide`). Nothing has been built from this repository yet, and the two workflows have not run here.
+- Studio builds need the Rust runtime, so the workflow checks out Yana-AI beside this repository to build `yana-rt`.
+- No release tagged `app-v*` exists here yet, so the app updater finds no update. Studio downloads (`studio-v*` tags) are still on the Yana-AI releases page until the first tag is made here.
+- The `npm run dist:*` scripts in `yana-studio/` still assume the Yana-AI directory layout. Use the workflow to build for now.
+- The website and the web server live in [yana-web](https://github.com/yanacuti1121/yana-web).
+
+## Legacy: Yana Terminal AI Workspace
 
 A terminal-native, local-first AI workspace for developers.
 
 This repository is currently an **UI/UX incubator** for the next Yana terminal experience. The current MVP uses mock data so the interaction model can be validated before connecting it back to `yana-rt` and the existing local-AI stack in `Yana-AI/tools/yana-web`.
 
-## Current MVP
+### Current MVP
 
 - Transcript-first interface
 - Adaptive activity and plan sidebar
@@ -15,13 +38,13 @@ This repository is currently an **UI/UX incubator** for the next Yana terminal e
 - High-contrast terminal theme
 - SPDX copyright headers
 
-## Run
+### Run
 
 ```bash
 cargo run
 ```
 
-## Controls
+### Controls
 
 | Key | Action |
 |---|---|
@@ -32,7 +55,7 @@ cargo run
 | `Esc` | Close overlay / quit |
 | `Ctrl+C` | Quit |
 
-## Architecture boundary
+### Architecture boundary
 
 The MVP intentionally implements only the terminal presentation layer and mock state:
 
@@ -45,7 +68,7 @@ reference/    legacy code for study only
 
 Provider adapters, model downloads, runtime management, safety guards, and session storage will not be duplicated here. They will be connected later through a small bridge to the existing Yana systems.
 
-## Project direction
+### Project direction
 
 - Local-first and privacy-first
 - Scope before deep repository scanning
@@ -54,7 +77,7 @@ Provider adapters, model downloads, runtime management, safety guards, and sessi
 - Capability-based model support
 - Terminal-native rather than a GUI drawn with characters
 
-## Authorship
+### Authorship
 
 Original concept, product direction, architecture, and interaction design by **Vũ Văn Tâm**.
 
@@ -62,7 +85,7 @@ AI tools may assist with implementation, testing, documentation, and review. Acc
 
 Licensed under Apache-2.0.
 
-## UI engine surface
+### UI engine surface
 
 The terminal now exposes fourteen deliberately UI-facing engines:
 
