@@ -48,6 +48,13 @@ const CAPABILITIES = Object.freeze([
     "None",
   ],
   [
+    "harness.audit",
+    "Audit the agent and skill files under the session root: removed APIs, reviewer agents holding write tools, duplicate names, oversized skills, mirror drift, bad frontmatter. Read-only.",
+    "ReadOnly",
+    "Low",
+    "None",
+  ],
+  [
     "process.list",
     "List bounded local processes sorted by cpu or memory; read-only.",
     "ReadOnly",
