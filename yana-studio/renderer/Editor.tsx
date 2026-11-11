@@ -24,7 +24,14 @@ function languageFor(filename: string) {
   if ([".yaml", ".yml"].includes(extension)) return yaml();
   if ([".py", ".pyi"].includes(extension)) return python();
   if ([".sh", ".bash", ".zsh", ".fish"].includes(extension))
-    return StreamLanguage.define(shell);
+    // @codemirror/legacy-modes 6.5.5 types `shell` with StreamParser from
+    // @codemirror/streamparser, a different package than the StreamParser
+    // that StreamLanguage.define expects (@codemirror/language). The two
+    // declarations are the same shape, so tsc fails on the nominal mismatch
+    // only. Cast at this one call site.
+    return StreamLanguage.define(
+      shell as unknown as Parameters<typeof StreamLanguage.define>[0],
+    );
   return null;
 }
 
