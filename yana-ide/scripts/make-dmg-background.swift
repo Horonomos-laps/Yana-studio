@@ -97,7 +97,7 @@ if let accentGrad = CGGradient(colorsSpace: colorSpace, colors: accentColors, lo
 }
 
 // 3. Official Yana Rabbit Emblem
-let svgPath = "tools/yana-ide/extensions/yana-agent/media/yana-emblem.svg"
+let svgPath = "yana-ide/extensions/yana-agent/media/yana-emblem.svg"
 let rabbitSvg = NSImage(contentsOfFile: svgPath)
 
 // 3a. Center Rabbit Holographic Watermark behind drag arrow
