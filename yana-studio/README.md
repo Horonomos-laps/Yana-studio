@@ -18,7 +18,7 @@ có bản dựng sẵn: `studio-v1.6.1` có Windows (x64, arm64) và Linux (`.de
 Từ thư mục gốc của repo:
 
 ```sh
-cd tools/yana-studio
+cd yana-studio
 npm start
 ```
 
@@ -28,8 +28,8 @@ Mở thẳng một project, không thay đổi file của project khi khởi đ�
 npm start -- --project /duong/dan/toi/project
 ```
 
-Tên cửa sổ/menu là **Yana Studio**, có nhãn **NEW**. Không mở `tools/yana-desktop`,
-không sử dụng `tools/yana-web/server.js`, không tự bật Chrome/code-server.
+Tên cửa sổ/menu là **Yana Studio**, có nhãn **NEW**. Không mở `yana-desktop` (repo Yana-AI),
+không sử dụng `server.js` của repo yana-web, không tự bật Chrome/code-server.
 App đang cài trong `/Applications/Yana AI.app` không bị thay thế.
 
 ## Cài development dependencies trên máy khác
