@@ -19,7 +19,7 @@
 	"serverApplicationName": "yana-studio-server",
 	"serverDataFolderName": ".yana-studio-server",
 	"tunnelApplicationName": "yana-studio-tunnel",
-	"reportIssueUrl": "https://github.com/yanacuti1121/Yana-AI/issues/new",
+	"reportIssueUrl": "https://github.com/Horonomos-laps/Yana-AI/issues/new",
 	"extensionsGallery": {
 		"serviceUrl": "https://open-vsx.org/vscode/gallery",
 		"itemUrl": "https://open-vsx.org/vscode/item",
