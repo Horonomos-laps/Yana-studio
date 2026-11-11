@@ -314,11 +314,11 @@ let fileManager = FileManager.default
 
 // Destination paths
 let targets: [(String, Data)] = [
-    ("tools/yana-studio/build/background@2x.png", png2xData),
-    ("tools/yana-studio/build/background.png", png1xData),
-    ("tools/yana-ide/branding/dmg-background@2x.png", png2xData),
-    ("tools/yana-ide/branding/dmg-background.png", png1xData),
-    ("tools/yana-ide/branding/dmg-background.tiff", tiffData)
+    ("yana-studio/build/background@2x.png", png2xData),
+    ("yana-studio/build/background.png", png1xData),
+    ("yana-ide/branding/dmg-background@2x.png", png2xData),
+    ("yana-ide/branding/dmg-background.png", png1xData),
+    ("yana-ide/branding/dmg-background.tiff", tiffData)
 ]
 
 for (relPath, data) in targets {
