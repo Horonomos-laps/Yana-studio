@@ -25,7 +25,7 @@ function studioCurrentVersion() {
 		return null;
 	}
 }
-const GITHUB_RELEASES_API = 'https://api.github.com/repos/yanacuti1121/Yana-AI/releases?per_page=15';
+const GITHUB_RELEASES_API = 'https://api.github.com/repos/Horonomos-laps/Yana-AI/releases?per_page=15';
 const CRATES_IO_YANA_RT_API = 'https://crates.io/api/v1/crates/yana-rt';
 
 function parseSemver(v) {
@@ -129,7 +129,7 @@ async function fetchLatestStudioRelease() {
 				return {
 					tag,
 					version: match[1],
-					url: r.html_url || `https://github.com/yanacuti1121/Yana-AI/releases/tag/${tag}`,
+					url: r.html_url || `https://github.com/Horonomos-laps/Yana-AI/releases/tag/${tag}`,
 					body: r.body || '',
 					assets: r.assets || []
 				};
@@ -184,7 +184,7 @@ async function fetchLatestRuntimeVersion() {
 				if (match) {
 					return {
 						version: match[1],
-						url: r.html_url || `https://github.com/yanacuti1121/Yana-AI/releases/tag/${tag}`,
+						url: r.html_url || `https://github.com/Horonomos-laps/Yana-AI/releases/tag/${tag}`,
 						source: 'github'
 					};
 				}

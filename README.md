@@ -1,7 +1,7 @@
 # Yana Studio and Yana app
 
 Source for the Yana desktop apps. They were split out of the main repository,
-[Yana-AI](https://github.com/yanacuti1121/Yana-AI), which keeps the Rust runtime
+[Yana-AI](https://github.com/Horonomos-laps/Yana-AI), which keeps the Rust runtime
 (`yana-rt`), the `core/` rules and hooks, and the PyPI and crates.io packages.
 
 ## What is here
@@ -19,7 +19,7 @@ Source for the Yana desktop apps. They were split out of the main repository,
 - Studio builds need the Rust runtime, so the workflow checks out Yana-AI beside this repository to build `yana-rt`.
 - No release tagged `app-v*` exists here yet, so the app updater finds no update. Studio downloads (`studio-v*` tags) are still on the Yana-AI releases page until the first tag is made here.
 - The `npm run dist:*` scripts in `yana-studio/` still assume the Yana-AI directory layout. Use the workflow to build for now.
-- The website and the web server live in [yana-web](https://github.com/yanacuti1121/yana-web).
+- The website and the web server live in [yana-web](https://github.com/Horonomos-laps/yana-web).
 
 ## Legacy: Yana Terminal AI Workspace
 

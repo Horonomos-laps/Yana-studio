@@ -124,7 +124,7 @@ jobs:
       - name: Checkout Yana-AI (runtime source)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          repository: yanacuti1121/Yana-AI
+          repository: Horonomos-laps/Yana-AI
           ref: main
           path: yana-ai
 

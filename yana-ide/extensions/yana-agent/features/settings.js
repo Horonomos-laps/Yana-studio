@@ -106,7 +106,7 @@ const ACTIONS = {
 	openKeybindings: () => vscode.commands.executeCommand('workbench.action.openGlobalKeybindings', 'yana'),
 	updateSetting: msg => updateSetting(String(msg.section), String(msg.key), msg.value),
 	openShortcuts: () => vscode.commands.executeCommand('workbench.action.openGlobalKeybindings', 'yana'),
-	provideFeedback: () => vscode.env.openExternal(vscode.Uri.parse('https://github.com/yanacuti1121/Yana-AI/issues')),
+	provideFeedback: () => vscode.env.openExternal(vscode.Uri.parse('https://github.com/Horonomos-laps/Yana-AI/issues')),
 };
 
 async function onMessage(context, msg) {
