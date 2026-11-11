@@ -1,0 +1,79 @@
+name: JS tests
+
+# The Node test files in yana-studio/test and yana-ide/tests were not run by any workflow, so a
+# change could break them without a red check. Repositories are public, so Actions minutes are free.
+#
+# Some tests compare Studio with files that live in Yana-AI (the Rust capability registry, the
+# model catalog, COMMANDS.md, the hook and lock files). Yana-AI is checked out next to this
+# repository and YANA_ROOT_DIR points at it. CI is set by GitHub, which makes a missing checkout a
+# failure instead of a skipped test.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CI: "true"
+  YANA_ROOT_DIR: ${{ github.workspace }}/yana-ai
+
+jobs:
+  yana-studio:
+    name: yana-studio tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkout Yana-AI (sources the tests compare against)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Horonomos-laps/Yana-AI
+          ref: main
+          path: yana-ai
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 (node24)
+        with:
+          node-version: '24'
+
+      - name: Install (lockfile only, no lifecycle scripts)
+        working-directory: yana-studio
+        run: npm ci --ignore-scripts
+
+      - name: Run the yana-studio tests
+        working-directory: yana-studio
+        run: node --test --test-timeout=120000 test/*.test.cjs
+
+  yana-ide:
+    name: yana-ide tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkout Yana-AI (the pack the Control Center tests inspect)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Horonomos-laps/Yana-AI
+          ref: main
+          path: yana-ai
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 (node24)
+        with:
+          node-version: '24'
+
+      - name: Install the Office tool dependencies (lockfile only, no lifecycle scripts)
+        working-directory: yana-ide/extensions/yana-agent/office
+        run: npm ci --ignore-scripts
+
+      - name: Run the yana-ide tests
+        working-directory: yana-ide
+        run: node --test --test-timeout=120000 tests/*.test.cjs
