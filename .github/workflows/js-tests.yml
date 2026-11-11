@@ -1,0 +1,106 @@
+name: JS tests
+
+# The Node test files in yana-studio/test and yana-ide/tests were not run by any workflow, so a
+# change could break them without a red check. Repositories are public, so Actions minutes are free.
+#
+# Some tests compare Studio with files that live in Yana-AI (the Rust capability registry, the
+# model catalog, COMMANDS.md, the hook and lock files). Yana-AI is checked out next to this
+# repository and YANA_ROOT_DIR points at it. CI is set by GitHub, which makes a missing checkout a
+# failure instead of a skipped test.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CI: "true"
+  YANA_ROOT_DIR: ${{ github.workspace }}/yana-ai
+
+jobs:
+  yana-studio:
+    name: yana-studio tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkout Yana-AI (sources the tests compare against)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Horonomos-laps/Yana-AI
+          ref: main
+          path: yana-ai
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 (node24)
+        with:
+          node-version: '24'
+
+      - name: Install (lockfile only, no lifecycle scripts)
+        working-directory: yana-studio
+        run: npm ci --ignore-scripts
+
+      - name: Run the yana-studio tests
+        working-directory: yana-studio
+        run: node --test --test-timeout=120000 test/*.test.cjs
+
+  yana-ide:
+    name: yana-ide tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkout Yana-AI (the pack the Control Center tests inspect)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Horonomos-laps/Yana-AI
+          ref: main
+          path: yana-ai
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 (node24)
+        with:
+          node-version: '24'
+
+      - name: Install the Office tool dependencies (lockfile only, no lifecycle scripts)
+        working-directory: yana-ide/extensions/yana-agent/office
+        run: npm ci --ignore-scripts
+
+      # office-typst.test.cjs compiles real PDFs, and the extension looks for the binary in
+      # /usr/local/bin. The release archive is pinned by version and by SHA-256.
+      - name: Install Typst 0.15.1
+        run: |
+          set -euo pipefail
+          curl -fsSL -o typst.tar.xz https://github.com/typst/typst/releases/download/v0.15.1/typst-x86_64-unknown-linux-musl.tar.xz
+          echo "a6d077d0a95eed5a2eba715b2dae06be954f624ccbf85758a03f389ded33118c  typst.tar.xz" | sha256sum --check
+          tar -xJf typst.tar.xz
+          sudo install -m 0755 typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst
+          typst --version
+
+      # governance-bridge.test.cjs runs the real yana-rt in a temporary project. Build it from the
+      # Yana-AI checkout the same way yana-studio-desktop.yml does.
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable branch, resolved 2026-08-16
+
+      - name: Build yana-rt
+        working-directory: yana-ai
+        run: cargo build --release --features cli --bin yana-rt
+
+      - name: Put yana-rt where the extension looks for it
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          cp yana-ai/target/release/yana-rt "$HOME/.local/bin/yana-rt"
+          "$HOME/.local/bin/yana-rt" --version
+
+      - name: Run the yana-ide tests
+        working-directory: yana-ide
+        run: node --test --test-timeout=120000 tests/*.test.cjs

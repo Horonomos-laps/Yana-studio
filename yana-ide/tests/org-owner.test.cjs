@@ -14,6 +14,9 @@ const OWNER = "horonomos-laps";
 const OLD_OWNER = "yanacuti1121";
 const OUR_REPOSITORIES = ["yana-ai", "yana-web", "yana-studio"];
 const SKIP_DIRECTORIES = new Set([".git", "node_modules", "target", "dist", "build", "vendor"]);
+// The js-tests workflow checks Yana-AI out into ./yana-ai for the parity tests. That is another
+// repository's content, so it must not count as this repository's URLs.
+const YANA_AI_CHECKOUT = path.join(REPO_ROOT, "yana-ai");
 const BINARY_SUFFIXES = new Set([".png", ".jpg", ".jpeg", ".gif", ".ico", ".icns", ".zip", ".woff", ".woff2", ".node", ".lock"]);
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const MIN_FILES = 100; // a Studio checkout holds several hundred files; fewer means REPO_ROOT is wrong
@@ -28,6 +31,7 @@ function textFiles(directory, found = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     if (SKIP_DIRECTORIES.has(entry.name)) continue;
     const full = path.join(directory, entry.name);
+    if (full === YANA_AI_CHECKOUT) continue;
     if (entry.isDirectory()) {
       textFiles(full, found);
     } else if (

@@ -5,6 +5,16 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
+
+// Three tests compare Studio with the Rust sources and COMMANDS.md of Yana-AI. This repository does
+// not hold them, so look for a Yana-AI checkout: YANA_ROOT_DIR, or the old monorepo position three
+// levels up. Locally the comparison is skipped when none is found; in CI (CI is set) it must run
+// and fail loudly instead.
+const yanaAiRoot = process.env.YANA_ROOT_DIR || path.resolve(__dirname, "../../..");
+const yanaAiPath = (...parts) => path.join(yanaAiRoot, ...parts);
+const needsYanaAi = fs.existsSync(yanaAiPath("src", "model", "catalog.rs"))
+  ? {}
+  : { skip: process.env.CI ? false : "set YANA_ROOT_DIR to a Yana-AI checkout" };
 const {
   Projects,
   parseStatus,
@@ -109,9 +119,9 @@ test("token usage keeps provider-reported rounds and honest totals", () => {
   assert.equal(summary.lastRecordedAt, "2026-09-08T11:00:00.000Z");
 });
 
-test("Studio capability surface stays aligned with Rust registry", () => {
+test("Studio capability surface stays aligned with Rust registry", needsYanaAi, () => {
   const source = fs.readFileSync(
-    path.join(__dirname, "../../../src/capability/registry_data.rs"),
+    yanaAiPath("src", "capability", "registry_data.rs"),
     "utf8",
   );
   const names = [
@@ -121,14 +131,13 @@ test("Studio capability surface stays aligned with Rust registry", () => {
     CAPABILITIES.map(([name]) => name),
     names,
   );
-  assert.equal(names.length, 13);
+  // Floor, not an exact count: the registry grows (harness.audit made it 14), and the deepEqual above
+  // already proves Studio lists every capability the Rust registry has, in the same order.
+  assert.ok(names.length >= 13, "the Rust registry lost capabilities");
 });
 
-test("command reference parser reads real CLI tables", () => {
-  const markdown = fs.readFileSync(
-    path.join(__dirname, "../../../COMMANDS.md"),
-    "utf8",
-  );
+test("command reference parser reads real CLI tables", needsYanaAi, () => {
+  const markdown = fs.readFileSync(yanaAiPath("COMMANDS.md"), "utf8");
   const commands = parseCommands(markdown);
   assert.ok(commands.length > 50);
   assert.ok(commands.some((entry) => entry.command === "yana-ai doctor --fix"));
@@ -1047,9 +1056,9 @@ test("cloud discovery excludes non-chat model families", () => {
     ["gpt-5"],
   );
 });
-test("Studio provider catalog stays aligned with the canonical Rust catalog", () => {
+test("Studio provider catalog stays aligned with the canonical Rust catalog", needsYanaAi, () => {
   const source = fs.readFileSync(
-    path.resolve(__dirname, "../../../src/model/catalog.rs"),
+    yanaAiPath("src", "model", "catalog.rs"),
     "utf8",
   );
   const block = source.match(
@@ -1071,18 +1080,9 @@ test("Studio provider catalog stays aligned with the canonical Rust catalog", ()
   assert.equal(publicCatalog().at(-1).canonical, false);
   assert.throws(() => providerById("invented"), /Unsupported/);
   const implementations = [
-    fs.readFileSync(
-      path.resolve(__dirname, "../../../src/chat/anthropic.rs"),
-      "utf8",
-    ),
-    fs.readFileSync(
-      path.resolve(__dirname, "../../../src/chat/gemini.rs"),
-      "utf8",
-    ),
-    fs.readFileSync(
-      path.resolve(__dirname, "../../../src/chat/openai_compat.rs"),
-      "utf8",
-    ),
+    fs.readFileSync(yanaAiPath("src", "chat", "anthropic.rs"), "utf8"),
+    fs.readFileSync(yanaAiPath("src", "chat", "gemini.rs"), "utf8"),
+    fs.readFileSync(yanaAiPath("src", "chat", "openai_compat.rs"), "utf8"),
   ].join("\n");
   for (const provider of PROVIDERS) {
     const model = provider.defaultModel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
