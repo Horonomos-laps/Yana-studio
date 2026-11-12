@@ -1,122 +1,118 @@
-# Yana Studio and Yana app
+<h1 align="center">Yana Studio</h1>
 
-Source for the Yana desktop apps. They were split out of the main repository,
-[Yana-AI](https://github.com/Horonomos-laps/Yana-AI), which keeps the Rust runtime
-(`yana-rt`), the `core/` rules and hooks, and the PyPI and crates.io packages.
+<p align="center">
+  <strong>The desktop apps of the Yana ecosystem.</strong><br>
+  One window for the files, terminals, chat and tasks of a real project, with Yana deciding what the AI may do.
+</p>
 
-## What is here
+<p align="center">
+  <img src="https://img.shields.io/badge/macOS-SwiftUI_app-000000?style=flat-square&logo=apple" alt="macOS SwiftUI app">
+  <img src="https://img.shields.io/badge/Studio-Electron-47848f?style=flat-square&logo=electron" alt="Studio on Electron">
+  <img src="https://img.shields.io/badge/IDE-Code--OSS-007acc?style=flat-square" alt="IDE on Code-OSS">
+  <img src="https://img.shields.io/badge/license-Apache--2.0-2563eb?style=flat-square" alt="Apache 2.0 license">
+</p>
 
-| Directory | What it is |
-|---|---|
-| `yana-app/` | The native macOS app (SwiftUI). Its updater reads the releases of this repository whose tag starts with `app-v`. |
-| `yana-studio/` | Yana Studio, an Electron app. See its own README. Windows and Linux builds: `.github/workflows/yana-studio-desktop.yml`. The native macOS part (`yana-studio/native-macos`): `.github/workflows/native-macos.yml`. |
-| `yana-ide/` | Yana overrides on top of Code-OSS (VS Code). It holds no upstream code. See its own README. |
-| `src/`, `Cargo.toml`, `docs/`, `reference/` | The earlier terminal prototype, described at the bottom. A copy now lives in Yana-AI as `tools/yana-terminal/`. |
+<p align="center">
+  <a href="#download">Download</a> ·
+  <a href="#the-apps">The apps</a> ·
+  <a href="#build-from-source">Build</a> ·
+  <a href="#status">Status</a> ·
+  <a href="https://yana.vutam.link">Website</a>
+</p>
+
+---
+
+## The Yana ecosystem
+
+| Repository | Role |
+| --- | --- |
+| **[Yana-AI](https://github.com/Horonomos-laps/Yana-AI)** | Runtime `yana-rt`, governance rules and hooks, CLI, agents and skills |
+| **[yana-web](https://github.com/Horonomos-laps/yana-web)** | The website at yana.vutam.link, and a local web app |
+| **Yana-studio** (this repo) | Desktop apps: native macOS app, Yana Studio, Yana IDE |
+
+The apps are the part you look at. They do not decide anything. Every model request
+goes through `yana-rt` from Yana-AI, so the permission checks are the same in every app
+and cannot be skipped by switching clients. Studio never calls a model provider from
+its UI layer.
+
+## Download
+
+Get the latest build from the [releases page](https://github.com/Horonomos-laps/Yana-studio/releases/latest)
+or from [yana.vutam.link](https://yana.vutam.link). Each release lists its own files,
+so check that your platform is there. Releases tagged `app-v*` are the native macOS
+app, and its updater reads them.
+
+> [!NOTE]
+> The macOS build is ad-hoc signed and **not notarized**, so Gatekeeper warns on first
+> launch. Yana-AI's [macOS install guide](https://github.com/Horonomos-laps/Yana-AI/blob/main/docs/MACOS_INSTALL.md)
+> shows the two official ways to open it. Verify downloads against `SHA256SUMS` when
+> a release provides it.
+
+## The apps
+
+| Directory | App | What it is |
+| --- | --- | --- |
+| [`yana-app/`](yana-app) | **Yana** for macOS | Native SwiftUI app. Its updater reads this repository's `app-v*` releases. |
+| [`yana-studio/`](yana-studio) | **Yana Studio** | Electron workspace for a real project. Windows and Linux builds come from `.github/workflows/yana-studio-desktop.yml`, the native macOS part from `.github/workflows/native-macos.yml`. |
+| [`yana-ide/`](yana-ide) | **Yana IDE** | Yana overrides on top of Code-OSS (VS Code). It holds no upstream code. |
+
+### What Yana Studio gives you
+
+| Area | What you get |
+| --- | --- |
+| **Files and editor** | Open a real folder, search filenames, edit with CodeMirror. Files up to 8 MiB are editable; larger ones open as read-only 256 KiB windows. Saves detect outside changes before overwriting. |
+| **Terminals** | Real PTY sessions in tabs, or a grid of up to 12. |
+| **Git** | Read-only status, worktrees and diffs. Stage and commit are deliberately not AI tools. |
+| **Chat** | Streamed through `yana-rt`, saved conversations, stop button, approval prompts, token usage. |
+| **Models** | Every `yana-rt` provider plus a custom OpenAI-compatible endpoint, and a local manager for Ollama, LM Studio, llama.cpp, 9Router and similar. API keys reach Rust over stdin and sit encrypted in the OS keystore, never in workspace files. |
+| **Tasks** | Backed by the real `yana-rt task` store. Marking a task done requires evidence, and `blocked` is computed by the runtime. |
+| **Design canvas** | Native canvas with components, phone and desktop screens, layers, undo and redo, and guarded AI proposals. |
+| **Governance telemetry** | What was allowed, what was blocked, and why. |
+
+Studio is a new app, not a reskin of the older Yana Desktop. It was built on a real
+workspace first, with no fake numbers or dead buttons. Per-screen status is in
+[`yana-studio/SCREEN-STATUS.md`](yana-studio/SCREEN-STATUS.md).
+
+## Build from source
+
+Studio needs Node 24 or newer and a C++ toolchain for `node-pty` (Xcode command-line
+tools on macOS; compiler, make and Python on Linux; Visual Studio C++ and the Windows
+SDK on Windows). It also needs a `yana-rt` binary built from Yana-AI.
+
+```bash
+git clone https://github.com/Horonomos-laps/Yana-AI.git
+cargo build --release --manifest-path Yana-AI/Cargo.toml    # produces yana-rt
+
+cd Yana-studio/yana-studio
+npm ci
+npm run rebuild
+npm run stage:runtime -- /absolute/path/to/Yana-AI/target/release/yana-rt
+npm start
+npm start -- --project /path/to/project    # open a project directly
+```
+
+`stage:runtime` checks that the binary answers a JSON error for empty input, copies it
+for the right OS and architecture, and records its SHA-256 in a manifest. That is a
+minimal protocol check, not an end-to-end test. Build the runtime from a current
+Yana-AI checkout: an old binary does not speak the newer protocol.
 
 ## Status
 
-- The three app directories are copies from Yana-AI (`tools/yana-app`, `tools/yana-studio`, `tools/yana-ide`). Nothing has been built from this repository yet, and the two workflows have not run here.
-- Studio builds need the Rust runtime, so the workflow checks out Yana-AI beside this repository to build `yana-rt`.
-- No release tagged `app-v*` exists here yet, so the app updater finds no update. Studio downloads (`studio-v*` tags) are still on the Yana-AI releases page until the first tag is made here.
-- The `npm run dist:*` scripts in `yana-studio/` still assume the Yana-AI directory layout. Use the workflow to build for now.
-- The website and the web server live in [yana-web](https://github.com/Horonomos-laps/yana-web).
+- **Source:** the three apps were moved here from Yana-AI. The macOS app release `app-v1.0.0` is published here. Nothing else has been released from this repository yet, and the two build workflows are new.
+- **Partial:** Studio does not yet match every screen of the earlier desktop app. Not built yet: device registry, agent sessions screen, mobile pairing, SSH and Docker execution, permission-lease UI, signed auto-update.
+- **Known limits:** the `npm run dist:*` scripts in `yana-studio/` still assume the Yana-AI directory layout, so use the workflow to build packages for now. The desktop build fails until the repository secret `YANA_GOOGLE_CLIENT_SECRET` is set in the repository settings.
 
-## Legacy: Yana Terminal AI Workspace
+## Legacy: Yana Terminal prototype
 
-A terminal-native, local-first AI workspace for developers.
+The root of this repository still holds an earlier terminal prototype (`src/`,
+`Cargo.toml`, `DESIGN.md`, `UI_ENGINES.md`, `reference/`). It is a Ratatui UI with mock
+data, kept to validate the interaction model. A copy lives in Yana-AI as
+`tools/yana-terminal/`. Run it with `cargo run`.
 
-This repository is currently an **UI/UX incubator** for the next Yana terminal experience. The current MVP uses mock data so the interaction model can be validated before connecting it back to `yana-rt` and the existing local-AI stack in `Yana-AI/tools/yana-web`.
+## More
 
-### Current MVP
+[Yana-AI](https://github.com/Horonomos-laps/Yana-AI) · [yana-web](https://github.com/Horonomos-laps/yana-web) · [yana.vutam.link](https://yana.vutam.link)
 
-- Transcript-first interface
-- Adaptive activity and plan sidebar
-- Smart Scope overlay
-- Plan overlay
-- Keyboard-first composer
-- Local runtime/model status
-- High-contrast terminal theme
-- SPDX copyright headers
-
-### Run
-
-```bash
-cargo run
-```
-
-### Controls
-
-| Key | Action |
-|---|---|
-| `Ctrl+S` | Open Smart Scope |
-| `Ctrl+P` | Open Plan Tracker |
-| `Tab` | Toggle sidebar |
-| `Enter` | Submit mock prompt / close overlay |
-| `Esc` | Close overlay / quit |
-| `Ctrl+C` | Quit |
-
-### Architecture boundary
-
-The MVP intentionally implements only the terminal presentation layer and mock state:
-
-```text
-src/app/      interaction state and keyboard events
-src/domain/   UI-facing data models
-src/ui/       adaptive Ratatui rendering
-reference/    legacy code for study only
-```
-
-Provider adapters, model downloads, runtime management, safety guards, and session storage will not be duplicated here. They will be connected later through a small bridge to the existing Yana systems.
-
-### Project direction
-
-- Local-first and privacy-first
-- Scope before deep repository scanning
-- Evidence for code claims
-- Review before applying changes
-- Capability-based model support
-- Terminal-native rather than a GUI drawn with characters
-
-### Authorship
-
-Original concept, product direction, architecture, and interaction design by **Vũ Văn Tâm**.
-
-AI tools may assist with implementation, testing, documentation, and review. Accepted changes remain under maintainer control.
-
-Licensed under Apache-2.0.
-
-### UI engine surface
-
-The terminal now exposes fourteen deliberately UI-facing engines:
-
-1. Chat
-2. Composer
-3. Render
-4. Layout
-5. Workflow
-6. Provider
-7. Session
-8. Storage
-9. Search
-10. Command
-11. Context View
-12. Attachment
-13. Notification
-14. Theme
-
-These engines coordinate terminal state and mock interaction only. They do not replace Yana Core, execute shell commands, mutate the workspace, or persist credentials.
-
-### MVP commands
-
-```text
-/help
-/engines
-/clear
-/new
-/provider [name]
-/search <text>
-/attach <workspace-relative-path>
-/theme
-/render
-/save
-```
+Original concept, product direction, architecture and interaction design by **Vũ Văn Tâm**.
+AI tools may assist with implementation, testing, documentation and review; accepted
+changes stay under maintainer control. Licensed under [Apache 2.0](LICENSE).
