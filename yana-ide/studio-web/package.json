@@ -47,7 +47,7 @@
 		"input-otp": "1.5.0",
 		"lucide-react": "0.564.0",
 		"mermaid": "12.3.0",
-		"react-day-picker": "9.13.2",
+		"react-day-picker": "10.0.2",
 		"react-hook-form": "7.91.0",
 		"react-resizable-panels": "2.1.9",
 		"shiki": "4.6.0",
