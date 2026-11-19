@@ -100,6 +100,10 @@ private let chatRows: [StringRow] = [
 	StringRow("chat.approveTitle", "Yana cần bạn duyệt", "Yana needs your approval", "Yana가 승인을 요청합니다"),
 	StringRow("chat.allow", "Cho phép", "Allow", "허용"),
 	StringRow("chat.deny", "Từ chối", "Deny", "거부"),
+	StringRow("chat.allowMore", "Nhớ lại…", "Remember…", "기억…"),
+	StringRow("chat.allowSession", "Cho phép lệnh này trong phiên này", "Allow this command for this session", "이 세션에서 이 명령 허용"),
+	StringRow("chat.allowAlways", "Luôn cho phép lệnh này", "Always allow this command", "이 명령 항상 허용"),
+	StringRow("chat.allowNote", "Chỉ đúng lệnh này, không phải lệnh tương tự. Thu hồi bằng yana-rt lease revoke.", "Only this exact command, not similar ones. Revoke with yana-rt lease revoke.", "정확히 이 명령만 해당합니다. yana-rt lease revoke로 취소할 수 있습니다."),
 	StringRow("chat.deniedBy", "Bị chặn", "Blocked", "차단됨"),
 ]
 
