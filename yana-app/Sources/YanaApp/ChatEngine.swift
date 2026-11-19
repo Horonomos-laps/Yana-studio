@@ -23,6 +23,8 @@ struct ChatLine: Identifiable {
 	var text: String
 	var error: String? = nil
 	var approval: ApprovalAsk? = nil
+	// Whether the answer to an approval was remembered, shown under the reply that followed it.
+	var grantNotice: GrantNotice? = nil
 	// Tokens reported by yana-rt's `metrics` events for this reply (0 until one arrives).
 	var inputTokens = 0
 	var outputTokens = 0
@@ -283,7 +285,7 @@ final class ChatEngine: ObservableObject {
 	}
 
 	// The human's answer to the latest open approval card.
-	func decide(_ approved: Bool) {
+	func decide(_ approved: Bool, _ scope: ApprovalScope) {
 		guard !running,
 		      let index = lines.lastIndex(where: { $0.approval != nil && $0.approval?.decided == nil }),
 		      let ask = lines[index].approval else { return }
@@ -291,6 +293,11 @@ final class ChatEngine: ObservableObject {
 		lines.append(ChatLine(role: .assistant, text: ""))
 		// Resume with the provider of the paused turn, even if the chip was changed since.
 		var payload: [String: Any] = ["approval_id": ask.id, "decision": approved, "decided_by": "human:yana-app"]
+		// An older yana-rt refuses a request with a field it does not know, so "once" sends nothing extra, and a
+		// longer scope is sent only for an approval of a command and only to a runtime that understands it.
+		if approved, scope != .once, ask.capability == RtClient.rememberableTool, RtClient.supportsApprovalScopes {
+			payload["scope"] = scope.rawValue
+		}
 		if let key = AppSettings.shared.apiKey(turnProvider) { payload["api_key"] = key }
 		start(["chat", "--resume-approval", "--provider", turnProvider], input: payload)
 	}
@@ -370,6 +377,8 @@ final class ChatEngine: ObservableObject {
 				id: event["approval_id"] as? String ?? "",
 				capability: event["capability"] as? String ?? "",
 				reason: event["reason"] as? String ?? "")
+		case "grant_outcome":
+			lines[last].grantNotice = GrantNotice.from(event)
 		case "metrics":
 			// One event per model call; a turn with tool rounds has several, so they add up.
 			lines[last].inputTokens += (event["input_tokens"] as? NSNumber)?.intValue ?? 0

@@ -487,7 +487,7 @@ struct ChatHome: View {
 struct MessageView: View {
 	let line: ChatLine
 	let running: Bool
-	let decide: (Bool) -> Void
+	let decide: (Bool, ApprovalScope) -> Void
 
 	var body: some View {
 		if line.role == .user {
@@ -528,6 +528,9 @@ struct MessageView: View {
 					Text(L("chat.thinking")).font(.system(size: 14)).foregroundStyle(FB.textTertiary)
 				}
 				if let error = line.error { FBAlert(kind: .error, text: error, closable: false) }
+				if let notice = line.grantNotice {
+					FBAlert(kind: notice.remembered ? .success : .warning, text: notice.text, closable: false)
+				}
 				if let ask = line.approval { ApprovalCard(ask: ask, running: running, decide: decide) }
 				if let used = line.memoryUsed {
 					Label(used, systemImage: "brain").font(.fbCaption).foregroundStyle(FB.textTertiary)
@@ -588,7 +591,10 @@ final class Speaker: NSObject, ObservableObject, NSSpeechSynthesizerDelegate {
 struct ApprovalCard: View {
 	let ask: ApprovalAsk
 	let running: Bool
-	let decide: (Bool) -> Void
+	let decide: (Bool, ApprovalScope) -> Void
+
+	// Only a command can be remembered, and only when the installed yana-rt understands the answer.
+	private var canRemember: Bool { ask.capability == RtClient.rememberableTool && RtClient.supportsApprovalScopes }
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 10) {
@@ -602,8 +608,19 @@ struct ApprovalCard: View {
 					.foregroundStyle(decided ? FB.successText : FB.errorText)
 			} else {
 				HStack(spacing: 8) {
-					FBButton(title: L("chat.allow"), variant: .primary, size: .small) { decide(true) }
-					FBButton(title: L("chat.deny"), variant: .secondary, size: .small) { decide(false) }
+					FBButton(title: L("chat.allow"), variant: .primary, size: .small) { decide(true, .once) }
+					if canRemember {
+						Menu {
+							Button(L("chat.allowSession")) { decide(true, .session) }
+							Button(L("chat.allowAlways")) { decide(true, .always) }
+						} label: {
+							Text(L("chat.allowMore")).font(.fbCaption)
+						}
+						.menuStyle(.borderlessButton)
+						.fixedSize()
+						.help(L("chat.allowNote"))
+					}
+					FBButton(title: L("chat.deny"), variant: .secondary, size: .small) { decide(false, .once) }
 				}
 				.disabled(running)
 			}
