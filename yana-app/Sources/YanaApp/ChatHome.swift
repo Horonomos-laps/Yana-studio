@@ -315,7 +315,13 @@ struct ChatHome: View {
 					.help(L("chat.modeHelp"))
 					.onTapGesture { if !engine.running { engine.planMode.toggle() } }
 				// Auto: yana-rt leases let commands and file edits run without a click per call, for a set time.
-				AutoRunChip(store: AutoRunStore.shared, folder: engine.workspace)
+				// With a yana-rt that has the control levels and the away mode, one chip holds both; the
+				// older leases-based Auto chip stays for a runtime that does not.
+				if RtClient.supportsAutonomyControls {
+					AwayChip(store: AutonomyStore.shared, folder: engine.workspace)
+				} else {
+					AutoRunChip(store: AutoRunStore.shared, folder: engine.workspace)
+				}
 				Spacer(minLength: 8)
 				// Reasoning depth: yana-rt's headless adapter has no such parameter, so it is shown but off.
 				Chip(icon: "layers", title: L("chat.reasoning"))
