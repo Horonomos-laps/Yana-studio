@@ -23,6 +23,8 @@ struct ChatLine: Identifiable {
 	var text: String
 	var error: String? = nil
 	var approval: ApprovalAsk? = nil
+	// Whether the answer to an approval was remembered, shown under the reply that followed it.
+	var grantNotice: GrantNotice? = nil
 	// Tokens reported by yana-rt's `metrics` events for this reply (0 until one arrives).
 	var inputTokens = 0
 	var outputTokens = 0
@@ -375,6 +377,8 @@ final class ChatEngine: ObservableObject {
 				id: event["approval_id"] as? String ?? "",
 				capability: event["capability"] as? String ?? "",
 				reason: event["reason"] as? String ?? "")
+		case "grant_outcome":
+			lines[last].grantNotice = GrantNotice.from(event)
 		case "metrics":
 			// One event per model call; a turn with tool rounds has several, so they add up.
 			lines[last].inputTokens += (event["input_tokens"] as? NSNumber)?.intValue ?? 0

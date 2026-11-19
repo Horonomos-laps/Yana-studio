@@ -528,6 +528,9 @@ struct MessageView: View {
 					Text(L("chat.thinking")).font(.system(size: 14)).foregroundStyle(FB.textTertiary)
 				}
 				if let error = line.error { FBAlert(kind: .error, text: error, closable: false) }
+				if let notice = line.grantNotice {
+					FBAlert(kind: notice.remembered ? .success : .warning, text: notice.text, closable: false)
+				}
 				if let ask = line.approval { ApprovalCard(ask: ask, running: running, decide: decide) }
 				if let used = line.memoryUsed {
 					Label(used, systemImage: "brain").font(.fbCaption).foregroundStyle(FB.textTertiary)

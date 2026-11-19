@@ -5,6 +5,33 @@ enum ApprovalScope: String {
 	case once, session, always
 }
 
+// What yana-rt says happened to a request to remember an answer: remembered (with its lease and expiry), or
+// allowed this once only (with the reason). It arrives as a `grant_outcome` event at the start of the resume.
+struct GrantNotice {
+	let remembered: Bool
+	let text: String
+
+	// nil for anything that is not a well-formed grant_outcome, so a malformed event shows nothing.
+	static func from(_ event: [String: Any]) -> GrantNotice? {
+		guard let remembered = event["remembered"] as? Bool else { return nil }
+		if !remembered {
+			let reason = (event["reason"] as? String) ?? ""
+			return GrantNotice(remembered: false, text: reason.isEmpty ? L("chat.notRemembered") : "\(L("chat.notRemembered")): \(reason)")
+		}
+		guard let id = event["lease_id"] as? String, !id.isEmpty else { return nil }
+		var text = "\(L("chat.remembered")) \(expiryText(event["expires_at"] as? String)). \(L("chat.revokeWith")) yana-rt lease revoke \(id)"
+		if let warning = event["warning"] as? String, !warning.isEmpty { text += "\n\(warning)" }
+		return GrantNotice(remembered: true, text: text)
+	}
+
+	// "2026-12-01T09:00:00+00:00" as a short local date; the raw text if it is not a date.
+	static func expiryText(_ iso: String?) -> String {
+		guard let iso, !iso.isEmpty else { return "" }
+		guard let date = ISO8601DateFormatter().date(from: iso) else { return iso }
+		return date.formatted(date: .abbreviated, time: .shortened)
+	}
+}
+
 extension RtClient {
 	// The first yana-rt that reads the `scope` field when a paused turn resumes. An older one refuses the whole
 	// request ("unknown field"), so the app offers "this session" and "always" only when the installed runtime is
