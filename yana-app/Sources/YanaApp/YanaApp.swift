@@ -98,6 +98,7 @@ struct RootView: View {
 			if let release = appUpdater.whatsNew { WhatsNewSheet(release: release) { appUpdater.whatsNew = nil } }
 		}
 		.id(loc.lang)
+		.background { if !rendering { KeepWindowOnClose() } }
 		.environmentObject(engine)
 		.environmentObject(editor)
 		.environmentObject(terminals)
@@ -210,6 +211,8 @@ func renderPNG(to path: String, page: String) {
 
 @main
 struct YanaApp: App {
+	@NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
 	init() {
 		let args = CommandLine.arguments
 		if let index = args.firstIndex(of: "--dmg-background"), index + 1 < args.count {
