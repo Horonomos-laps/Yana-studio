@@ -6,17 +6,30 @@ import AppKit
 // (AppCommands.swift), and that item is what macOS uses to make a window again for an app that has none.
 // Hiding keeps the open chat too. Quit (⌘Q or the Dock menu) still ends the app.
 
+
+
 @MainActor
 enum WindowKeeper {
-	private(set) static weak var window: NSWindow?
+	// Held strongly on purpose: a hidden window must not be released, or there is nothing to bring back.
+	private(set) static var window: NSWindow?
 	private static let closeHandler = CloseHidesWindow()
+	private static var watching: NSKeyValueObservation?
 
 	// Called with the window RootView lives in. Safe to call again: the language switch rebuilds the view.
+	// SwiftUI sets its own window delegate after the view is first placed, so this also watches the delegate
+	// and takes it over again whenever SwiftUI replaces it.
 	static func adopt(_ candidate: NSWindow) {
+		window = candidate
+		takeOver(candidate)
+		watching = candidate.observe(\.delegate, options: [.new]) { observed, _ in
+			Task { @MainActor in takeOver(observed) }
+		}
+	}
+
+	private static func takeOver(_ candidate: NSWindow) {
 		guard candidate.delegate !== closeHandler else { return }
 		closeHandler.original = candidate.delegate
 		candidate.delegate = closeHandler
-		window = candidate
 	}
 
 	// True when it showed the window, so the caller can tell macOS not to try making another one.
