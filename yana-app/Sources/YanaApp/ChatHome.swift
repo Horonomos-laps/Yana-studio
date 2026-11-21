@@ -30,6 +30,8 @@ struct ChatHome: View {
 	@EnvironmentObject private var engine: ChatEngine
 	@State private var text = ""
 	@State private var showModels = false
+	@State private var showKeys = false
+	@State private var keyTarget: KeyTarget? = nil
 	@AppStorage("yana.ui.chatSidebar") private var chatSidebar = true
 	@EnvironmentObject private var terminals: TerminalStore
 	// Starts hidden so the chat gets the whole width; the button at the top right opens it.
@@ -323,10 +325,8 @@ struct ChatHome: View {
 					AutoRunChip(store: AutoRunStore.shared, folder: engine.workspace)
 				}
 				Spacer(minLength: 8)
-				// Reasoning depth: yana-rt's headless adapter has no such parameter, so it is shown but off.
-				Chip(icon: "layers", title: L("chat.reasoning"))
-					.opacity(0.45)
-					.help(L("chat.reasoningNA"))
+				// Reasoning depth: on only for a provider and model yana-rt says take it (Reasoning.swift).
+				ReasoningChip(store: ReasoningStore.shared, engine: engine)
 				Chip(icon: "cpu", title: engine.model.map { "\(engine.provider) · \($0)" } ?? L("model.choose"), trailing: "chevron-down")
 					.onTapGesture { showModels = true }
 					.popover(isPresented: $showModels, arrowEdge: Self.popoverEdge) {
@@ -334,6 +334,17 @@ struct ChatHome: View {
 					}
 					// YANA_OPEN_MODELS=1 opens the model list at launch (to check where it opens in the live window).
 					.onAppear { if ProcessInfo.processInfo.environment["YANA_OPEN_MODELS"] == "1" { showModels = true } }
+				// API keys without going to Settings; the dialog is the one Settings uses.
+				FBIconButton(icon: "key", variant: .ghost, size: .small, tooltip: L("keys.help")) { showKeys = true }
+					.popover(isPresented: $showKeys, arrowEdge: Self.popoverEdge) {
+						ApiKeysPopover { id in showKeys = false; keyTarget = KeyTarget(id: id) }
+					}
+					.sheet(item: $keyTarget) { target in
+						APIKeySheet(provider: target.id, saved: AppSettings.shared.hasKey(target.id), close: { keyTarget = nil }) { key in
+							AppSettings.shared.saveKey(key, for: target.id)
+							keyTarget = nil
+						}
+					}
 				Button(action: engine.running ? engine.stop : send) {
 					FBIcon(name: engine.running ? "stop" : "arrow-up", size: 15, color: FB.onPrimary)
 						.frame(width: 32, height: 32)

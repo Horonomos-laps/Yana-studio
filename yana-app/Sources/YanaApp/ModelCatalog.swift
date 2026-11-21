@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 // The models the user can actually use, asked from each provider with the user's own key:
@@ -23,6 +24,17 @@ final class ModelCatalog: ObservableObject {
 	@Published private(set) var groups: [ProviderModels] = []
 	@Published private(set) var loadedAt: Date? = nil
 	private var loading = false
+	// A key saved or removed while a load is running: the finished load would miss it, so load once more.
+	private var loadAgain = false
+	private var keyWatch: AnyCancellable?
+
+	// Saving or removing a key in Settings reloads the list at once. Without this the list was only built at
+	// launch (and again after five minutes), so a key added later showed no models until the refresh button.
+	init() {
+		keyWatch = AppSettings.shared.$keyVersion.dropFirst().sink { [weak self] _ in
+			Task { @MainActor in self?.refresh() }
+		}
+	}
 
 	nonisolated private static let timeout: TimeInterval = 10
 	nonisolated private static let localTimeout: TimeInterval = 1.5
@@ -60,7 +72,7 @@ final class ModelCatalog: ObservableObject {
 	}
 
 	func refresh() {
-		guard !loading else { return }
+		guard !loading else { loadAgain = true; return }
 		loading = true
 		let settings = AppSettings.shared
 		var plan: [(String, Endpoint?, String?)] = [] // provider, endpoint, key
@@ -95,6 +107,7 @@ final class ModelCatalog: ObservableObject {
 			groups.insert(contentsOf: await locals, at: 0)
 			loadedAt = Date()
 			loading = false
+			if loadAgain { loadAgain = false; refresh() }
 		}
 	}
 

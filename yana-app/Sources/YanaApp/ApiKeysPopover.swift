@@ -1,0 +1,41 @@
+import SwiftUI
+
+// The API keys without a trip to Settings: a key button in the chat bar next to the model chip opens this list.
+// Each provider shows whether a key is saved and offers add, replace or remove; the same dialog as Settings
+// (APIKeySheet) does the typing, and saving a key reloads the model list (ModelCatalog watches keyVersion).
+
+struct ApiKeysPopover: View {
+	@ObservedObject private var settings = AppSettings.shared
+	let edit: (String) -> Void
+
+	private var providers: [ProviderInfo] { providerCatalog.filter { $0.kind != .local } }
+
+	var body: some View {
+		VStack(alignment: .leading, spacing: 8) {
+			Text(L("keys.title")).font(.fbHeading5).foregroundStyle(FB.text)
+			Text(L("keys.sub")).font(.fbCaption).foregroundStyle(FB.textSecondary).fixedSize(horizontal: false, vertical: true)
+			ScrollView {
+				VStack(spacing: 0) {
+					ForEach(providers) { provider in row(provider.id) }
+				}
+			}
+			.frame(height: 260)
+		}
+		.padding(14)
+		.frame(width: 380)
+		.background(FB.canvas)
+	}
+
+	private func row(_ id: String) -> some View {
+		let saved = settings.keyVersion >= 0 && settings.hasKey(id)
+		return HStack(spacing: 8) {
+			Text(id).font(.fbBodyMedium).foregroundStyle(FB.text)
+			Spacer(minLength: 4)
+			Text(saved ? L("set.keySaved") : L("set.keyNone")).font(.fbCaption)
+				.foregroundStyle(saved ? FB.successText : FB.textSecondary)
+			Button(saved ? L("set.keyReplace") : L("set.keyAdd")) { edit(id) }
+			if saved { Button(L("set.remove")) { settings.removeKey(id) } }
+		}
+		.frame(height: 32)
+	}
+}

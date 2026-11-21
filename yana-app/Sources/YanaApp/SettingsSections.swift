@@ -81,7 +81,7 @@ private let keyPages: [String: String] = [
 ]
 
 // The add/replace key dialog: sized to its content, with where to get a key and a show/hide toggle.
-private struct APIKeySheet: View {
+struct APIKeySheet: View {
 	let provider: String
 	let saved: Bool
 	let close: () -> Void

@@ -276,6 +276,8 @@ final class ChatEngine: ObservableObject {
 		}
 		if let value = settings.maxTokensValue { payload["max_tokens"] = value }
 		if let value = settings.temperatureValue { payload["temperature"] = value }
+		// Only a level the current model is known to take; yana-rt refuses anything else.
+		if let level = ReasoningStore.shared.activeLevel { payload["reasoning_effort"] = level.rawValue }
 		// Auto mode: name the lease subject so yana-rt can find the leases the user granted (AutoRun.swift).
 		if AutoRunStore.shared.isOn { payload["agent_id"] = AutoRunStore.subject }
 		turnProvider = provider
