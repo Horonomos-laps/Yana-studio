@@ -34,6 +34,7 @@ enum FeedReader {
 			case .marketplace: return .success(try parseMarketplace(try await get(feed.url, allowedHosts), feed: feed))
 			case .awesomeList: return .success(parseAwesomeList(String(decoding: try await get(feed.url, allowedHosts), as: UTF8.self), feed: feed))
 			case .mcpRegistry: return .success(try await readRegistry(feed, allowedHosts, since: nil) { _ in })
+			case .cliHub: return .success(parseCliHub(try await get(feed.url, allowedHosts), feed: feed))
 			}
 		} catch {
 			return .failure(error)
@@ -52,6 +53,20 @@ enum FeedReader {
 	}
 
 	// MARK: Claude Code marketplace.json
+
+	// CLI-Hub entries (CliHubFeed): what the store shows, plus where the SKILL.md lives so it can be installed.
+	// `parts` carries the CLI's own install command for display only; it is never run.
+	static func parseCliHub(_ data: Data, feed: StoreFeed) -> [StoreItem] {
+		CliHubFeed.parse(data).map { entry in
+			var parts: [String] = []
+			if let command = entry.installCommand, !command.isEmpty { parts.append(command) }
+			if let requires = entry.requires, !requires.isEmpty { parts.append("requires: \(requires)") }
+			return StoreItem(id: "\(feed.id)#\(entry.id)", feed: feed.id, feedLabel: feed.label, kind: .cliHub,
+			                 name: entry.displayName, summary: entry.summary, category: entry.category,
+			                 author: entry.author, link: entry.homepage.flatMap(URL.init(string:)),
+			                 version: entry.version, pin: nil, parts: parts, repo: entry.repo, repoPath: entry.skillDir)
+		}
+	}
 
 	// "https://raw.githubusercontent.com/<owner>/<repo>/<ref>/..." -> "https://github.com/<owner>/<repo>"; nil for any other host.
 	static func marketplaceRepo(_ feedURL: URL) -> String? {

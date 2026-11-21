@@ -61,7 +61,7 @@ struct StoreDetailSheet: View {
 					Text(item.summary.isEmpty ? L("store.noDescription") : item.summary).font(.system(size: 14)).foregroundStyle(FB.text)
 						.textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
 					if !item.parts.isEmpty {
-						section(L(item.kind == .mcpRegistry ? "store.connectHow" : "store.adds")) {
+						section(L(item.kind == .mcpRegistry ? "store.connectHow" : item.kind == .cliHub ? "store.cliInstall" : "store.adds")) {
 							ForEach(item.parts, id: \.self) { part in
 								Text(part).font(.system(size: 12, design: .monospaced)).foregroundStyle(FB.text).textSelection(.enabled)
 							}
@@ -74,7 +74,7 @@ struct StoreDetailSheet: View {
 						if let pin = item.pin, pin != "latest" { row(L("store.pin"), String(pin.prefix(12))) }
 						if let author = item.author { row(L("store.developer"), author) }
 					}
-					Text(L(item.kind == .awesomeList ? "store.chatgptNote" : "store.safetyNote")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+					Text(L(item.kind == .awesomeList ? "store.chatgptNote" : item.kind == .cliHub ? "store.cliHubNote" : "store.safetyNote")).font(.fbCaption).foregroundStyle(FB.textSecondary)
 						.fixedSize(horizontal: false, vertical: true)
 				}
 				.padding(24)
@@ -108,14 +108,14 @@ struct StoreDetailSheet: View {
 					.padding(.horizontal, 20).padding(.vertical, 6).background(Capsule().fill(FB.primary))
 			}
 			.buttonStyle(.plain)
-		case .marketplace where item.repo == nil:
+		case .marketplace where item.repo == nil, .cliHub where item.repo == nil:
 			label(L("plugin.noSource")).help(L("plugin.noSourceHelp"))
-		case .marketplace where pluginInstalled:
+		case .marketplace where pluginInstalled, .cliHub where pluginInstalled:
 			HStack(spacing: 8) {
 				label(L("plugin.installed"))
 				FBButton(title: L("store.remove"), variant: .secondary, size: .small) { removePlugin() }
 			}
-		case .marketplace:
+		case .marketplace, .cliHub:
 			Button(action: startPlugin) {
 				Text(working ? L("plugin.working") : L("store.get")).font(.system(size: 13, weight: .bold)).foregroundStyle(FB.onPrimary)
 					.padding(.horizontal, 20).padding(.vertical, 6).background(Capsule().fill(FB.primary))
@@ -393,6 +393,7 @@ struct StoreSourcesView: View {
 					Text(L("store.kind.marketplace")).tag(StoreFeed.Kind.marketplace)
 					Text(L("store.kind.mcpRegistry")).tag(StoreFeed.Kind.mcpRegistry)
 					Text(L("store.kind.awesomeList")).tag(StoreFeed.Kind.awesomeList)
+				Text(L("store.kind.cliHub")).tag(StoreFeed.Kind.cliHub)
 				}
 				TextField("https://…", text: $url).textFieldStyle(.roundedBorder)
 				TextField(L("store.sourceName"), text: $label).textFieldStyle(.roundedBorder)
