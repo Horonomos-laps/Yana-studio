@@ -7,7 +7,7 @@ import SwiftUI
 // and sends nothing. The choice is sent as `reasoning_effort` on the next turn only when the current model takes it.
 
 enum ReasoningLevel: String, CaseIterable, Identifiable {
-	case low, medium, high
+	case low, medium, high, max
 	var id: String { rawValue }
 	var title: String { L("reasoning.\(rawValue)") }
 }
@@ -81,16 +81,16 @@ struct ReasoningChip: View {
 
 	private var on: Bool { store.support.supported }
 
+	// The chip is always usable, like in other apps. The pick is kept, and goes out only on a model that takes it.
 	private var title: String {
-		guard on, let level = store.activeLevel else { return L("chat.reasoning") }
+		guard let level = store.chosen else { return L("chat.reasoning") }
 		return "\(L("chat.reasoning")): \(level.title)"
 	}
 
 	var body: some View {
-		Chip(icon: "layers", title: title, trailing: on ? "chevron-down" : nil)
-			.opacity(on ? 1 : 0.45)
+		Chip(icon: "layers", title: title, trailing: "chevron-down")
 			.help(on ? L("reasoning.help") : L("reasoning.unavailable"))
-			.onTapGesture { if on { open = true } }
+			.onTapGesture { open = true }
 			.popover(isPresented: $open, arrowEdge: ChatHome.popoverEdge) { menu }
 			.task(id: "\(engine.provider)|\(engine.model ?? "")") {
 				await store.refresh(provider: engine.provider, model: engine.model)
@@ -101,8 +101,10 @@ struct ReasoningChip: View {
 		VStack(alignment: .leading, spacing: 2) {
 			Text(L("chat.reasoning")).font(.fbHeading5).foregroundStyle(FB.text).padding(.bottom, 4)
 			row(nil, L("reasoning.off"))
-			ForEach(store.support.levels) { level in row(level, level.title) }
-			Text(L("reasoning.note")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+			// The levels yana-rt reports for this model (only Claude has Max); all of them while none applies.
+			ForEach(on ? store.support.levels : ReasoningLevel.allCases) { level in row(level, level.title) }
+			Text(on ? L("reasoning.note") : L("reasoning.pending"))
+				.font(.fbCaption).foregroundStyle(on ? FB.textSecondary : FB.warningText)
 				.fixedSize(horizontal: false, vertical: true).padding(.top, 6)
 		}
 		.padding(12)
