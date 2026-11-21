@@ -206,7 +206,7 @@ struct TerminalPage: View {
 			FBIconButton(icon: "close", variant: .ghost, size: .small, tooltip: L("term.hidePanel"), action: close)
 		}
 		.padding(EdgeInsets(top: titleBarClearance, leading: 14, bottom: 8, trailing: 14))
-		.background(FB.chrome)
+		.background(LiquidGlass.active ? Color.clear : FB.chrome)
 	}
 
 	private func exitedBar(_ tab: TerminalTab) -> some View {

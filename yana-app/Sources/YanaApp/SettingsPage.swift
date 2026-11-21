@@ -83,7 +83,7 @@ struct SettingsPage: View {
 				.padding(EdgeInsets(top: 8, leading: 14, bottom: 14, trailing: 14))
 			}
 			.frame(width: 240)
-			.background(SidebarBackground(color: FB.chrome))
+			.sidePanelBackground(color: FB.chrome, leadingInset: 2)
 
 			VStack(alignment: .leading, spacing: 0) {
 				PaneHeader(section: section)

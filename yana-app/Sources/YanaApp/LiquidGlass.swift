@@ -55,7 +55,27 @@ struct YanaGlass<S: Shape>: ViewModifier {
 	}
 }
 
+// A column on the right (terminal, browser, tools): the same floating glass panel as the rail and the chat list,
+// the same radius and the same distance from the window edge. Flat and untouched when Liquid Glass is off.
+struct FloatingPanel: ViewModifier {
+	@AppStorage(LiquidGlass.enabledKey) private var enabled = true
+
+	func body(content: Content) -> some View {
+		if LiquidGlass.active, #available(macOS 26.0, *) {
+			let shape = RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous)
+			content
+				.clipShape(shape)
+				.background { Color.clear.glassEffect(.regular, in: shape) }
+				.padding(EdgeInsets(top: LiquidGlass.panelInset, leading: 2, bottom: LiquidGlass.panelInset, trailing: LiquidGlass.panelInset))
+		} else {
+			content
+		}
+	}
+}
+
 extension View {
+	func floatingPanel() -> some View { modifier(FloatingPanel()) }
+
 	func yanaGlass<S: Shape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
 		modifier(YanaGlass(shape: shape, tint: tint, interactive: interactive))
 	}
@@ -98,12 +118,13 @@ struct GlassBackdrop: View {
 	var body: some View {
 		if LiquidGlass.active {
 			ZStack {
-				LinearGradient(colors: [Color(hex: 0xEEF3FF), Color(hex: 0xF7F1FF), Color(hex: 0xEAF8FF)],
+				// Nearly white, so the glass reads as clear and frosted rather than blue.
+				LinearGradient(colors: [Color(hex: 0xFFFFFF), Color(hex: 0xFAFBFF), Color(hex: 0xF5F8FF)],
 				               startPoint: .topLeading, endPoint: .bottomTrailing)
 				// Radial gradients that fade to clear, so the soft glow needs no blur filter (which some renderers skip).
-				glow(FB.primary.opacity(0.30), center: .topLeading, radius: 620)
-				glow(Color(hex: 0xB58CFF).opacity(0.26), center: .bottomTrailing, radius: 680)
-				glow(Color(hex: 0x5BD6E8).opacity(0.20), center: UnitPoint(x: 0.55, y: 0), radius: 520)
+				glow(FB.primary.opacity(0.07), center: .topLeading, radius: 620)
+				glow(Color(hex: 0xB58CFF).opacity(0.06), center: .bottomTrailing, radius: 680)
+				glow(Color(hex: 0x5BD6E8).opacity(0.05), center: UnitPoint(x: 0.55, y: 0), radius: 520)
 			}
 			.ignoresSafeArea()
 		} else {

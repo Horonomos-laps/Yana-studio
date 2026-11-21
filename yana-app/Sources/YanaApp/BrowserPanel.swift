@@ -109,7 +109,7 @@ struct BrowserPanel: View {
 				}
 			}
 		}
-		.background(FB.canvas)
-		.overlay(alignment: .leading) { FB.divider.frame(width: 1) }
+		.background(LiquidGlass.active ? Color.clear : FB.canvas)
+		.overlay(alignment: .leading) { if !LiquidGlass.active { FB.divider.frame(width: 1) } }
 	}
 }

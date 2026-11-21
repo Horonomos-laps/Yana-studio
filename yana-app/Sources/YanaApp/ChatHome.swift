@@ -200,7 +200,7 @@ struct ChatHome: View {
 					browserView.frame(maxWidth: .infinity)
 				} else {
 					resizeHandle
-					browserView.frame(width: panelWidth).clipped()
+					browserView.floatingPanel().frame(width: panelWidth).clipped()
 				}
 			case .terminal:
 				// Same slot, width, drag handle and expand state as the browser.
@@ -208,7 +208,7 @@ struct ChatHome: View {
 					TerminalPage(expanded: $browserExpanded) { right = .tools }.frame(maxWidth: .infinity)
 				} else {
 					resizeHandle
-					TerminalPage(expanded: $browserExpanded) { right = .tools }.frame(width: panelWidth).clipped()
+					TerminalPage(expanded: $browserExpanded) { right = .tools }.floatingPanel().frame(width: panelWidth).clipped()
 				}
 			case .tools:
 				sidePanel(L("panel.tools"), back: false) {
@@ -234,7 +234,7 @@ struct ChatHome: View {
 
 	// Drag to make the browser wider or narrower (between the min and max widths).
 	private var resizeHandle: some View {
-		FB.divider
+		(LiquidGlass.active ? Color.clear : FB.divider)
 			.frame(width: 5)
 			.contentShape(Rectangle())
 			.onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
@@ -259,8 +259,9 @@ struct ChatHome: View {
 		}
 		.frame(width: Self.panelWidth)
 		.frame(maxHeight: .infinity)
-		.background(FB.chrome)
-		.overlay(alignment: .leading) { FB.divider.frame(width: 1) }
+		.background(LiquidGlass.active ? Color.clear : FB.chrome)
+		.overlay(alignment: .leading) { if !LiquidGlass.active { FB.divider.frame(width: 1) } }
+		.floatingPanel()
 	}
 
 	private var chatColumn: some View {

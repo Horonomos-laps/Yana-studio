@@ -100,6 +100,7 @@ struct RootView: View {
 		}
 		.id(loc.lang)
 		.background { if !rendering { KeepWindowOnClose() } }
+		.background { if !rendering { TrafficLightsAnchor() } }
 		.environmentObject(engine)
 		.environmentObject(editor)
 		.environmentObject(terminals)
@@ -241,6 +242,14 @@ func scheduleWindowSnapshot() {
 		do { try png.write(to: URL(fileURLWithPath: path)) } catch {
 			FileHandle.standardError.write(Data("snapshot: cannot write \(path)\n".utf8))
 			exit(1)
+		}
+		// Where the three window buttons ended up, from the window's top-left corner (to check them without a screenshot).
+		if let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }), let content = window.contentView {
+			for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+				guard let b = window.standardWindowButton(kind) else { continue }
+				let r = b.convert(b.bounds, to: content)
+				print(String(format: "button x %.1f..%.1f  y %.1f..%.1f", r.minX, r.maxX, content.bounds.height - r.maxY, content.bounds.height - r.minY))
+			}
 		}
 		print("snapshot \(path)")
 		exit(0)
