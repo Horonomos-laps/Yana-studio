@@ -30,7 +30,7 @@ struct RootView: View {
 		let start = AppSettings.shared.startPage
 		let wanted = page ?? (start == "ask" ? "Start" : start)
 		// The terminal lives in the chat page's right panel, so "Terminal" opens Chat with that panel.
-		openTerminal = wanted == "Terminal"
+		openTerminal = LaunchPanel.opensTerminal(startPage: wanted)
 		_selected = State(initialValue: openTerminal ? "Chat" : wanted)
 		self.rendering = rendering
 	}
@@ -63,8 +63,8 @@ struct RootView: View {
 	var body: some View {
 		HStack(spacing: 0) {
 			if selected == "Start" {
+				// Both cards go to the chat with the right panel closed; its button opens it (LaunchPanel.swift).
 				StartChooser {
-					terminals.wantsPanel = true
 					selected = "Chat"
 				}
 			} else {

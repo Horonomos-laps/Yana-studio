@@ -9,7 +9,8 @@ import SwiftUI
 struct StartChooser: View {
 	@EnvironmentObject private var engine: ChatEngine
 	@EnvironmentObject private var editor: EditorLauncher
-	let openTerminal: () -> Void
+	// Moves on to the chat. It never opens the right panel: that stays closed until its button is pressed.
+	let start: () -> Void
 
 	var body: some View {
 		VStack(spacing: 28) {
@@ -20,12 +21,12 @@ struct StartChooser: View {
 			}
 			HStack(alignment: .top, spacing: 18) {
 				StartCard(icon: "message", title: L("startup.terminal"), detail: L("startup.terminalDetail"),
-				          note: nil, action: openTerminal)
+				          note: nil, action: start)
 				StartCard(icon: "code", title: L("startup.ide"), detail: L("startup.ideDetail"),
 				          note: L("startup.ideNote")) {
 					editor.open(folder: engine.workspace)
-					// Yana keeps running in its own window (the bridge needs it); it moves on to the terminal.
-					openTerminal()
+					// Yana keeps running in its own window (the bridge needs it); it moves on to the chat.
+					start()
 				}
 			}
 			if case .failed(let why) = editor.status {
