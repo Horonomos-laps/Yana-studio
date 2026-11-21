@@ -5,12 +5,12 @@ import SwiftUI
 // working, so it is visible from any page.
 
 enum RailMetrics {
-	// The window's close, minimize and zoom buttons are drawn by macOS at 9 to 69 pt from the left edge, so the rail
-	// has to be wider than that with room to spare, or the green one hangs over the edge (RailTests measures it).
-	static let width: CGFloat = 80
+	// The window's close, minimize and zoom buttons are moved into the top of the rail (TrafficLights.swift), so the
+	// rail only has to be wider than that row with room to spare (RailTests measures it).
+	static let width: CGFloat = 68
 	// Space above the first item, below the buttons.
 	static let topInset: CGFloat = 52
-	static let itemWidth: CGFloat = 62
+	static let itemWidth: CGFloat = 52
 	static let itemHeight: CGFloat = 50
 	// How many of the first pages form the main group; the others follow after a divider.
 	static let mainGroupSize = 4

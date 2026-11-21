@@ -43,6 +43,8 @@ final class RailTests: XCTestCase {
 		guard let content = window.contentView,
 		      let zoom = window.standardWindowButton(.zoomButton),
 		      let close = window.standardWindowButton(.closeButton) else { throw XCTSkip("no window buttons in this session") }
+		// Where the app puts the buttons (TrafficLightsPlacer), not macOS's own place.
+		TrafficLightsPlacer.apply(to: window, custom: true)
 		let right = zoom.convert(zoom.bounds, to: content).maxX
 		let bottom = content.bounds.height - close.convert(close.bounds, to: content).minY
 		XCTAssertGreaterThan(right, 40, "the buttons were not laid out")

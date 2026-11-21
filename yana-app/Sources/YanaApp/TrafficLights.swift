@@ -8,7 +8,7 @@ import SwiftUI
 
 enum TrafficLights {
 	// Where the first button's top-left corner is, from the window's top-left corner, and the gap between buttons.
-	static let leading: CGFloat = 18
+	static let leading: CGFloat = 12
 	static let top: CGFloat = 21
 	static let step: CGFloat = 15
 	static let size: CGFloat = 14
