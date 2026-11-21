@@ -45,6 +45,8 @@ struct RootView: View {
 			// browser never has it drawn over its own toolbar.
 			ChatHome(openSettings: { selected = "Settings" }, openApprovals: { selected = "Tool approvals" })
 		case "Settings": SettingsPage(back: { selected = lastPage }) { selected = $0 }
+		// YANA_PAGE=Tour shows the guide in the page area, where a snapshot can capture it (a sheet is not captured).
+		case "Tour": OnboardingTourView { selected = "Chat" }
 		case "Tool approvals": ApprovalsPage().padding(.top, 30)
 		case "Overview": HomePage().padding(.top, 30)
 		case "Tasks": TasksPage().padding(.top, 30)

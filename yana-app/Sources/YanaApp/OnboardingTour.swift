@@ -13,18 +13,34 @@ struct TourPage: Identifiable {
 }
 
 enum OnboardingTour {
-	static let seenKey = "yana.onboarding.seen"
+	// The guide grew (chats, voice, shortcuts, the look). `seenKey` is for the current guide; `legacySeenKey` is the
+	// one the first five pages set, so a person who finished those is shown only the new pages, once.
+	static let legacySeenKey = "yana.onboarding.seen"
+	static let seenKey = "yana.onboarding.seen.v2"
 	static let pages: [TourPage] = [
 		TourPage(id: "welcome", layout: .hero, tint: FB.primarySubtle),
 		TourPage(id: "models", layout: .mediaLeft, tint: FB.surfaceTertiary),
 		TourPage(id: "approve", layout: .mediaTop, tint: FB.warningSubtle),
 		TourPage(id: "tools", layout: .mediaRight, tint: FB.successSubtle),
-		TourPage(id: "memory", layout: .mediaTop, tint: FB.primarySubtle, badge: "tour.new"),
+		TourPage(id: "memory", layout: .mediaTop, tint: FB.primarySubtle),
+		TourPage(id: "chats", layout: .mediaLeft, tint: FB.primarySubtle, badge: "tour.new"),
+		TourPage(id: "voice", layout: .mediaRight, tint: FB.warningSubtle, badge: "tour.new"),
+		TourPage(id: "shortcuts", layout: .mediaTop, tint: FB.surfaceTertiary, badge: "tour.new"),
+		TourPage(id: "look", layout: .mediaLeft, tint: FB.successSubtle, badge: "tour.new"),
 	]
 	static let cardSize = CGSize(width: 680, height: 500)
 
 	static var shouldShowAtLaunch: Bool { !UserDefaults.standard.bool(forKey: seenKey) }
-	static func markSeen() { UserDefaults.standard.set(true, forKey: seenKey) }
+	static func markSeen() {
+		UserDefaults.standard.set(true, forKey: seenKey)
+		UserDefaults.standard.set(true, forKey: legacySeenKey)
+	}
+
+	// Where the guide opens: at the first new page for someone who saw the old guide, at the start otherwise.
+	static func startIndex(legacySeen: Bool, seen: Bool, pages: [TourPage] = OnboardingTour.pages) -> Int {
+		guard legacySeen, !seen else { return 0 }
+		return pages.firstIndex { $0.badge != nil } ?? 0
+	}
 }
 
 // The plugin store's own guide: shown on the first visit, and from the "?" button on the store page.
@@ -48,6 +64,13 @@ struct OnboardingTourView: View {
 	@State private var index = ProcessInfo.processInfo.environment["YANA_TOUR_PAGE"]
 		.flatMap(Int.init).map { min(max($0 - 1, 0), OnboardingTour.pages.count - 1) } ?? 0
 	private var page: TourPage { pages[min(index, pages.count - 1)] }
+	// Opens at the new pages for a person who already saw the first guide (OnboardingTour.startIndex).
+	private func openAtNewPages() {
+		guard seenKey == OnboardingTour.seenKey, ProcessInfo.processInfo.environment["YANA_TOUR_PAGE"] == nil else { return }
+		let defaults = UserDefaults.standard
+		index = OnboardingTour.startIndex(legacySeen: defaults.bool(forKey: OnboardingTour.legacySeenKey),
+		                                  seen: defaults.bool(forKey: OnboardingTour.seenKey), pages: pages)
+	}
 	private var isLast: Bool { index >= pages.count - 1 }
 
 	var body: some View {
@@ -57,10 +80,11 @@ struct OnboardingTourView: View {
 		}
 		.frame(width: OnboardingTour.cardSize.width, height: OnboardingTour.cardSize.height)
 		.background(FB.canvas)
+		.onAppear(perform: openAtNewPages)
 		.overlay(alignment: .topTrailing) {
 			Button(action: finish) { Image(systemName: "xmark").font(.system(size: 12, weight: .semibold)) }
 				.buttonStyle(.plain).foregroundStyle(FB.textSecondary)
-				.frame(width: 28, height: 28).background(Circle().fill(.white.opacity(0.9)))
+				.frame(width: 28, height: 28).background(Circle().fill(FB.surface.opacity(0.9)))
 				.padding(12).help(L("tour.skip"))
 		}
 	}

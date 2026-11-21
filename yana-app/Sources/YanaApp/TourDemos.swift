@@ -21,6 +21,10 @@ struct TourMedia: View {
 				case "models": ModelDemo(t: t)
 				case "approve": ApproveDemo(t: t)
 				case "tools": ToolsDemo(t: t)
+				case "chats": ChatsDemo(t: t)
+				case "voice": VoiceDemo(t: t)
+				case "shortcuts": ShortcutsDemo(t: t)
+				case "look": LookDemo(t: t)
 				case "store-browse": StoreBrowseDemo(t: t)
 				case "store-sources": StoreSourcesDemo(t: t)
 				case "store-get": StoreGetDemo(t: t)
@@ -70,15 +74,15 @@ private struct LoopingVideo: NSViewRepresentable {
 }
 
 // Seconds into the current loop of `cycle` seconds.
-private func phase(_ t: Double, _ cycle: Double) -> Double { t.truncatingRemainder(dividingBy: cycle) }
+func phase(_ t: Double, _ cycle: Double) -> Double { t.truncatingRemainder(dividingBy: cycle) }
 // 0 before `start`, 1 after `start + length`, linear between.
-private func ramp(_ p: Double, _ start: Double, _ length: Double = 0.3) -> Double { min(max((p - start) / length, 0), 1) }
+func ramp(_ p: Double, _ start: Double, _ length: Double = 0.3) -> Double { min(max((p - start) / length, 0), 1) }
 
 // macOS window buttons (close, minimize, zoom) for the mini window.
 private let windowLights: [Color] = [Color(hex: 0xFF5F57), Color(hex: 0xFEBC2E), Color(hex: 0x28C840)]
 
 // A small app window frame the demos draw into.
-private struct MiniWindow<Content: View>: View {
+struct MiniWindow<Content: View>: View {
 	@ViewBuilder let content: Content
 
 	var body: some View {
