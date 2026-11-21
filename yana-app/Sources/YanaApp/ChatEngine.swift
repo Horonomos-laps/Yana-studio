@@ -28,6 +28,7 @@ struct ChatLine: Identifiable {
 	// Tokens reported by yana-rt's `metrics` events for this reply (0 until one arrives).
 	var inputTokens = 0
 	var outputTokens = 0
+	var tokensAt: Date? = nil
 	// Thumbnails of the images sent with a user message.
 	var images: [NSImage] = []
 	// Long-term memory: what the reply drew on, and a fact Yana proposes to remember (user decides).
@@ -214,6 +215,7 @@ final class ChatEngine: ObservableObject {
 			restored.error = line.error
 			restored.inputTokens = line.inputTokens
 			restored.outputTokens = line.outputTokens
+			restored.tokensAt = line.at
 			return restored
 		}
 	}
@@ -222,7 +224,7 @@ final class ChatEngine: ObservableObject {
 	func saveToHistory() {
 		guard let title else { return }
 		let saved = lines.filter { !$0.text.isEmpty || $0.error != nil }.map {
-			SavedLine(user: $0.role == .user, text: $0.text, error: $0.error, inputTokens: $0.inputTokens, outputTokens: $0.outputTokens)
+			SavedLine(user: $0.role == .user, text: $0.text, error: $0.error, inputTokens: $0.inputTokens, outputTokens: $0.outputTokens, at: $0.tokensAt)
 		}
 		let firstLine = title.split(separator: "\n").first.map(String.init) ?? title
 		var chat = SavedChat(id: sessionId, title: String(firstLine.prefix(ChatHistoryStore.titleChars)),
@@ -451,6 +453,7 @@ final class ChatEngine: ObservableObject {
 			// One event per model call; a turn with tool rounds has several, so they add up.
 			lines[last].inputTokens += (event["input_tokens"] as? NSNumber)?.intValue ?? 0
 			lines[last].outputTokens += (event["output_tokens"] as? NSNumber)?.intValue ?? 0
+			if lines[last].tokensAt == nil { lines[last].tokensAt = Date() }
 		default:
 			break // runtime_event, cancelled: not shown yet
 		}

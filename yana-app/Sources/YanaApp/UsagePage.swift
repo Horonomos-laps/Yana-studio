@@ -50,6 +50,8 @@ struct UsageData {
 
 struct UsagePage: View {
 	@State private var data: UsageData? = nil
+	@State private var appEntries: [AppUsageEntry] = []
+	private static let topChatCount = 5
 	private static let chartDays = 14
 	private static let recentCount = 15
 	private static let barHeight: CGFloat = 90
@@ -82,12 +84,14 @@ struct UsagePage: View {
 	private func reload() {
 		let workspace = RtClient.workspace()
 		Task { data = await Task.detached { UsageData.load(workspace: workspace) }.value }
+		appEntries = AppUsage.entries(from: ChatHistoryStore.shared.chats)
 	}
 
 	@ViewBuilder
 	private func content(_ data: UsageData) -> some View {
 		let today = Self.utcDay.string(from: Date())
 		let month = String(today.prefix(7))
+		appChatsPanels(today: today, month: month)
 		Panel(title: L("usage.summary")) {
 			summaryRow(L("usage.all"), data.entries)
 			summaryRow(L("usage.today"), data.entries.filter { $0.day == today })
@@ -100,7 +104,7 @@ struct UsagePage: View {
 				Text("\(data.skippedLines) \(L("usage.skipped"))").font(.fbCaption).foregroundStyle(FB.warningText)
 			}
 		}
-		Panel(title: L("usage.daily14")) { dailyChart(data.entries) }
+		Panel(title: L("usage.daily14")) { dailyChart(Dictionary(grouping: data.entries, by: \.day).mapValues { $0.reduce(0) { $0 + $1.tokens } }) }
 		Panel(title: L("usage.byModel"), count: Set(data.entries.map(\.model)).count) {
 			ForEach(byModel(data.entries), id: \.model) { row in
 				HStack {
@@ -126,6 +130,39 @@ struct UsagePage: View {
 		}
 	}
 
+	// This app's own chats, from the saved chats: tokens only, kept apart from the ledger below.
+	@ViewBuilder
+	private func appChatsPanels(today: String, month: String) -> some View {
+		Panel(title: L("usage.appChats")) {
+			appRow(L("usage.all"), appEntries)
+			appRow(L("usage.today"), appEntries.filter { $0.day == today })
+			appRow(L("usage.month"), appEntries.filter { $0.day.hasPrefix(month) })
+			Text(L("usage.appNote")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+			if appEntries.isEmpty { Text(L("usage.appEmpty")).font(.fbBody).foregroundStyle(FB.textSecondary) }
+		}
+		if !appEntries.isEmpty {
+			Panel(title: L("usage.appDaily14")) { dailyChart(AppUsage.byDay(appEntries)) }
+			Panel(title: L("usage.appTop"), count: min(Self.topChatCount, Set(appEntries.map(\.chat)).count)) {
+				ForEach(AppUsage.topChats(appEntries, limit: Self.topChatCount), id: \.chat) { row in
+					HStack {
+						Text(row.chat).font(.fbBodyMedium).foregroundStyle(FB.text).lineLimit(1)
+						Spacer()
+						Text("\(row.tokens.formatted()) \(L("usage.tokens"))").font(.fbCaption).foregroundStyle(FB.textSecondary)
+					}
+				}
+			}
+		}
+	}
+
+	private func appRow(_ label: String, _ entries: [AppUsageEntry]) -> some View {
+		let t = AppUsage.total(entries)
+		return HStack {
+			Text(label).font(.fbBodyMedium).foregroundStyle(FB.text).frame(width: 110, alignment: .leading)
+			Text("\(t.replies) \(L("usage.replies")) · \((t.input + t.output).formatted()) \(L("usage.tokens")) (↑ \(t.input.formatted())  ↓ \(t.output.formatted()))")
+				.font(.fbBody).foregroundStyle(FB.textSecondary)
+		}
+	}
+
 	private func summaryRow(_ label: String, _ entries: [LedgerEntry]) -> some View {
 		let input = entries.reduce(0) { $0 + $1.inputTokens }
 		let output = entries.reduce(0) { $0 + $1.outputTokens }
@@ -144,11 +181,10 @@ struct UsagePage: View {
 	}
 
 	// Tokens per UTC day for the last 14 days, oldest on the left. Days with no calls show an empty bar.
-	private func dailyChart(_ entries: [LedgerEntry]) -> some View {
+	private func dailyChart(_ totals: [String: Int]) -> some View {
 		let days = (0 ..< Self.chartDays).reversed().map { offset in
 			Self.utcDay.string(from: Date().addingTimeInterval(-Double(offset) * 86_400))
 		}
-		let totals = Dictionary(grouping: entries, by: \.day).mapValues { $0.reduce(0) { $0 + $1.tokens } }
 		let peak = max(1, days.map { totals[$0] ?? 0 }.max() ?? 1)
 		return HStack(alignment: .bottom, spacing: 8) {
 			ForEach(days, id: \.self) { day in

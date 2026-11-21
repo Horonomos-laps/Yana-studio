@@ -11,6 +11,8 @@ struct SavedLine: Codable, Equatable {
 	var error: String?
 	var inputTokens = 0
 	var outputTokens = 0
+	// When this reply's token numbers arrived (the Usage page counts it on that day). Missing in older chats.
+	var at: Date? = nil
 }
 
 struct SavedChat: Codable, Identifiable, Equatable {
