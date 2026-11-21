@@ -2,18 +2,22 @@ import AppKit
 import SwiftUI
 
 // The window's close, minimize and zoom buttons. macOS draws them at its default place, 9 pt from the corner and
-// 12 pt across, which looks big and crowded against the icon rail. So they are drawn smaller (a bit over half the
-// size) and centered in the top of the rail, with the same space left and right of the row. TrafficLightsPlacer
+// 12 pt across, which looks big and crowded against the icon rail. So they are drawn smaller (70% of the size, with
+// the space between them cut to match) and centered in the top of the rail, with the same space left and right of the row. TrafficLightsPlacer
 // can put them back where macOS puts them.
 
 enum TrafficLights {
 	// Where the first button's top-left corner is, from the window's top-left corner, and the gap between buttons.
-	static let leading: CGFloat = 6
+	static let leading: CGFloat = 8
 	static let top: CGFloat = 21
-	static let step: CGFloat = 15
+	static let step: CGFloat = 13
 	static let size: CGFloat = 14
 	// The dots are drawn smaller than macOS draws them (12 pt across), so they sit lightly in the rail.
-	static let scale: CGFloat = 0.55
+	static let scale: CGFloat = 0.7
+	// How wide macOS draws a dot inside its 14 pt button; the drawn size is this times the scale.
+	static let dot: CGFloat = 12
+	// The space between two drawn dots. Their buttons overlap by a pt, which is harmless: the drawn dots never do.
+	static var gap: CGFloat { step - dot * scale }
 
 	// What the buttons must sit inside: the icon rail, a flat column against the window's edge. The same place also
 	// lies inside the Settings list's glass panel, which has rounded corners, so fitsInPanel keeps a rounded corner

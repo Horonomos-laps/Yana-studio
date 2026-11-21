@@ -18,7 +18,8 @@ final class TrafficLightsLayoutTests: XCTestCase {
 		let spots = (0 ..< 3).map(TrafficLights.origin)
 		XCTAssertEqual(spots[1].x - spots[0].x, spots[2].x - spots[1].x)
 		XCTAssertTrue(spots.allSatisfy { $0.y == spots[0].y })
-		XCTAssertGreaterThan(TrafficLights.step, TrafficLights.size, "the buttons must not touch")
+		XCTAssertGreaterThan(TrafficLights.gap, 2, "the drawn dots must not touch")
+		XCTAssertLessThan(TrafficLights.gap, TrafficLights.dot * TrafficLights.scale, "the gap must not look wider than a dot")
 	}
 
 	func testTheSpaceLeftAndRightOfTheRowIsAboutEqual() {
