@@ -134,8 +134,12 @@ struct ChatSidebar: View {
 	@State private var renaming: SavedChat?
 	@State private var renameText = ""
 
-	// Pinned chats first, then the newest; filtered by the search box (title and every message).
-	private var shown: [SavedChat] { history.search(query) }
+	// "Pinned" then "Recent", filtered by the search box (title and every message). See ChatSections.swift.
+	@AppStorage("yana.ui.sidebar.pinnedCollapsed") private var pinnedCollapsed = false
+	@AppStorage("yana.ui.sidebar.recentCollapsed") private var recentCollapsed = false
+	@State private var showAllRecent = false
+	private var searching: Bool { !ChatLibrary.normalize(query).isEmpty }
+	private var sections: [ChatSection] { ChatSections.build(chats: history.chats, query: query, showAllRecent: showAllRecent) }
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 4) {
@@ -157,29 +161,14 @@ struct ChatSidebar: View {
 				.help(engine.workspace)
 
 			// Saved chats (ChatHistory.swift), newest first; the open one is highlighted. Right-click deletes.
-			SidebarHeading(L("chat.recent"))
 			searchField
 			ScrollView {
 				LazyVStack(alignment: .leading, spacing: 2) {
 					if query.isEmpty, engine.title != nil && history.chat(engine.currentChatID) == nil {
 						RecentRow(title: engine.title ?? "", date: nil, current: true)
 					}
-					ForEach(shown) { chat in
-						RecentRow(title: chat.displayTitle, date: chat.updated, current: chat.id == engine.currentChatID,
-						          pinned: chat.isPinned, snippet: ChatLibrary.snippet(lines: chat.lines.map(\.text), query: query, radius: 24))
-							.onTapGesture { engine.open(chat) }
-							.contextMenu {
-								Button(chat.isPinned ? L("history.unpin") : L("history.pin")) { history.setPinned(chat.id, !chat.isPinned) }
-								Button(L("history.rename")) { renameText = chat.displayTitle; renaming = chat }
-								Button(L("history.export")) { export(chat) }
-								Divider()
-								Button(L("history.delete"), role: .destructive) {
-									if chat.id == engine.currentChatID { engine.reset() }
-									history.delete(chat.id)
-								}
-							}
-					}
-					if shown.isEmpty && !query.isEmpty {
+					ForEach(sections) { section in sectionView(section) }
+					if sections.isEmpty && !query.isEmpty {
 						Text(L("history.noMatch")).font(.fbCaption).foregroundStyle(FB.textSecondary)
 							.padding(.horizontal, 10).padding(.vertical, 6)
 					} else if history.chats.isEmpty && engine.title == nil {
@@ -201,6 +190,42 @@ struct ChatSidebar: View {
 				renaming = nil
 			}
 		}
+	}
+
+	// One group: a heading that folds it (not while searching, so matches are never hidden), then its chats.
+	@ViewBuilder
+	private func sectionView(_ section: ChatSection) -> some View {
+		let pinned = section.kind == .pinned
+		let collapsed = pinned ? pinnedCollapsed : recentCollapsed
+		SidebarSectionHeader(title: pinned ? L("chat.pinned") : L("chat.recent"), count: section.chats.count + section.hidden,
+		                     collapsed: collapsed && !searching, foldable: !searching) {
+			if pinned { pinnedCollapsed.toggle() } else { recentCollapsed.toggle() }
+		}
+		if searching || !collapsed {
+			ForEach(section.chats) { chat in chatRow(chat) }
+			if section.hidden > 0 {
+				SidebarLink(title: String(format: L("chat.showMore"), section.hidden)) { showAllRecent = true }
+			} else if !pinned && showAllRecent && !searching && section.chats.count > ChatSections.recentLimit {
+				SidebarLink(title: L("chat.showLess")) { showAllRecent = false }
+			}
+		}
+	}
+
+	private func chatRow(_ chat: SavedChat) -> some View {
+		RecentRow(title: chat.displayTitle, date: chat.updated, current: chat.id == engine.currentChatID,
+		          pinned: chat.isPinned, snippet: ChatLibrary.snippet(lines: chat.lines.map(\.text), query: query, radius: 24),
+		          togglePin: { history.setPinned(chat.id, !chat.isPinned) })
+			.onTapGesture { engine.open(chat) }
+			.contextMenu {
+				Button(chat.isPinned ? L("history.unpin") : L("history.pin")) { history.setPinned(chat.id, !chat.isPinned) }
+				Button(L("history.rename")) { renameText = chat.displayTitle; renaming = chat }
+				Button(L("history.export")) { export(chat) }
+				Divider()
+				Button(L("history.delete"), role: .destructive) {
+					if chat.id == engine.currentChatID { engine.reset() }
+					history.delete(chat.id)
+				}
+			}
 	}
 
 	// Searches the titles and every message of the saved chats, ignoring case and accents.
@@ -261,17 +286,26 @@ struct RecentRow: View {
 	let current: Bool
 	var pinned = false
 	var snippet: String? = nil
+	// Pins or unpins from the row itself; nil for a chat that is not saved yet.
+	var togglePin: (() -> Void)? = nil
 	@State private var hover = false
 
 	var body: some View {
 		HStack(spacing: 8) {
-			if pinned { FBIcon(name: "pin", size: 11, color: FB.textTertiary) }
 			VStack(alignment: .leading, spacing: 1) {
 				Text(title).font(.system(size: 13, weight: current ? .semibold : .regular)).foregroundStyle(FB.text).lineLimit(1)
 				if let snippet { Text(snippet).font(.system(size: 11)).foregroundStyle(FB.textTertiary).lineLimit(1) }
 			}
 			Spacer(minLength: 4)
-			if let date {
+			// While the pointer is on the row, the date gives way to a pin button.
+			if hover, let togglePin {
+				Button(action: togglePin) {
+					FBIcon(name: "pin", size: 13, color: pinned ? FB.primaryText : FB.textSecondary)
+						.frame(width: 22, height: 22).contentShape(Rectangle())
+				}
+				.buttonStyle(.plain)
+				.help(pinned ? L("history.unpin") : L("history.pin"))
+			} else if let date {
 				Text(date, format: .relative(presentation: .numeric)).font(.system(size: 10)).foregroundStyle(FB.textTertiary).lineLimit(1)
 			}
 		}
@@ -281,6 +315,50 @@ struct RecentRow: View {
 		.contentShape(Rectangle())
 		.onHover { hover = $0 }
 		.help(title)
+	}
+}
+
+// The heading of a chat group: a chevron, the name and how many chats it holds. Pressing it folds the group.
+struct SidebarSectionHeader: View {
+	let title: String
+	let count: Int
+	let collapsed: Bool
+	let foldable: Bool
+	let toggle: () -> Void
+	@State private var hover = false
+
+	var body: some View {
+		Button(action: toggle) {
+			HStack(spacing: 5) {
+				FBIcon(name: collapsed ? "chevron-right" : "chevron-down", size: 10, color: FB.textTertiary)
+					.opacity(foldable ? 1 : 0)
+				Text(title).font(.system(size: 12, weight: .medium)).foregroundStyle(FB.textSecondary)
+				Text("\(count)").font(.system(size: 11)).foregroundStyle(FB.textTertiary)
+				Spacer(minLength: 0)
+			}
+			.padding(EdgeInsets(top: 12, leading: 8, bottom: 4, trailing: 8))
+			.contentShape(Rectangle())
+		}
+		.buttonStyle(.plain)
+		.disabled(!foldable)
+		.onHover { hover = $0 }
+		.accessibilityLabel(Text("\(title), \(count)"))
+	}
+}
+
+// A quiet text button under a group ("Show more").
+struct SidebarLink: View {
+	let title: String
+	let action: () -> Void
+
+	var body: some View {
+		Button(action: action) {
+			Text(title).font(.system(size: 12)).foregroundStyle(FB.primaryText)
+				.padding(.horizontal, 10).padding(.vertical, 5)
+				.frame(maxWidth: .infinity, alignment: .leading)
+				.contentShape(Rectangle())
+		}
+		.buttonStyle(.plain)
 	}
 }
 

@@ -146,6 +146,10 @@ struct RootView: View {
 		case .openStudio: editor.open(folder: engine.workspace)
 		case .terminal: terminals.wantsPanel = true; selected = "Chat"
 		case .toggleChatList: chatSidebar.toggle(); selected = "Chat"
+		case .pinChat:
+			// Only a chat that is already saved can be pinned; a chat with no messages yet is not.
+			let history = ChatHistoryStore.shared
+			if let chat = history.chat(engine.currentChatID) { history.setPinned(chat.id, !chat.isPinned) }
 		case .uninstall: Uninstaller.run()
 		case .tour: showTour = true
 		default:

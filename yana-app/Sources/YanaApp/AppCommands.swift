@@ -5,7 +5,7 @@ import SwiftUI
 // Titles are read when the menu is built: after a language change they update on the next launch.
 
 enum MenuAction: String {
-	case settings, checkUpdates, newChat, openFolder, openStudio, terminal, toggleChatList, uninstall, tour
+	case settings, checkUpdates, newChat, openFolder, openStudio, terminal, toggleChatList, pinChat, uninstall, tour
 	case page1, page2, page3, page4, page5, page6, page7
 }
 
@@ -40,6 +40,7 @@ struct YanaCommands: Commands {
 		CommandGroup(before: .sidebar) {
 			Button(L("nav.Terminal")) { post(.terminal) }.yanaShortcut(shortcuts.effective(.terminal))
 			Button(L("menu.toggleChatList")) { post(.toggleChatList) }.yanaShortcut(shortcuts.effective(.toggleChatList))
+			Button(L("history.pinToggle")) { post(.pinChat) }.yanaShortcut(shortcuts.effective(.pinChat))
 			Divider()
 			ForEach(Array(railEntries.prefix(7).enumerated()), id: \.offset) { index, entry in
 				Button(L("nav.\(entry.id)")) { post(MenuAction(rawValue: "page\(index + 1)") ?? .page1) }
