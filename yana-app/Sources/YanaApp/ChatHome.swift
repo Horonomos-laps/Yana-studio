@@ -530,9 +530,8 @@ struct MessageView: View {
 		} else {
 			VStack(alignment: .leading, spacing: 10) {
 				if !line.text.isEmpty {
-					Text(markdown(line.text)).font(.system(size: 14)).foregroundStyle(FB.text)
-						.textSelection(.enabled)
-						.frame(maxWidth: .infinity, alignment: .leading)
+						RichText(text: line.text)
+							.frame(maxWidth: .infinity, alignment: .leading)
 					HStack(spacing: 8) {
 						MessageActions(text: line.text)
 						if AppSettings.shared.showTokens, line.inputTokens + line.outputTokens > 0 {
@@ -557,10 +556,6 @@ struct MessageView: View {
 		}
 	}
 
-	private func markdown(_ text: String) -> AttributedString {
-		let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-		return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
-	}
 }
 
 // Under each reply: copy to the clipboard, and read aloud with the macOS voice (on this Mac, no network).
