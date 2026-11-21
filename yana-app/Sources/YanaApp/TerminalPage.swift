@@ -13,6 +13,8 @@ final class TerminalTab: NSObject, ObservableObject, Identifiable, LocalProcessT
 	let view: LocalProcessTerminalView
 	@Published var title: String
 	@Published var exited = false
+	// True when this tab's shell runs under the sandbox (TerminalSandbox.swift).
+	@Published private(set) var sandboxed = false
 
 	// A fixed program this tab runs instead of a shell (the runtime installer), with its title.
 	struct Job {
@@ -39,9 +41,18 @@ final class TerminalTab: NSObject, ObservableObject, Identifiable, LocalProcessT
 		let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
 		var environment = Terminal.getEnvironmentVariables(termName: "xterm-256color", trueColor: true)
 		environment += ["SHELL=\(shell)", "TERM_PROGRAM=Yana"]
+		exited = false
+		// With the sandbox on, the shell is started by sandbox-exec (as a login shell with -l).
+		let policy = TerminalSandbox.current()
+		if policy.enabled && TerminalSandbox.isAvailable {
+			let run = TerminalSandbox.launch(shell: shell, folder: folder, home: NSHomeDirectory(), blockNetwork: policy.blockNetwork)
+			sandboxed = true
+			view.startProcess(executable: run.executable, args: run.args, environment: environment, execName: nil, currentDirectory: folder)
+			return
+		}
+		sandboxed = false
 		// "-zsh" as argv[0] makes it a login shell, the way macOS Terminal starts one (PATH from path_helper).
 		let execName = "-" + URL(fileURLWithPath: shell).lastPathComponent
-		exited = false
 		view.startProcess(executable: shell, args: [], environment: environment, execName: execName, currentDirectory: folder)
 	}
 
@@ -230,7 +241,8 @@ private struct TerminalTabChip: View {
 
 	var body: some View {
 		HStack(spacing: 6) {
-			FBIcon(name: "terminal", size: 13, color: selected ? FB.primaryText : FB.textSecondary)
+			FBIcon(name: tab.sandboxed ? "lock" : "terminal", size: 13, color: selected ? FB.primaryText : FB.textSecondary)
+				.help(tab.sandboxed ? L("sbx.tabHelp") : "")
 			Text(tab.title).font(.system(size: 12, weight: selected ? .semibold : .regular))
 				.foregroundStyle(tab.exited ? FB.textSecondary : FB.text).lineLimit(1)
 			FBIcon(name: "close", size: 11, color: FB.textSecondary)

@@ -150,6 +150,9 @@ struct KeyTarget: Identifiable { let id: String }
 struct TerminalSettings: View {
 	@EnvironmentObject private var terminals: TerminalStore
 	@ObservedObject private var settings = AppSettings.shared
+	// The sandbox applies to terminal tabs opened after the change (TerminalSandbox.swift).
+	@AppStorage(TerminalSandbox.enabledKey) private var sandbox = false
+	@AppStorage(TerminalSandbox.blockNetworkKey) private var sandboxNoNetwork = false
 
 	var body: some View {
 		Form {
@@ -163,6 +166,14 @@ struct TerminalSettings: View {
 				LabeledContent(L("set.termShell"), value: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh")
 				LabeledContent(L("set.termTabs"), value: "\(terminals.tabs.count)")
 			} footer: { SettingsNote(L("set.termNote")) }
+
+			Section {
+				Toggle(L("sbx.enable"), isOn: $sandbox)
+				Toggle(L("sbx.noNetwork"), isOn: $sandboxNoNetwork).disabled(!sandbox)
+				if sandbox && !TerminalSandbox.isAvailable {
+					Text(L("sbx.unavailable")).font(.fbCaption).foregroundStyle(FB.warningText)
+				}
+			} header: { Text(L("sbx.title")) } footer: { SettingsNote(L("sbx.note")) }
 		}
 	}
 }
