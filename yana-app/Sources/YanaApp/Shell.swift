@@ -60,69 +60,8 @@ extension View {
 	func glassCard(radius: CGFloat = 22) -> some View { modifier(GlassCard(radius: radius)) }
 }
 
-struct RailButton: View {
-	let icon: String
-	let label: String
-	let selected: Bool
-	@State private var hover = false
-
-	var body: some View {
-		FBIcon(name: icon, size: 18, color: selected ? FB.primaryText : FB.textSecondary)
-			.frame(width: 40, height: 40)
-			.background(RoundedRectangle(cornerRadius: 12).fill(selected ? FB.canvas : hover ? FB.hoverOnChrome : .clear))
-			.overlay(RoundedRectangle(cornerRadius: 12).stroke(selected ? FB.primaryBorder : .clear, lineWidth: 1))
-			.contentShape(Rectangle())
-			.help(label)
-			.onHover { hover = $0 }
-			.animation(FB.fast, value: hover)
-	}
-}
-
-struct IconRail: View {
-	@Binding var selected: String
-	@EnvironmentObject private var runtime: RuntimeUpdater
-	@EnvironmentObject private var terminals: TerminalStore
-	@EnvironmentObject private var appUpdater: AppUpdater
-	@EnvironmentObject private var engine: ChatEngine
-	@State private var showUpdate = false
-
-	var body: some View {
-		VStack(spacing: 6) {
-			ForEach(railEntries) { entry in
-				RailButton(icon: entry.icon, label: L("nav.\(entry.id)"), selected: selected == entry.id)
-					.onTapGesture { selected = entry.id }
-			}
-			Spacer(minLength: 0)
-			// A newer Yana app on GitHub Releases, kept reachable after "Remind me later".
-			if appUpdater.available != nil && !appUpdater.showSheet {
-				UpdatePill { appUpdater.showSheet = true }.padding(.bottom, 4)
-			}
-			// Install/update notice, folded into one button (red dot) instead of a banner over the content.
-			if runtime.showsBanner {
-				RailButton(icon: "download", label: L("rt.updateButton"), selected: showUpdate)
-					.overlay(alignment: .topTrailing) { Circle().fill(FB.error).frame(width: 8, height: 8).offset(x: -6, y: 6) }
-					.onTapGesture { showUpdate.toggle() }
-					.popover(isPresented: $showUpdate, arrowEdge: .trailing) {
-						// Install runs in the app's own terminal panel; the app keeps working meanwhile.
-						RuntimeBanner(updater: runtime) {
-							runtime.install(in: terminals, folder: engine.workspace)
-							selected = "Chat" // the terminal panel lives on the chat page
-							showUpdate = false
-						}
-						.frame(width: 520).padding(10)
-					}
-			}
-			RailButton(icon: "settings", label: L("nav.Settings"), selected: selected == "Settings")
-				.onTapGesture { selected = "Settings" }
-		}
-		// 76 wide with a 52 pt top inset: the window's close/minimize/zoom buttons (about 70 pt wide, size
-		// fixed by macOS) sit inside the rail instead of spilling over its edge, with room above the icons.
-		.padding(EdgeInsets(top: 52, leading: 18, bottom: 14, trailing: 18))
-		.frame(width: 76)
-		.frame(maxHeight: .infinity)
-		.background(SidebarBackground(color: railColor))
-	}
-}
+// The icon rail (RailViews.swift) draws the far-left column; its colors are shared from here.
+let railBackground = railColor
 
 // The list sidebar of the chat section. It shows only real things: the current project and, when
 // yana-rt can list them, chats. Today there is nothing to list, and it says so instead of inventing rows.
