@@ -53,6 +53,13 @@ enum FeedReader {
 
 	// MARK: Claude Code marketplace.json
 
+	// "https://raw.githubusercontent.com/<owner>/<repo>/<ref>/..." -> "https://github.com/<owner>/<repo>"; nil for any other host.
+	static func marketplaceRepo(_ feedURL: URL) -> String? {
+		guard feedURL.host == "raw.githubusercontent.com" else { return nil }
+		let parts = feedURL.path.split(separator: "/").map(String.init)
+		return parts.count >= 2 ? "https://github.com/\(parts[0])/\(parts[1])" : nil
+	}
+
 	static func parseMarketplace(_ data: Data, feed: StoreFeed) throws -> [StoreItem] {
 		guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
 		      let plugins = json["plugins"] as? [[String: Any]] else { throw FetchError.format }
@@ -64,11 +71,19 @@ enum FeedReader {
 			if p["lspServers"] != nil { parts.append("LSP") }
 			if let url = source?["url"] as? String { parts.append(url) } else if let path = p["source"] as? String { parts.append(path) }
 			let link = (p["homepage"] as? String).flatMap(URL.init(string:)).flatMap { $0.scheme == "https" ? $0 : nil }
+			// Where the code is: a git url (with a pinned sha, maybe a folder), or a folder of the marketplace's own repository.
+			var repo = source?["url"] as? String
+			var repoPath = source?["path"] as? String
+			if repo == nil, let inRepo = p["source"] as? String, let own = marketplaceRepo(feed.url) {
+				repo = own
+				repoPath = inRepo
+			}
 			return StoreItem(id: "\(feed.id)#\(name)", feed: feed.id, feedLabel: feed.label, kind: .marketplace,
 			                 name: (p["displayName"] as? String) ?? prettify(name),
 			                 summary: (p["description"] as? String) ?? "", category: (p["category"] as? String) ?? "other",
 			                 author: (p["author"] as? [String: Any])?["name"] as? String, link: link,
-			                 version: p["version"] as? String, pin: source?["sha"] as? String, parts: parts)
+			                 version: p["version"] as? String, pin: source?["sha"] as? String, parts: parts,
+			                 repo: repo, repoPath: repoPath)
 		}
 	}
 

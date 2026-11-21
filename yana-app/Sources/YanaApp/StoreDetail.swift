@@ -13,6 +13,13 @@ struct StoreDetailSheet: View {
 	@State private var preview: McpInstaller.Entry?
 	@State private var problem: String?
 	@State private var installed = false
+	// Marketplace plugins (PluginInstaller): the plan shown before anything is written, and the work in progress.
+	@State private var pluginPlan: PluginInstaller.Plan?
+	@State private var pluginInstalled = false
+	@State private var working = false
+	@State private var pluginDone: String?
+
+	private var pluginName: String { item.id.split(separator: "#").last.map(String.init) ?? item.name }
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 0) {
@@ -46,6 +53,8 @@ struct StoreDetailSheet: View {
 				VStack(alignment: .leading, spacing: 18) {
 					if let problem { FBAlert(kind: .error, text: problem, closable: false) }
 					if let preview { previewPanel(preview) }
+					if let pluginPlan { pluginPanel(pluginPlan) }
+					if let pluginDone { FBAlert(kind: .success, text: pluginDone, closable: false) }
 					Text(item.summary.isEmpty ? L("store.noDescription") : item.summary).font(.system(size: 14)).foregroundStyle(FB.text)
 						.textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
 					if !item.parts.isEmpty {
@@ -71,7 +80,10 @@ struct StoreDetailSheet: View {
 		}
 		.frame(width: 640, height: 560)
 		.background(FB.canvas)
-		.onAppear { installed = McpInstaller.installedNames(in: engine.workspace).contains(McpInstaller.serverName(item)) }
+		.onAppear {
+			installed = McpInstaller.installedNames(in: engine.workspace).contains(McpInstaller.serverName(item))
+			pluginInstalled = PluginInstaller.isInstalled(pluginName)
+		}
 	}
 
 	@ViewBuilder
@@ -92,9 +104,106 @@ struct StoreDetailSheet: View {
 					.padding(.horizontal, 20).padding(.vertical, 6).background(Capsule().fill(FB.primary))
 			}
 			.buttonStyle(.plain)
+		case .marketplace where item.repo == nil:
+			label(L("plugin.noSource")).help(L("plugin.noSourceHelp"))
+		case .marketplace where pluginInstalled:
+			HStack(spacing: 8) {
+				label(L("plugin.installed"))
+				FBButton(title: L("store.remove"), variant: .secondary, size: .small) { removePlugin() }
+			}
 		case .marketplace:
-			label(L("store.getSoon")).help(L("store.getSoonHelp"))
+			Button(action: startPlugin) {
+				Text(working ? L("plugin.working") : L("store.get")).font(.system(size: 13, weight: .bold)).foregroundStyle(FB.onPrimary)
+					.padding(.horizontal, 20).padding(.vertical, 6).background(Capsule().fill(FB.primary))
+			}
+			.buttonStyle(.plain)
+			.disabled(working)
 		}
+	}
+
+	// Step 1 of Get for a plugin: read what the plugin would add from its pinned commit and show it; nothing is written.
+	private func startPlugin() {
+		problem = nil
+		pluginDone = nil
+		working = true
+		let name = pluginName
+		let version = item.version
+		let repo = item.repo ?? ""
+		let path = item.repoPath
+		let pin = item.pin
+		Task {
+			do {
+				// A plugin inside the marketplace's own repository has no pin of its own: use the commit it is at now.
+				var sha = pin
+				if sha == nil, let own = URL(string: repo)?.pathComponents.filter({ $0 != "/" }), own.count >= 2 {
+					sha = try await PluginInstaller.currentSha(owner: own[0], repo: own[1])
+				}
+				let source = try PluginInstaller.source(url: repo, path: path, sha: sha)
+				pluginPlan = try await PluginInstaller.fetchPlan(plugin: name, version: version, source: source)
+			} catch {
+				problem = error.localizedDescription
+			}
+			working = false
+		}
+	}
+
+	// Step 2: download, scan, and write to ~/.yana-ai/plugins; then the skills and commands appear after "/".
+	private func installPlugin(_ plan: PluginInstaller.Plan) {
+		working = true
+		Task {
+			do {
+				let manifest = try await PluginInstaller.install(plan)
+				pluginInstalled = true
+				pluginPlan = nil
+				engine.reloadSkills()
+				pluginDone = String(format: L("plugin.done"), manifest.components.count, manifest.plugin)
+			} catch {
+				problem = error.localizedDescription
+			}
+			working = false
+		}
+	}
+
+	private func removePlugin() {
+		do {
+			try PluginInstaller.remove(pluginName)
+			pluginInstalled = false
+			pluginDone = nil
+			engine.reloadSkills()
+		} catch {
+			problem = error.localizedDescription
+		}
+	}
+
+	private func pluginPanel(_ plan: PluginInstaller.Plan) -> some View {
+		let skills = plan.components.filter { $0.kind == .skill }.map(\.name)
+		let commands = plan.components.filter { $0.kind == .command }.map(\.name)
+		return VStack(alignment: .leading, spacing: 10) {
+			Text(L("plugin.previewTitle")).font(.system(size: 15, weight: .bold)).foregroundStyle(FB.text)
+			Text(L("plugin.previewWhere")).font(.fbCaption).foregroundStyle(FB.textSecondary).fixedSize(horizontal: false, vertical: true)
+			VStack(alignment: .leading, spacing: 4) {
+				Text("\(L("store.source")): \(plan.source.owner)/\(plan.source.repo)@\(plan.source.sha.prefix(12))")
+				if !skills.isEmpty { Text("\(L("plugin.skills")) (\(skills.count)): \(skills.prefix(12).joined(separator: ", "))\(skills.count > 12 ? "…" : "")") }
+				if !commands.isEmpty { Text("\(L("plugin.commands")) (\(commands.count)): \(commands.prefix(12).map { "/\(plan.plugin):\($0)" }.joined(separator: ", "))\(commands.count > 12 ? "…" : "")") }
+				Text("\(L("plugin.size")): \(max(plan.totalBytes / 1000, 1)) KB")
+			}
+			.font(.system(size: 12, design: .monospaced)).foregroundStyle(FB.text).textSelection(.enabled)
+			.padding(10).frame(maxWidth: .infinity, alignment: .leading)
+			.background(RoundedRectangle(cornerRadius: 8).fill(FB.surfaceTertiary))
+			if !plan.left.isEmpty {
+				Text(String(format: L("plugin.left"), plan.left.map { L("plugin.left.\($0.rawValue)") }.joined(separator: ", ")))
+					.font(.fbCaption).foregroundStyle(FB.warningText).fixedSize(horizontal: false, vertical: true)
+			}
+			Text(L("plugin.safety")).font(.fbCaption).foregroundStyle(FB.textSecondary).fixedSize(horizontal: false, vertical: true)
+			HStack {
+				Spacer()
+				FBButton(title: L("store.cancel"), variant: .secondary, size: .small) { pluginPlan = nil }
+				FBButton(title: working ? L("plugin.working") : L("plugin.install"), variant: .primary, size: .small) { installPlugin(plan) }
+					.disabled(working)
+			}
+		}
+		.padding(14)
+		.background(RoundedRectangle(cornerRadius: 12).stroke(FB.primaryBorder))
 	}
 
 	private func label(_ text: String) -> some View {

@@ -137,6 +137,13 @@ final class ChatEngine: ObservableObject {
 	// A skill's instructions are sent as the turn's system prompt; cap keeps one skill from flooding context.
 	private static let maxSkillChars = 24_000
 
+	// After a plugin is installed or removed: read the skill folders again so the "/" list is current.
+	func reloadSkills() {
+		skills = []
+		skillsLoading = false
+		loadSkillsIfNeeded()
+	}
+
 	func loadSkillsIfNeeded() {
 		guard skills.isEmpty, !skillsLoading else { return }
 		skillsLoading = true
@@ -151,6 +158,13 @@ final class ChatEngine: ObservableObject {
 		guard message.hasPrefix("/") else { return nil }
 		let name = String(message.dropFirst().prefix { !$0.isWhitespace })
 		guard skills.contains(where: { $0.id == name }) else { return nil }
+		// A plugin's skill or command ("plugin:name"): a command's $ARGUMENTS is what follows the name.
+		if let installed = PluginInstaller.components().first(where: { $0.id == name }) {
+			guard let text = try? String(contentsOf: installed.file, encoding: .utf8) else { return nil }
+			let rest = String(message.dropFirst(name.count + 1))
+			let body = installed.kind == .command ? PluginInstaller.expandCommand(text, arguments: rest) : text
+			return (name, String(body.prefix(Self.maxSkillChars)))
+		}
 		let file = URL(fileURLWithPath: RtClient.workspace()).appendingPathComponent("core/skills/\(name)/SKILL.md")
 		guard let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
 		return (name, String(text.prefix(Self.maxSkillChars)))

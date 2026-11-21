@@ -39,6 +39,10 @@ struct StoreItem: Codable, Identifiable, Hashable {
 	let pin: String?        // marketplace: git sha of the plugin source
 	let parts: [String]     // marketplace: what it adds; MCP: how to connect (remote URL / package)
 	var package: McpPackage? = nil // MCP: a local (stdio) npm or PyPI package yana-rt can run; nil = remote only
+	// Marketplace: where the plugin's code is, for "Get" (PluginInstaller). Entries cached before these existed
+	// decode with nil and get them on the next refresh.
+	var repo: String? = nil        // https://github.com/<owner>/<repo>
+	var repoPath: String? = nil    // folder inside that repository
 }
 
 // The one local package of an MCP registry entry that yana-rt can start (it runs stdio servers only).
@@ -206,6 +210,8 @@ final class PluginCatalog: ObservableObject {
 		items = cache.items
 		updated = cache.updated
 		synced = cache.synced ?? [:]
+		// A cache written before entries carried their source has no way to install: load again right away.
+		if items.contains(where: { $0.kind == .marketplace && $0.repo == nil && $0.pin != nil }) { updated = nil }
 	}
 
 	private func writeCache() {
