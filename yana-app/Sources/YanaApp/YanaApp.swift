@@ -9,6 +9,8 @@ struct RootView: View {
 	@StateObject private var engine = ChatEngine()
 	// Whether the chat list sidebar is shown; remembered between launches.
 	@AppStorage("yana.ui.chatSidebar") private var chatSidebar = true
+	// The sidebar button hides the whole left side (the icon rail too), so the chat gets the full window.
+	@AppStorage(LeftSide.hiddenKey) private var railHidden = false
 	@StateObject private var runtime = RuntimeUpdater()
 	// Opens Yana Studio (the IDE layer) on demand; it never starts with this app.
 	@StateObject private var editor = EditorLauncher()
@@ -66,8 +68,8 @@ struct RootView: View {
 					selected = "Chat"
 				}
 			} else {
-				IconRail(selected: $selected)
-				if selected == "Chat" && chatSidebar { ChatSidebar { chatSidebar = false } }
+				if !LeftSide.railVisible(hidden: railHidden, page: selected) { Color.clear.frame(width: 0) } else { IconRail(selected: $selected) }
+				if selected == "Chat" && chatSidebar { ChatSidebar { chatSidebar = false; railHidden = true } }
 				page
 					.frame(maxWidth: .infinity, maxHeight: .infinity)
 			}
@@ -101,6 +103,8 @@ struct RootView: View {
 		.id(loc.lang)
 		.background { if !rendering { KeepWindowOnClose() } }
 		.background { if !rendering { TrafficLightsAnchor() } }
+		.onChange(of: railHidden) { _, _ in LeftSide.publish(hidden: railHidden, page: selected) }
+		.onChange(of: selected) { _, _ in LeftSide.publish(hidden: railHidden, page: selected) }
 		.environmentObject(engine)
 		.environmentObject(editor)
 		.environmentObject(terminals)
@@ -117,7 +121,7 @@ struct RootView: View {
 			if openTerminal { terminals.wantsPanel = true }
 			// The chat list starts hidden at every launch for a wide chat; the sidebar button shows it.
 			// YANA_CHAT_LIST=1 keeps it open (to check it in the live window).
-			if !rendering { chatSidebar = ProcessInfo.processInfo.environment["YANA_CHAT_LIST"] == "1" }
+			if !rendering { chatSidebar = ProcessInfo.processInfo.environment["YANA_CHAT_LIST"] == "1"; railHidden = ProcessInfo.processInfo.environment["YANA_HIDE_LEFT"] == "1" }
 			NSApplication.shared.appearance = NSAppearance(named: .aqua)
 			// Launched from a terminal the app starts without focus; bring it to the front.
 			NSApplication.shared.setActivationPolicy(.regular)
@@ -147,7 +151,7 @@ struct RootView: View {
 			if panel.runModal() == .OK, let url = panel.url { engine.workspace = url.path }
 		case .openStudio: editor.open(folder: engine.workspace)
 		case .terminal: terminals.wantsPanel = true; selected = "Chat"
-		case .toggleChatList: chatSidebar.toggle(); selected = "Chat"
+		case .toggleChatList: chatSidebar.toggle(); if chatSidebar { railHidden = false }; selected = "Chat"
 		case .dictate:
 			// The chat box does the listening, so the chat page has to be showing first.
 			let wait = selected == "Chat" ? 0.0 : 0.35

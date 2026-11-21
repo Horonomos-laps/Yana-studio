@@ -36,6 +36,7 @@ struct ChatHome: View {
 	@State private var showKeys = false
 	@State private var keyTarget: KeyTarget? = nil
 	@AppStorage("yana.ui.chatSidebar") private var chatSidebar = true
+	@AppStorage(LeftSide.hiddenKey) private var railHidden = false
 	@EnvironmentObject private var terminals: TerminalStore
 	// Starts hidden so the chat gets the whole width; the button at the top right opens it.
 	@State private var right: RightMode = .hidden
@@ -182,7 +183,7 @@ struct ChatHome: View {
 				.clipped()
 				.overlay(alignment: .topLeading) {
 					if !chatSidebar {
-						FBIconButton(icon: "sidebar", variant: .ghost, size: .medium, tooltip: L("sidebar.show")) { chatSidebar = true }
+						FBIconButton(icon: "sidebar", variant: .ghost, size: .medium, tooltip: L("sidebar.show")) { chatSidebar = true; railHidden = false }
 							.padding(.top, titleBarClearance).padding(.leading, 14)
 					}
 				}
