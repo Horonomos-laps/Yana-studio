@@ -3,6 +3,7 @@ import SwiftUI
 // Text for Liquid Glass (Settings > General) and the rail's open-page surface.
 
 let glassRows: [StringRow] = [
+	StringRow("set.back", "Quay lại ứng dụng", "Back to the app", "앱으로 돌아가기"),
 	StringRow("set.glass", "Giao diện kính lỏng (Liquid Glass)", "Liquid Glass look", "리퀴드 글래스 스타일"),
 	StringRow("set.glassOff", "Đang dùng giao diện phẳng vì Mac chưa lên macOS 26, hoặc đã bật “Giảm độ trong suốt” trong Cài đặt hệ thống.", "The flat look is in use because this Mac is older than macOS 26 or “Reduce transparency” is on in System Settings.", "macOS 26 미만이거나 시스템 설정에서 \"투명도 줄이기\"가 켜져 있어 일반 스타일을 사용 중입니다."),
 ]

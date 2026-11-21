@@ -47,6 +47,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 }
 
 struct SettingsPage: View {
+	// Back to the page the person came from.
+	var back: () -> Void = {}
 	let openPage: (String) -> Void
 	// YANA_SETTINGS=<section> opens a given pane (used to check panes in the live window).
 	@State private var section: SettingsSection =
@@ -59,8 +61,19 @@ struct SettingsPage: View {
 		HStack(spacing: 0) {
 			ScrollView {
 				VStack(alignment: .leading, spacing: 2) {
+					// Below the window buttons, which sit in the top of this panel now that the icon rail is not there.
+					Button(action: back) {
+						HStack(spacing: 6) {
+							FBIcon(name: "arrow-left", size: 14, color: FB.textSecondary)
+							Text(L("set.back")).font(.system(size: 13, weight: .medium)).foregroundStyle(FB.text)
+							Spacer(minLength: 0)
+						}
+						.padding(.horizontal, 10).frame(height: 30).contentShape(Rectangle())
+					}
+					.buttonStyle(.plain)
+					.keyboardShortcut(.cancelAction)
 					Text(L("nav.Settings")).font(.system(size: 20, weight: .semibold)).foregroundStyle(FB.text)
-						.padding(EdgeInsets(top: 0, leading: 10, bottom: 8, trailing: 0))
+						.padding(EdgeInsets(top: 6, leading: 10, bottom: 8, trailing: 0))
 					HStack(spacing: 6) {
 						FBIcon(name: "search", size: 13, color: FB.textTertiary)
 						TextField("", text: $query, prompt: Text(L("set.search"))).textFieldStyle(.plain).font(.system(size: 13))
@@ -80,10 +93,10 @@ struct SettingsPage: View {
 						Text(L("set.noMatch")).font(.fbCaption).foregroundStyle(FB.textSecondary).padding(.horizontal, 10).padding(.vertical, 6)
 					}
 				}
-				.padding(EdgeInsets(top: 8, leading: 14, bottom: 14, trailing: 14))
+				.padding(EdgeInsets(top: 46, leading: 14, bottom: 14, trailing: 14))
 			}
 			.frame(width: 240)
-			.sidePanelBackground(color: FB.chrome, leadingInset: 2)
+			.sidePanelBackground(color: FB.chrome, leadingInset: LiquidGlass.panelInset)
 
 			VStack(alignment: .leading, spacing: 0) {
 				PaneHeader(section: section)

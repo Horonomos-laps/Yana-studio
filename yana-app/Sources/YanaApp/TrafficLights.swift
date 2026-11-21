@@ -134,7 +134,7 @@ struct TrafficLightsAnchor: NSViewRepresentable {
 			// macOS may lay the buttons out again right after the event, so place them on the next turn.
 			DispatchQueue.main.async { [weak self] in
 				guard let window = self?.window else { return }
-				TrafficLightsPlacer.apply(to: window, custom: LiquidGlass.active && LeftSide.railShown())
+				TrafficLightsPlacer.apply(to: window, custom: LiquidGlass.active)
 			}
 		}
 
