@@ -146,10 +146,40 @@ struct ChatHome: View {
 		.padding(.bottom, 8)
 	}
 
+	// The width the right panel takes, and what the chat column keeps (PanelLayout.swift): the panel gives way
+	// first, so the page is never wider than the window.
+	private func widths(_ total: CGFloat) -> (chat: CGFloat, panel: CGFloat) {
+		switch right {
+		case .hidden: return (total, 0)
+		case .tools, .files: return (max(total - Self.panelWidth, 0), Self.panelWidth)
+		case .browser, .terminal:
+			if browserExpanded { return (0, total) }
+			let split = PanelLayout.split(available: total, requested: browserWidth)
+			return (split.chat, split.panel)
+		}
+	}
+
 	var body: some View {
+		GeometryReader { geo in
+			let w = widths(geo.size.width)
+			pageRow(chatWidth: w.chat, panelWidth: w.panel)
+				.frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
+		}
+		// The start chooser or the start page asked for the terminal: open it in this panel.
+		.onAppear(perform: openTerminalIfAsked)
+		// YANA_OPEN_CHAT=<session id> opens a saved chat at launch (to check the layout with a conversation on screen).
+		.onAppear {
+			if let id = ProcessInfo.processInfo.environment["YANA_OPEN_CHAT"], let chat = ChatHistoryStore.shared.chat(id) { engine.open(chat) }
+		}
+		.onChange(of: terminals.wantsPanel) { _, _ in openTerminalIfAsked() }
+	}
+
+	private func pageRow(chatWidth: CGFloat, panelWidth: CGFloat) -> some View {
 		HStack(spacing: 0) {
 			if !((right == .browser || right == .terminal) && browserExpanded) {
 				chatColumn
+				.frame(width: chatWidth)
+				.clipped()
 				.overlay(alignment: .topLeading) {
 					if !chatSidebar {
 						FBIconButton(icon: "sidebar", variant: .ghost, size: .medium, tooltip: L("sidebar.show")) { chatSidebar = true }
@@ -170,7 +200,7 @@ struct ChatHome: View {
 					browserView.frame(maxWidth: .infinity)
 				} else {
 					resizeHandle
-					browserView.frame(width: browserWidth)
+					browserView.frame(width: panelWidth).clipped()
 				}
 			case .terminal:
 				// Same slot, width, drag handle and expand state as the browser.
@@ -178,7 +208,7 @@ struct ChatHome: View {
 					TerminalPage(expanded: $browserExpanded) { right = .tools }.frame(maxWidth: .infinity)
 				} else {
 					resizeHandle
-					TerminalPage(expanded: $browserExpanded) { right = .tools }.frame(width: browserWidth)
+					TerminalPage(expanded: $browserExpanded) { right = .tools }.frame(width: panelWidth).clipped()
 				}
 			case .tools:
 				sidePanel(L("panel.tools"), back: false) {
@@ -189,9 +219,6 @@ struct ChatHome: View {
 				sidePanel(L("panel.files"), back: true) { FilesPanel() }
 			}
 		}
-		// The start chooser or the start page asked for the terminal: open it in this panel.
-		.onAppear(perform: openTerminalIfAsked)
-		.onChange(of: terminals.wantsPanel) { _, _ in openTerminalIfAsked() }
 	}
 
 	private func openTerminalIfAsked() {
