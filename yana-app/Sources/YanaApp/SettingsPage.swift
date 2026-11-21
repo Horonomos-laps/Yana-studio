@@ -7,12 +7,13 @@ import SwiftUI
 // SettingsInfo.swift. API keys go to the macOS Keychain only and are never shown again after saving.
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-	case general, chat, memory, models, terminal, studio, git, worktree, hooks, security, data, updates, system, shortcuts, about
+	case general, chat, personal, memory, models, terminal, studio, git, worktree, hooks, security, data, updates, system, shortcuts, about
 	var id: String { rawValue }
 	var icon: String {
 		switch self {
 		case .general: return "settings"
 		case .chat: return "message"
+		case .personal: return "user"
 		case .memory: return "bookmark"
 		case .models: return "cpu"
 		case .terminal: return "terminal"
@@ -32,6 +33,17 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 	var subtitle: String { L("set.about.\(rawValue)") }
 	// A thin line in the list before these, grouping app / AI / tools / safety / info like System Settings.
 	var startsGroup: Bool { [.models, .git, .security, .updates].contains(self) }
+
+	// The sections whose name or one-line description holds every word of the query, in the same order. The
+	// match ignores case and accents, so "ca nhan" finds "Cá nhân hóa". An empty query is every section.
+	static func matching(_ query: String) -> [SettingsSection] {
+		let words = ChatLibrary.normalize(query).split(whereSeparator: \.isWhitespace).map(String.init)
+		guard !words.isEmpty else { return allCases }
+		return allCases.filter { item in
+			let hay = ChatLibrary.normalize(item.title + " " + item.subtitle + " " + item.rawValue)
+			return words.allSatisfy { hay.contains($0) }
+		}
+	}
 }
 
 struct SettingsPage: View {
@@ -39,17 +51,33 @@ struct SettingsPage: View {
 	// YANA_SETTINGS=<section> opens a given pane (used to check panes in the live window).
 	@State private var section: SettingsSection =
 		ProcessInfo.processInfo.environment["YANA_SETTINGS"].flatMap(SettingsSection.init(rawValue:)) ?? .general
+	@State private var query = ""
+	private var shown: [SettingsSection] { SettingsSection.matching(query) }
+	private var searching: Bool { !ChatLibrary.normalize(query).isEmpty }
 
 	var body: some View {
 		HStack(spacing: 0) {
 			ScrollView {
 				VStack(alignment: .leading, spacing: 2) {
 					Text(L("nav.Settings")).font(.system(size: 20, weight: .semibold)).foregroundStyle(FB.text)
-						.padding(EdgeInsets(top: 0, leading: 10, bottom: 12, trailing: 0))
-					ForEach(SettingsSection.allCases) { item in
-						if item.startsGroup { FB.divider.frame(height: 1).padding(.vertical, 6).padding(.horizontal, 10) }
+						.padding(EdgeInsets(top: 0, leading: 10, bottom: 8, trailing: 0))
+					HStack(spacing: 6) {
+						FBIcon(name: "search", size: 13, color: FB.textTertiary)
+						TextField("", text: $query, prompt: Text(L("set.search"))).textFieldStyle(.plain).font(.system(size: 13))
+						if searching {
+							Button { query = "" } label: { FBIcon(name: "close", size: 11, color: FB.textTertiary) }.buttonStyle(.plain)
+						}
+					}
+					.padding(.horizontal, 10).frame(height: 30)
+					.background(RoundedRectangle(cornerRadius: 9).fill(FB.hoverOnChrome))
+					.padding(EdgeInsets(top: 0, leading: 2, bottom: 8, trailing: 2))
+					ForEach(shown) { item in
+						if item.startsGroup && !searching { FB.divider.frame(height: 1).padding(.vertical, 6).padding(.horizontal, 10) }
 						SettingsNavRow(icon: item.icon, title: item.title, selected: item == section)
 							.onTapGesture { section = item }
+					}
+					if shown.isEmpty {
+						Text(L("set.noMatch")).font(.fbCaption).foregroundStyle(FB.textSecondary).padding(.horizontal, 10).padding(.vertical, 6)
 					}
 				}
 				.padding(EdgeInsets(top: 8, leading: 14, bottom: 14, trailing: 14))
@@ -72,6 +100,7 @@ struct SettingsPage: View {
 		switch section {
 		case .general: GeneralSettings()
 		case .chat: ChatSettings()
+		case .personal: PersonalSettings()
 		case .memory: MemorySettings()
 		case .models: ModelSettings()
 		case .terminal: TerminalSettings()

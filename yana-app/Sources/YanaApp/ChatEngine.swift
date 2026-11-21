@@ -231,6 +231,7 @@ final class ChatEngine: ObservableObject {
 		if let existing = ChatHistoryStore.shared.chat(sessionId) {
 			chat.customTitle = existing.customTitle
 			chat.pinned = existing.pinned
+			chat.archived = existing.archived
 		}
 		ChatHistoryStore.shared.save(chat)
 	}
@@ -300,6 +301,7 @@ final class ChatEngine: ObservableObject {
 			}
 			system.append(Self.rememberInstruction)
 		}
+		if let personal = Personalization.instruction() { system.append(personal) }
 		if let git = GitPrefs.instruction() { system.append(git) }
 		if !system.isEmpty { payload["system"] = system.joined(separator: "\n\n") }
 		let settings = AppSettings.shared

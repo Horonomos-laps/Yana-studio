@@ -55,6 +55,9 @@ struct SecuritySettings: View {
 
 struct DataSettings: View {
 	@EnvironmentObject private var engine: ChatEngine
+	@ObservedObject private var history = ChatHistoryStore.shared
+	@State private var message = ""
+	@State private var confirmDelete = false
 	private var appData: URL {
 		FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/YanaApp")
 	}
@@ -62,6 +65,15 @@ struct DataSettings: View {
 
 	var body: some View {
 		Form {
+			Section {
+				LabeledContent(L("data.chats"), value: String(format: L("data.counts"), history.chats.count, ChatSections.archivedCount(history.chats)))
+				Button(L("data.export")) { exportAll() }.disabled(history.chats.isEmpty)
+				Button(L("data.archiveAll")) { history.archiveAll(); engine.reset() }
+					.disabled(history.chats.allSatisfy(\.isArchived))
+				Button(L("data.deleteAll"), role: .destructive) { confirmDelete = true }.disabled(history.chats.isEmpty)
+				if !message.isEmpty { Text(message).font(.fbCaption).foregroundStyle(FB.textSecondary) }
+			} header: { Text(L("data.chats")) }
+
 			Section {
 				folderRow(L("set.dataApp"), appData)
 				folderRow(L("set.dataProject"), projectData)
@@ -73,6 +85,25 @@ struct DataSettings: View {
 				fileRow("authority-receipts.jsonl", L("set.dataReceipts"))
 				fileRow("pending-approvals.json", L("set.dataPending"))
 			} header: { Text(L("set.dataFiles")) }
+		}
+		.alert(L("data.deleteTitle"), isPresented: $confirmDelete) {
+			Button(L("data.deleteConfirm"), role: .destructive) { engine.reset(); history.deleteAll(); message = "" }
+			Button(L("set.cancel"), role: .cancel) {}
+		} message: { Text(L("data.deleteBody")) }
+	}
+
+	private func exportAll() {
+		let panel = NSOpenPanel()
+		panel.canChooseDirectories = true
+		panel.canChooseFiles = false
+		panel.canCreateDirectories = true
+		guard panel.runModal() == .OK, let base = panel.url else { return }
+		let stamp = ISO8601DateFormatter().string(from: Date()).prefix(10)
+		do {
+			let count = try history.exportAll(to: base.appendingPathComponent("Yana chats \(stamp)", isDirectory: true))
+			message = String(format: L("data.exportDone"), count)
+		} catch {
+			message = "\(L("data.exportFailed")): \(error.localizedDescription)"
 		}
 	}
 

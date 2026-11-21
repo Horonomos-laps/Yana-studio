@@ -24,9 +24,11 @@ struct SavedChat: Codable, Identifiable, Equatable {
 	// keeps them when it saves the chat again (ChatEngine.saveToHistory).
 	var customTitle: String? = nil
 	var pinned: Bool? = nil
+	var archived: Bool? = nil
 
 	var displayTitle: String { customTitle.flatMap { $0.isEmpty ? nil : $0 } ?? title }
 	var isPinned: Bool { pinned == true }
+	var isArchived: Bool { archived == true }
 }
 
 @MainActor
@@ -83,6 +85,63 @@ final class ChatHistoryStore: ObservableObject {
 		guard var chat = chat(id) else { return }
 		chat.pinned = pinned ? true : nil
 		persist(chat)
+	}
+
+	// Hides a chat from the sidebar lists without deleting it. An archived chat is no longer pinned.
+	func setArchived(_ id: String, _ archived: Bool) {
+		guard var chat = chat(id) else { return }
+		chat.archived = archived ? true : nil
+		if archived { chat.pinned = nil }
+		persist(chat)
+	}
+
+	// Archives every chat that is not archived yet.
+	func archiveAll() {
+		for chat in chats where !chat.isArchived { setArchived(chat.id, true) }
+	}
+
+	// A copy of a chat under a new session id, so the two continue separately. Nil when the chat is unknown.
+	@discardableResult
+	func fork(_ id: String, now: Date = Date()) -> SavedChat? {
+		guard let source = chat(id) else { return nil }
+		var copy = source
+		copy = SavedChat(id: UUID().uuidString.lowercased(), title: source.title, updated: now, provider: source.provider,
+		                 model: source.model, lines: source.lines,
+		                 customTitle: String(format: L("history.forkTitle"), source.displayTitle), pinned: nil, archived: nil)
+		save(copy)
+		return chat(copy.id)
+	}
+
+	// File names for an export: one per chat, unique inside the folder ("Title.md", "Title 2.md"...).
+	static func exportNames(for chats: [SavedChat]) -> [String] {
+		var used = Set<String>()
+		return chats.map { chat in
+			let base = ChatLibrary.fileName(for: chat.displayTitle)
+			var name = base
+			var n = 2
+			while !used.insert(name.lowercased()).inserted {
+				name = String(base.dropLast(3)) + " \(n).md"
+				n += 1
+			}
+			return name
+		}
+	}
+
+	// Writes every chat as a Markdown file into `folder`. Returns how many were written.
+	func exportAll(to folder: URL) throws -> Int {
+		let list = ordered
+		let names = Self.exportNames(for: list)
+		try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+		for (chat, name) in zip(list, names) {
+			try Data(markdown(chat).utf8).write(to: folder.appendingPathComponent(name), options: .atomic)
+		}
+		return list.count
+	}
+
+	// Removes every saved chat (and its file). Nothing else in the folder is touched.
+	func deleteAll() {
+		for chat in chats { try? FileManager.default.removeItem(at: url(chat.id)) }
+		chats = []
 	}
 
 	// Writes a changed chat back without moving it to the top: only a new message does that.

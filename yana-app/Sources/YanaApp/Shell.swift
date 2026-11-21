@@ -77,8 +77,12 @@ struct ChatSidebar: View {
 	@AppStorage("yana.ui.sidebar.pinnedCollapsed") private var pinnedCollapsed = false
 	@AppStorage("yana.ui.sidebar.recentCollapsed") private var recentCollapsed = false
 	@State private var showAllRecent = false
+	@State private var showArchived = false
 	private var searching: Bool { !ChatLibrary.normalize(query).isEmpty }
-	private var sections: [ChatSection] { ChatSections.build(chats: history.chats, query: query, showAllRecent: showAllRecent) }
+	private var sections: [ChatSection] {
+		ChatSections.build(chats: history.chats, query: query, showAllRecent: showAllRecent, showArchived: showArchived)
+	}
+	private var archivedCount: Int { ChatSections.archivedCount(history.chats) }
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 4) {
@@ -107,6 +111,11 @@ struct ChatSidebar: View {
 						RecentRow(title: engine.title ?? "", date: nil, current: true)
 					}
 					ForEach(sections) { section in sectionView(section) }
+					if archivedCount > 0 && !searching {
+						SidebarLink(title: showArchived ? L("chat.archivedHide") : String(format: L("chat.archivedShow"), archivedCount)) {
+							showArchived.toggle()
+						}
+					}
 					if sections.isEmpty && !query.isEmpty {
 						Text(L("history.noMatch")).font(.fbCaption).foregroundStyle(FB.textSecondary)
 							.padding(.horizontal, 10).padding(.vertical, 6)
@@ -134,17 +143,18 @@ struct ChatSidebar: View {
 	// One group: a heading that folds it (not while searching, so matches are never hidden), then its chats.
 	@ViewBuilder
 	private func sectionView(_ section: ChatSection) -> some View {
-		let pinned = section.kind == .pinned
-		let collapsed = pinned ? pinnedCollapsed : recentCollapsed
-		SidebarSectionHeader(title: pinned ? L("chat.pinned") : L("chat.recent"), count: section.chats.count + section.hidden,
-		                     collapsed: collapsed && !searching, foldable: !searching) {
-			if pinned { pinnedCollapsed.toggle() } else { recentCollapsed.toggle() }
+		let kind = section.kind
+		let collapsed = kind == .pinned ? pinnedCollapsed : kind == .recent ? recentCollapsed : false
+		let title = kind == .pinned ? L("chat.pinned") : kind == .recent ? L("chat.recent") : L("chat.archived")
+		SidebarSectionHeader(title: title, count: section.chats.count + section.hidden,
+		                     collapsed: collapsed && !searching, foldable: !searching && kind != .archived) {
+			if kind == .pinned { pinnedCollapsed.toggle() } else if kind == .recent { recentCollapsed.toggle() }
 		}
 		if searching || !collapsed {
 			ForEach(section.chats) { chat in chatRow(chat) }
 			if section.hidden > 0 {
 				SidebarLink(title: String(format: L("chat.showMore"), section.hidden)) { showAllRecent = true }
-			} else if !pinned && showAllRecent && !searching && section.chats.count > ChatSections.recentLimit {
+			} else if kind == .recent && showAllRecent && !searching && section.chats.count > ChatSections.recentLimit {
 				SidebarLink(title: L("chat.showLess")) { showAllRecent = false }
 			}
 		}
@@ -156,9 +166,16 @@ struct ChatSidebar: View {
 		          togglePin: { history.setPinned(chat.id, !chat.isPinned) })
 			.onTapGesture { engine.open(chat) }
 			.contextMenu {
-				Button(chat.isPinned ? L("history.unpin") : L("history.pin")) { history.setPinned(chat.id, !chat.isPinned) }
+				if !chat.isArchived {
+					Button(chat.isPinned ? L("history.unpin") : L("history.pin")) { history.setPinned(chat.id, !chat.isPinned) }
+				}
 				Button(L("history.rename")) { renameText = chat.displayTitle; renaming = chat }
 				Button(L("history.export")) { export(chat) }
+				Button(L("history.fork")) { if let copy = history.fork(chat.id) { engine.open(copy) } }
+				Button(chat.isArchived ? L("history.unarchive") : L("history.archive")) {
+					if chat.id == engine.currentChatID && !chat.isArchived { engine.reset() }
+					history.setArchived(chat.id, !chat.isArchived)
+				}
 				Divider()
 				Button(L("history.delete"), role: .destructive) {
 					if chat.id == engine.currentChatID { engine.reset() }
