@@ -7,7 +7,7 @@ import SwiftUI
 // SettingsInfo.swift. API keys go to the macOS Keychain only and are never shown again after saving.
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-	case general, chat, memory, models, terminal, studio, security, data, updates, system, shortcuts, about
+	case general, chat, memory, models, terminal, studio, git, worktree, hooks, security, data, updates, system, shortcuts, about
 	var id: String { rawValue }
 	var icon: String {
 		switch self {
@@ -17,6 +17,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 		case .models: return "cpu"
 		case .terminal: return "terminal"
 		case .studio: return "code"
+		case .git: return "steps"
+		case .worktree: return "tree"
+		case .hooks: return "link"
 		case .security: return "shield"
 		case .data: return "folder"
 		case .updates: return "download"
@@ -28,7 +31,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 	var title: String { L("set.section.\(rawValue)") }
 	var subtitle: String { L("set.about.\(rawValue)") }
 	// A thin line in the list before these, grouping app / AI / tools / safety / info like System Settings.
-	var startsGroup: Bool { [.models, .security, .updates].contains(self) }
+	var startsGroup: Bool { [.models, .git, .security, .updates].contains(self) }
 }
 
 struct SettingsPage: View {
@@ -73,6 +76,9 @@ struct SettingsPage: View {
 		case .models: ModelSettings()
 		case .terminal: TerminalSettings()
 		case .studio: StudioSettings()
+		case .git: GitSettings()
+		case .worktree: WorktreeSettings()
+		case .hooks: HookSettings()
 		case .security: SecuritySettings { openPage("Tool approvals") }
 		case .data: DataSettings()
 		case .updates: UpdateSettings()

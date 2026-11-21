@@ -300,6 +300,7 @@ final class ChatEngine: ObservableObject {
 			}
 			system.append(Self.rememberInstruction)
 		}
+		if let git = GitPrefs.instruction() { system.append(git) }
 		if !system.isEmpty { payload["system"] = system.joined(separator: "\n\n") }
 		let settings = AppSettings.shared
 		if let key = settings.apiKey(provider) { payload["api_key"] = key }

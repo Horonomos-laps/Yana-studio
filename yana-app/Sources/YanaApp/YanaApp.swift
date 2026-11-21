@@ -209,6 +209,29 @@ func renderPNG(to path: String, page: String) {
 	print("wrote \(path)")
 }
 
+// `YANA_SNAPSHOT=out.png` opens the real window, waits for it to settle, saves the window as a PNG and quits.
+// Unlike `--render`, this draws the live window, so form controls and the material show up. It needs no
+// screen-recording permission because the app only reads its own window.
+func scheduleWindowSnapshot() {
+	guard let path = ProcessInfo.processInfo.environment["YANA_SNAPSHOT"], !path.isEmpty else { return }
+	let wait = Double(ProcessInfo.processInfo.environment["YANA_SNAPSHOT_WAIT"] ?? "") ?? 5
+	DispatchQueue.main.asyncAfter(deadline: .now() + wait) {
+		guard let view = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil })?.contentView,
+		      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+			FileHandle.standardError.write(Data("snapshot: no window\n".utf8))
+			exit(1)
+		}
+		view.cacheDisplay(in: view.bounds, to: rep)
+		guard let png = rep.representation(using: .png, properties: [:]) else { exit(1) }
+		do { try png.write(to: URL(fileURLWithPath: path)) } catch {
+			FileHandle.standardError.write(Data("snapshot: cannot write \(path)\n".utf8))
+			exit(1)
+		}
+		print("snapshot \(path)")
+		exit(0)
+	}
+}
+
 @main
 struct YanaApp: App {
 	@NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -228,6 +251,7 @@ struct YanaApp: App {
 			renderPNG(to: args[index + 1], page: index + 2 < args.count ? args[index + 2] : "Chat")
 			exit(0)
 		}
+		scheduleWindowSnapshot()
 	}
 
 	var body: some Scene {
