@@ -32,6 +32,22 @@ final class TrafficLightsLayoutTests: XCTestCase {
 		XCTAssertLessThanOrEqual(TrafficLights.top + TrafficLights.size + 8, RailMetrics.topInset)
 	}
 
+	// A layer scales about its anchor point; the transform has to keep each dot's center where it was either way.
+	@MainActor
+	func testScalingKeepsTheCenterInPlaceForEitherAnchor() {
+		let size = CGSize(width: 14, height: 14)
+		for anchor in [CGPoint(x: 0.5, y: 0.5), CGPoint(x: 0, y: 0)] {
+			let t = TrafficLightsPlacer.scaling(0.8, size: size, anchor: anchor)
+			let a = CGPoint(x: anchor.x * size.width, y: anchor.y * size.height)
+			// A point's place after scaling about the anchor, then the extra translation.
+			func moved(_ p: CGPoint) -> CGPoint { CGPoint(x: a.x + t.a * (p.x - a.x) + t.tx, y: a.y + t.d * (p.y - a.y) + t.ty) }
+			let center = CGPoint(x: 7, y: 7)
+			XCTAssertEqual(moved(center).x, 7, accuracy: 0.0001)
+			XCTAssertEqual(moved(center).y, 7, accuracy: 0.0001)
+			XCTAssertEqual(moved(CGPoint(x: 14, y: 7)).x - moved(CGPoint(x: 0, y: 7)).x, 14 * 0.8, accuracy: 0.0001)
+		}
+	}
+
 	func testInsideKnowsTheRoundedCorner() {
 		let r = CGRect(x: 0, y: 0, width: 100, height: 100)
 		XCTAssertTrue(TrafficLights.inside(CGPoint(x: 50, y: 50), of: r, radius: 24))
@@ -82,6 +98,17 @@ final class TrafficLightsPlacerTests: XCTestCase {
 			XCTAssertEqual(a.x, b.x, accuracy: 1)
 			XCTAssertEqual(a.y, b.y, accuracy: 1)
 		}
+	}
+
+	func testTheDotsAreShrunkAndGoBackToFullSize() throws {
+		let window = makeWindow()
+		defer { window.orderOut(nil) }
+		try XCTSkipIf(spots(window).count != 3, "no window buttons in this session")
+		let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { window.standardWindowButton($0) }
+		TrafficLightsPlacer.apply(to: window, custom: true)
+		for b in buttons { XCTAssertEqual(b.layer?.affineTransform().a ?? 0, TrafficLights.scale, accuracy: 0.001) }
+		TrafficLightsPlacer.apply(to: window, custom: false)
+		for b in buttons { XCTAssertEqual(b.layer?.affineTransform().a ?? 0, 1, accuracy: 0.001) }
 	}
 
 	func testPlacingTwiceGivesTheSamePlaces() throws {

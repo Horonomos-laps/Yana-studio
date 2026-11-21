@@ -10,9 +10,11 @@ import SwiftUI
 enum TrafficLights {
 	// Where the first button's top-left corner is, from the window's top-left corner, and the gap between buttons.
 	static let leading: CGFloat = 21
-	static let top: CGFloat = 23
-	static let step: CGFloat = 17
+	static let top: CGFloat = 21
+	static let step: CGFloat = 15
 	static let size: CGFloat = 14
+	// The dots are drawn smaller than macOS draws them (12 pt across), so they sit lightly in the rail's panel.
+	static let scale: CGFloat = 0.8
 
 	// The panel the buttons must sit inside: the rail's glass panel.
 	static var panel: CGRect {
@@ -44,6 +46,20 @@ enum TrafficLights {
 
 @MainActor
 enum TrafficLightsPlacer {
+	// The transform that scales a layer about its own center. A layer scales about its anchor point, and a view's
+	// backing layer may use (0, 0) or (0.5, 0.5), so the difference between the center and the anchor is added back.
+	static func scaling(_ factor: CGFloat, size: CGSize, anchor: CGPoint) -> CGAffineTransform {
+		let tx = (size.width / 2 - anchor.x * size.width) * (1 - factor)
+		let ty = (size.height / 2 - anchor.y * size.height) * (1 - factor)
+		return CGAffineTransform(a: factor, b: 0, c: 0, d: factor, tx: tx, ty: ty)
+	}
+
+	private static func shrink(_ button: NSButton, to factor: CGFloat) {
+		button.wantsLayer = true
+		guard let layer = button.layer else { return }
+		layer.setAffineTransform(factor == 1 ? .identity : scaling(factor, size: button.bounds.size, anchor: layer.anchorPoint))
+	}
+
 	private static let kinds: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
 
 	// What macOS laid out, kept the first time so it can be put back: the buttons, and the title bar views that
@@ -70,7 +86,7 @@ enum TrafficLightsPlacer {
 		if !custom {
 			container?.frame = saved.container
 			host.frame = saved.host
-			for (button, origin) in zip(buttons, saved.buttons) { button.setFrameOrigin(origin) }
+			for (button, origin) in zip(buttons, saved.buttons) { button.setFrameOrigin(origin); shrink(button, to: 1) }
 			return
 		}
 		// Make the title bar tall enough to hold the lowered buttons, still glued to the top of the window.
@@ -83,6 +99,7 @@ enum TrafficLightsPlacer {
 			let spot = TrafficLights.origin(index)
 			// The title bar view is not flipped: y runs up from its bottom, which is `needed` below the window's top.
 			button.setFrameOrigin(NSPoint(x: spot.x, y: host.frame.height - spot.y - button.frame.height))
+			shrink(button, to: TrafficLights.scale)
 		}
 	}
 }
