@@ -1,7 +1,8 @@
 import SwiftUI
 
 // Design tokens. Values follow the Fluent Blue light theme (MIT, github.com/danieldev23/fluent-blue), with Yana's
-// primary blue #1470F0 (the lightest blue that keeps white text at 4.5:1). Light only: there is no dark theme.
+// primary blue #1470F0 (the lightest blue that keeps white text at 4.5:1). The colors that differ between the light
+// and the dark look are pairs in Palette.swift; the rest (the solid primary and status colors) are the same in both.
 
 extension Color {
 	init(hex: UInt32, opacity: Double = 1) {
@@ -18,44 +19,44 @@ enum FB {
 	static let primary = Color(hex: 0x1470F0)
 	static let primaryHover = Color(hex: 0x0F62DC)
 	static let primaryPressed = Color(hex: 0x0D54BA)
-	static let primarySubtle = Color(hex: 0xE6F4FF)
-	static let primarySubtleHover = Color(hex: 0xBAE0FF)
-	static let primaryBorder = Color(hex: 0x91CAFF)
-	static let primaryText = Color(hex: 0x0958D9)
+	static let primarySubtle = FBPair.primarySubtle.color
+	static let primarySubtleHover = FBPair.primarySubtleHover.color
+	static let primaryBorder = FBPair.primaryBorder.color
+	static let primaryText = FBPair.primaryText.color
 	static let ramp300 = Color(hex: 0x69B1FF)
 	static let ramp700 = Color(hex: 0x003EB3)
 	static let ramp100 = Color(hex: 0xBAE0FF)
 	static let ramp500 = Color(hex: 0x1677FF)
 
 	// Surfaces and lines
-	static let background = Color(hex: 0xF5F5F5)
-	static let surface = Color.white
-	static let surfaceSecondary = Color(hex: 0xFAFAFA)
-	static let surfaceTertiary = Color(hex: 0xF0F0F0)
-	static let border = Color(hex: 0xD9D9D9)
-	static let borderSubtle = Color(hex: 0xF0F0F0)
-	static let borderStrong = Color(hex: 0xBFBFBF)
-	static let ghostHover = Color(hex: 0xF5F5F5)
+	static let background = FBPair.background.color
+	static let surface = FBPair.surface.color
+	static let surfaceSecondary = FBPair.surfaceSecondary.color
+	static let surfaceTertiary = FBPair.surfaceTertiary.color
+	static let border = FBPair.border.color
+	static let borderSubtle = FBPair.borderSubtle.color
+	static let borderStrong = FBPair.borderStrong.color
+	static let ghostHover = FBPair.ghostHover.color
 
 	// Text
-	static let text = Color(hex: 0x141414)
-	static let textSecondary = Color(hex: 0x595959)
-	static let textTertiary = Color(hex: 0x555555)
-	static let textDisabled = Color(hex: 0xBFBFBF)
+	static let text = FBPair.text.color
+	static let textSecondary = FBPair.textSecondary.color
+	static let textTertiary = FBPair.textTertiary.color
+	static let textDisabled = FBPair.textDisabled.color
 
 	// Status. The *Text colors are the darker variants so small text stays readable.
 	static let success = Color(hex: 0x52C41A)
-	static let successText = Color(hex: 0x237804)
-	static let successSubtle = Color(hex: 0xF6FFED)
-	static let successBorder = Color(hex: 0xB7EB8F)
+	static let successText = FBPair.successText.color
+	static let successSubtle = FBPair.successSubtle.color
+	static let successBorder = FBPair.successBorder.color
 	static let warning = Color(hex: 0xFAAD14)
-	static let warningText = Color(hex: 0x9A5C00)
-	static let warningSubtle = Color(hex: 0xFFFBE6)
-	static let warningBorder = Color(hex: 0xFFE58F)
+	static let warningText = FBPair.warningText.color
+	static let warningSubtle = FBPair.warningSubtle.color
+	static let warningBorder = FBPair.warningBorder.color
 	static let error = Color(hex: 0xD92D30)
-	static let errorText = Color(hex: 0xCF1322)
-	static let errorSubtle = Color(hex: 0xFFF2F0)
-	static let errorBorder = Color(hex: 0xFFCCC7)
+	static let errorText = FBPair.errorText.color
+	static let errorSubtle = FBPair.errorSubtle.color
+	static let errorBorder = FBPair.errorBorder.color
 
 	// Semantic roles (core/rules/color-rules.md: name the role, never a raw value). Every role points at a
 	// Fluent Blue value above, so the app stays on one system; screens use these, not hex literals.

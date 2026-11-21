@@ -4,6 +4,7 @@ import AppKit
 struct RootView: View {
 	@State private var selected: String
 	@ObservedObject private var loc = Loc.shared
+	@ObservedObject private var appSettings = AppSettings.shared
 	// One chat for the window, shared by the chat page and its sidebar. Lives here so a language switch
 	// (which rebuilds the subtree below) keeps the conversation.
 	@StateObject private var engine = ChatEngine()
@@ -115,14 +116,14 @@ struct RootView: View {
 		.ignoresSafeArea()
 		.frame(minWidth: rendering ? 1536 : 1040, idealWidth: 1360, maxWidth: rendering ? 1536 : .infinity,
 		       minHeight: rendering ? 1024 : 680, idealHeight: 860, maxHeight: rendering ? 1024 : .infinity)
-		// Light only: without this, a Mac in dark mode gives the window a dark title area.
-		.preferredColorScheme(.light)
+		// The look is the person's choice (light by default); without a fixed scheme the title area would follow macOS.
+		.preferredColorScheme(Appearance.resolved(appSettings.appearance).colorScheme)
 		.onAppear {
 			if openTerminal { terminals.wantsPanel = true }
 			// The chat list starts hidden at every launch for a wide chat; the sidebar button shows it.
 			// YANA_CHAT_LIST=1 keeps it open (to check it in the live window).
 			if !rendering { chatSidebar = ProcessInfo.processInfo.environment["YANA_CHAT_LIST"] == "1" }
-			NSApplication.shared.appearance = NSAppearance(named: .aqua)
+			Appearance.apply(appSettings.appearance)
 			// Launched from a terminal the app starts without focus; bring it to the front.
 			NSApplication.shared.setActivationPolicy(.regular)
 			NSApplication.shared.activate(ignoringOtherApps: true)
@@ -131,6 +132,14 @@ struct RootView: View {
 		// Install now, the update popover) brings the chat page forward, which opens the panel.
 		.onChange(of: terminals.wantsPanel) { _, wanted in
 			if wanted && selected != "Chat" && selected != "Start" { selected = "Chat" }
+		}
+		// The terminals are AppKit views: they are colored again when the look changes, from Settings or from macOS.
+		.onChange(of: appSettings.appearance) { _, _ in
+			Appearance.apply(appSettings.appearance)
+			terminals.restyle()
+		}
+		.onReceive(DistributedNotificationCenter.default().publisher(for: Notification.Name("AppleInterfaceThemeChangedNotification"))) { _ in
+			Task { try? await Task.sleep(nanoseconds: 200_000_000); terminals.restyle() }
 		}
 		.onReceive(NotificationCenter.default.publisher(for: .yanaMenu)) { note in
 			guard let raw = note.object as? String, let action = MenuAction(rawValue: raw) else { return }

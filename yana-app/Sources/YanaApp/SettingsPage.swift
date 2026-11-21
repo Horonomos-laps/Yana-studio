@@ -195,6 +195,11 @@ struct GeneralSettings: View {
 				Picker(L("set.language"), selection: $loc.lang) {
 					ForEach(Lang.allCases) { Text($0.nativeName).tag($0) }
 				}
+				Picker(L("set.appearance"), selection: $settings.appearance) {
+					Text(L("set.appearanceLight")).tag(Appearance.light)
+					Text(L("set.appearanceDark")).tag(Appearance.dark)
+					Text(L("set.appearanceSystem")).tag(Appearance.system)
+				}
 				Picker(L("set.startPage"), selection: $settings.startPage) {
 					Text(L("set.startAsk")).tag("ask")
 					Text(L("nav.Terminal")).tag("Terminal")

@@ -36,6 +36,8 @@ final class AppSettings: ObservableObject {
 	@Published var ideCheckout: String { didSet { store.set(ideCheckout, forKey: "yana.ideCheckout") } }
 	// What opens when Yana starts: "ask" (the start chooser), "Terminal" or "Chat".
 	@Published var startPage: String { didSet { store.set(startPage, forKey: "yana.startPage") } }
+	// The look: light (the default), dark, or follow macOS (Palette.swift).
+	@Published var appearance: Appearance { didSet { store.set(appearance.rawValue, forKey: "yana.appearance"); MainActor.assumeIsolated { Appearance.apply(appearance) } } }
 	// Default project folder for chat, terminal and Yana Studio. Empty: the git repo Yana was started in.
 	@Published var workspace: String { didSet { store.set(workspace, forKey: "yana.workspace") } }
 	// Terminal: ⌥ sends Meta (Esc prefix) instead of typing accented letters. Off, like macOS Terminal.
@@ -69,6 +71,7 @@ final class AppSettings: ObservableObject {
 		ideCheckout = store.string(forKey: "yana.ideCheckout") ?? "\(NSHomeDirectory())/yana-ide-upstream/vscode"
 		// A new install opens straight on the chat screen; the start chooser is opt-in from Settings.
 		startPage = store.string(forKey: "yana.startPage") ?? "Chat"
+		appearance = store.string(forKey: "yana.appearance").flatMap(Appearance.init(rawValue:)) ?? .light
 		workspace = store.string(forKey: "yana.workspace") ?? ""
 		terminalOptionAsMeta = store.bool(forKey: "yana.terminal.optionAsMeta")
 		checkUpdatesOnLaunch = store.object(forKey: "yana.updates.onLaunch") as? Bool ?? true

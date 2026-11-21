@@ -43,7 +43,7 @@ struct YanaGlass<S: Shape>: ViewModifier {
 		if LiquidGlass.active, #available(macOS 26.0, *) {
 			content
 				.glassEffect(style, in: shape)
-				.background { shape.fill(Color.white.opacity(LiquidGlass.whiteBacking)) }
+				.background { shape.fill(FBPair.glassBacking.color.opacity(LiquidGlass.whiteBacking)) }
 		} else {
 			content
 				.background(shape.fill(FB.canvas))
@@ -72,7 +72,7 @@ struct FloatingPanel: ViewModifier {
 				.clipShape(shape)
 				.background {
 					ZStack {
-						shape.fill(Color.white.opacity(LiquidGlass.whiteBacking))
+						shape.fill(FBPair.glassBacking.color.opacity(LiquidGlass.whiteBacking))
 						Color.clear.glassEffect(.regular, in: shape)
 					}
 				}
@@ -107,7 +107,7 @@ struct SidePanelBackground: ViewModifier {
 				Color.clear.overlay {
 					ZStack {
 						RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous)
-							.fill(Color.white.opacity(LiquidGlass.whiteBacking))
+							.fill(FBPair.glassBacking.color.opacity(LiquidGlass.whiteBacking))
 						RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous)
 							.fill(Color.clear)
 							.glassEffect(.regular, in: RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous))
@@ -124,6 +124,10 @@ struct SidePanelBackground: ViewModifier {
 // The colors behind the glass. Glass needs something to refract: on plain white it would look like a gray box.
 struct GlassBackdrop: View {
 	@AppStorage(LiquidGlass.enabledKey) private var enabled = true
+	@Environment(\.colorScheme) private var scheme
+
+	// Strength of each soft glow: barely there on white, a little more on dark so the glass has something to catch.
+	private func strength(_ light: Double, _ dark: Double) -> Double { scheme == .dark ? dark : light }
 
 	private func glow(_ color: Color, center: UnitPoint, radius: CGFloat) -> some View {
 		RadialGradient(colors: [color, color.opacity(0)], center: center, startRadius: 0, endRadius: radius)
@@ -132,13 +136,13 @@ struct GlassBackdrop: View {
 	var body: some View {
 		if LiquidGlass.active {
 			ZStack {
-				// Nearly white, so the glass reads as clear and frosted rather than blue.
-				LinearGradient(colors: [Color(hex: 0xFFFFFF), Color(hex: 0xFAFBFF), Color(hex: 0xF5F8FF)],
+				// Pure white in the light look (dark gray in the dark one), so the glass reads as clear and frosted.
+				LinearGradient(colors: [FBPair.backdropTop.color, FBPair.backdropMiddle.color, FBPair.backdropBottom.color],
 				               startPoint: .topLeading, endPoint: .bottomTrailing)
 				// Radial gradients that fade to clear, so the soft glow needs no blur filter (which some renderers skip).
-				glow(FB.primary.opacity(0.07), center: .topLeading, radius: 620)
-				glow(Color(hex: 0xB58CFF).opacity(0.06), center: .bottomTrailing, radius: 680)
-				glow(Color(hex: 0x5BD6E8).opacity(0.05), center: UnitPoint(x: 0.55, y: 0), radius: 520)
+				glow(FB.primary.opacity(strength(0.025, 0.12)), center: .topLeading, radius: 620)
+				glow(Color(hex: 0xB58CFF).opacity(strength(0.02, 0.10)), center: .bottomTrailing, radius: 680)
+				glow(Color(hex: 0x5BD6E8).opacity(strength(0.015, 0.08)), center: UnitPoint(x: 0.55, y: 0), radius: 520)
 			}
 			.ignoresSafeArea()
 		} else {

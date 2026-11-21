@@ -33,7 +33,8 @@ let railEntries: [RailEntry] = [
 
 // Sidebars are solid token colors. A behind-window material was tried first (2026-11-07): with macOS in
 // dark mode it took the dark desktop color and turned the sidebar and the glass composer a muddy grey.
-private let railColor = FB.chrome
+// The icon rail is pure white in the light look (a neutral gray read as yellowish next to the page), dark gray in the dark.
+private let railColor = FBPair.rail.color
 private let sidebarColor = FB.chrome
 private let dividerColor = FB.divider
 
