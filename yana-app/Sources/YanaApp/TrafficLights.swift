@@ -1,25 +1,25 @@
 import AppKit
 import SwiftUI
 
-// The window's close, minimize and zoom buttons. With Liquid Glass the icon rail is a rounded panel floating 8 pt
-// inside the window, and macOS draws the buttons at its default place, 9 pt from the corner: the red one then sits
-// outside the panel's curved corner and the green one at its edge, which looks wrong. So, while the glass is on,
-// the three buttons are moved to sit together inside the panel, with the same space around them on every side.
-// With the glass off they go back to where macOS puts them.
+// The window's close, minimize and zoom buttons. macOS draws them at its default place, 9 pt from the corner and
+// 12 pt across, which looks big and crowded against the icon rail. So they are drawn smaller (a bit over half the
+// size) and centered in the top of the rail, with the same space left and right of the row. TrafficLightsPlacer
+// can put them back where macOS puts them.
 
 enum TrafficLights {
 	// Where the first button's top-left corner is, from the window's top-left corner, and the gap between buttons.
-	static let leading: CGFloat = 21
+	static let leading: CGFloat = 18
 	static let top: CGFloat = 21
 	static let step: CGFloat = 15
 	static let size: CGFloat = 14
-	// The dots are drawn smaller than macOS draws them (12 pt across), so they sit lightly in the rail's panel.
-	static let scale: CGFloat = 0.8
+	// The dots are drawn smaller than macOS draws them (12 pt across), so they sit lightly in the rail.
+	static let scale: CGFloat = 0.55
 
-	// The panel the buttons must sit inside: the rail's glass panel.
+	// What the buttons must sit inside: the icon rail, a flat column against the window's edge. The same place also
+	// lies inside the Settings list's glass panel, which has rounded corners, so fitsInPanel keeps a rounded corner
+	// in mind for both.
 	static var panel: CGRect {
-		CGRect(x: LiquidGlass.panelInset, y: LiquidGlass.panelInset, width: RailMetrics.width - LiquidGlass.panelInset - 2,
-		       height: 400)
+		CGRect(x: 0, y: 0, width: RailMetrics.width, height: 400)
 	}
 
 	static func origin(_ index: Int) -> CGPoint { CGPoint(x: leading + CGFloat(index) * step, y: top) }
@@ -134,7 +134,7 @@ struct TrafficLightsAnchor: NSViewRepresentable {
 			// macOS may lay the buttons out again right after the event, so place them on the next turn.
 			DispatchQueue.main.async { [weak self] in
 				guard let window = self?.window else { return }
-				TrafficLightsPlacer.apply(to: window, custom: LiquidGlass.active)
+				TrafficLightsPlacer.apply(to: window, custom: true)
 			}
 		}
 

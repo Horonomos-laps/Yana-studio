@@ -1,7 +1,7 @@
 import SwiftUI
 
-// The far-left rail: the Yana mark, the pages in two groups, then the update notice and Settings. Each page is an
-// icon with its name under it, so the rail can be read at a glance. The Chat entry shows a live dot while the AI is
+// The far-left rail: a flat column with the Yana mark, the pages in two groups, then the update notice and Settings.
+// Each page is an icon with its name under it, so the rail can be read at a glance. The Chat entry shows a live dot while the AI is
 // working, so it is visible from any page.
 
 enum RailMetrics {
@@ -50,12 +50,6 @@ struct RailItem: View {
 		}
 		.frame(width: RailMetrics.itemWidth, height: RailMetrics.itemHeight)
 		.modifier(RailItemSurface(selected: selected, hover: hover, tint: accent.color))
-		.overlay(alignment: .leading) {
-			// A short bar on the left edge marks the page that is open.
-			RoundedRectangle(cornerRadius: 1.5).fill(accent.color).frame(width: 3, height: 22)
-				.offset(x: -5).opacity(selected ? 1 : 0)
-		}
-		.shadow(color: selected ? FB.shadow : .clear, radius: 6, y: 2)
 		.contentShape(Rectangle())
 		.help(label)
 		.onHover { hover = $0 }
@@ -126,6 +120,8 @@ struct IconRail: View {
 		                    trailing: (RailMetrics.width - RailMetrics.itemWidth) / 2))
 		.frame(width: RailMetrics.width)
 		.frame(maxHeight: .infinity)
-		.sidePanelBackground(color: railBackground)
+		// A flat column against the window's edge with a hairline on its right, not a floating panel.
+		.background(railBackground)
+		.overlay(alignment: .trailing) { FB.divider.frame(width: 1) }
 	}
 }
