@@ -51,8 +51,29 @@ enum PluginInstaller {
 		let source: Source
 		let components: [Component]
 		let left: [Left]
+		// The MCP servers the plugin declares in .mcp.json, described, never installed by Get (see McpServer).
+		var mcp: [McpServer] = []
 		var totalBytes: Int { components.flatMap(\.files).reduce(0) { $0 + $1.size } }
 	}
+
+	// One server from a plugin's .mcp.json. Remote ones (https) are named so the person knows why they are not
+	// connected: yana-rt starts local servers only. A local one that runs `npx` or `uvx` with an exact version
+	// can be added to a project through McpInstaller; anything else (an unpinned package, another program) is
+	// not offered, because it would run code nobody fixed to a version.
+	struct McpServer: Equatable {
+		enum Kind: Equatable {
+			case remote(url: String)
+			case local(command: String, args: [String], pinned: Bool)
+			case other
+		}
+		let name: String
+		let kind: Kind
+		let env: [String]              // variable names the server reads; values are never copied
+		var installable: Bool { if case .local(_, _, true) = kind { return true }; return false }
+	}
+
+	static let maxMcpServers = 16
+	static let maxMcpBytes = 20_000
 
 	struct Manifest: Codable, Equatable {
 		struct Entry: Codable, Equatable { let kind: Component.Kind; let name: String; let files: [FileHash] }
@@ -199,6 +220,100 @@ enum PluginInstaller {
 		return Left.allCases.filter(found.contains)
 	}
 
+	// MARK: .mcp.json (pure)
+
+	// Both forms Claude Code reads: {"mcpServers": {...}} and the bare {"name": {...}}. Names are sorted so the
+	// answer does not depend on dictionary order; a name that is not safe is skipped; at most maxMcpServers.
+	static func parseMcp(_ data: Data) -> [McpServer] {
+		guard data.count <= maxMcpBytes, let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return [] }
+		let table = root["mcpServers"] as? [String: Any] ?? root
+		return table.keys.sorted().compactMap { key -> McpServer? in
+			guard let name = safeName(key), let object = table[key] as? [String: Any] else { return nil }
+			let env = (object["env"] as? [String: Any])?.keys.sorted().filter { isEnvName($0) } ?? []
+			return McpServer(name: name, kind: mcpKind(object), env: env)
+		}.prefix(maxMcpServers).map { $0 }
+	}
+
+	// The servers kept next to the installed plugin (.mcp-servers.json), so the plugin's page can show them again.
+	private struct StoredMcp: Codable {
+		let name: String
+		let kind: String            // remote, local or other
+		var url: String?
+		var command: String?
+		var args: [String]?
+		var pinned: Bool?
+		let env: [String]
+	}
+
+	static func storedMcp(_ servers: [McpServer]) -> Data? {
+		guard !servers.isEmpty else { return nil }
+		let stored = servers.map { server -> StoredMcp in
+			switch server.kind {
+			case .remote(let url): return StoredMcp(name: server.name, kind: "remote", url: url, env: server.env)
+			case .local(let command, let args, let pinned):
+				return StoredMcp(name: server.name, kind: "local", command: command, args: args, pinned: pinned, env: server.env)
+			case .other: return StoredMcp(name: server.name, kind: "other", env: server.env)
+			}
+		}
+		let encoder = JSONEncoder()
+		encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+		return try? encoder.encode(stored)
+	}
+
+	static func loadMcp(_ data: Data) -> [McpServer] {
+		guard data.count <= maxMcpBytes * 2, let stored = try? JSONDecoder().decode([StoredMcp].self, from: data) else { return [] }
+		return stored.prefix(maxMcpServers).compactMap { item -> McpServer? in
+			guard let name = safeName(item.name) else { return nil }
+			switch item.kind {
+			case "remote": return item.url.map { McpServer(name: name, kind: .remote(url: $0), env: item.env) }
+			case "local":
+				guard let command = item.command, let args = item.args else { return nil }
+				return McpServer(name: name, kind: .local(command: command, args: args, pinned: item.pinned ?? false), env: item.env)
+			default: return McpServer(name: name, kind: .other, env: item.env)
+			}
+		}
+	}
+
+	static func installedMcp(_ plugin: String, root: URL = defaultRoot()) -> [McpServer] {
+		guard let name = safeName(plugin), isInstalled(name, root: root),
+		      let data = try? Data(contentsOf: root.appendingPathComponent(name).appendingPathComponent(".mcp-servers.json")) else { return [] }
+		return loadMcp(data)
+	}
+
+	private static func mcpKind(_ object: [String: Any]) -> McpServer.Kind {
+		if object["command"] == nil, let url = object["url"] as? String {
+			return url.hasPrefix("https://") ? .remote(url: url) : .other
+		}
+		guard let command = object["command"] as? String, command == "npx" || command == "uvx" else { return .other }
+		let rawArgs = (object["args"] as? [Any]) ?? []
+		guard rawArgs.allSatisfy({ $0 is String }) else { return .other }
+		let strings = rawArgs.compactMap { $0 as? String }
+		// The package is the first argument that is not a flag.
+		let package = strings.first { !$0.hasPrefix("-") } ?? ""
+		let pinned = command == "npx" ? isExactNpm(package) : isExactPython(package)
+		return .local(command: command, args: strings, pinned: pinned)
+	}
+
+	private static func isEnvName(_ text: String) -> Bool {
+		guard let first = text.first, first.isLetter || first == "_" else { return false }
+		return text.allSatisfy { ($0.isASCII && ($0.isLetter || $0.isNumber)) || $0 == "_" }
+	}
+
+	private static let exactVersion = #"^\d+\.\d+\.\d+([-+][0-9A-Za-z.\-+]+)?$"#
+
+	// "pkg@1.2.3" or "@scope/pkg@1.2.3": an exact version, not "latest", a range, or nothing.
+	private static func isExactNpm(_ argument: String) -> Bool {
+		let body = argument.hasPrefix("@") ? String(argument.dropFirst()) : argument
+		guard let at = body.lastIndex(of: "@") else { return false }
+		return body[body.index(after: at)...].range(of: exactVersion, options: .regularExpression) != nil
+	}
+
+	// "pkg==1.2.3".
+	private static func isExactPython(_ argument: String) -> Bool {
+		guard let range = argument.range(of: "==") else { return false }
+		return argument[range.upperBound...].range(of: exactVersion, options: .regularExpression) != nil
+	}
+
 	// MARK: Scanning (pure)
 
 	// Phrases that exist to take over the model reading the file, and characters that hide text. A hit refuses the
@@ -255,7 +370,14 @@ enum PluginInstaller {
 			throw Failure.message("Bad address.")
 		}
 		let tree = try parseTree(try await get(url, limit: maxTreeBytes))
-		return try plan(plugin: plugin, version: version, source: source, tree: tree)
+		var made = try plan(plugin: plugin, version: version, source: source, tree: tree)
+		// The plugin's MCP servers are read only to describe them; a missing or unreadable file means none.
+		let mcpPath = source.subpath.isEmpty ? ".mcp.json" : source.subpath + "/.mcp.json"
+		if tree.contains(where: { $0.path == mcpPath && $0.size <= maxMcpBytes }), let raw = rawURL(source, mcpPath),
+		   let data = try? await get(raw, limit: maxMcpBytes) {
+			made.mcp = parseMcp(data)
+		}
+		return made
 	}
 
 	private static func rawURL(_ source: Source, _ path: String) -> URL? {
@@ -310,6 +432,7 @@ enum PluginInstaller {
 			encoder.dateEncodingStrategy = .iso8601
 			encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
 			try encoder.encode(manifest).write(to: pluginDir.appendingPathComponent(".plugin.json"), options: .atomic)
+			if let mcp = storedMcp(plan.mcp) { try mcp.write(to: pluginDir.appendingPathComponent(".mcp-servers.json"), options: .atomic) }
 			let final = root.appendingPathComponent(plan.plugin, isDirectory: true)
 			if fm.fileExists(atPath: final.path) { try fm.removeItem(at: final) }
 			try fm.moveItem(at: pluginDir, to: final)

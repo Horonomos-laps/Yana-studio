@@ -18,6 +18,8 @@ struct StoreDetailSheet: View {
 	@State private var pluginInstalled = false
 	@State private var working = false
 	@State private var pluginDone: String?
+	// The MCP servers the plugin declares (PluginInstaller.McpServer), kept after install so a local one can be added.
+	@State private var pluginMcp: [PluginInstaller.McpServer] = []
 
 	private var pluginName: String { item.id.split(separator: "#").last.map(String.init) ?? item.name }
 
@@ -55,6 +57,7 @@ struct StoreDetailSheet: View {
 					if let preview { previewPanel(preview) }
 					if let pluginPlan { pluginPanel(pluginPlan) }
 					if let pluginDone { FBAlert(kind: .success, text: pluginDone, closable: false) }
+					if pluginPlan == nil { pluginMcpSection }
 					Text(item.summary.isEmpty ? L("store.noDescription") : item.summary).font(.system(size: 14)).foregroundStyle(FB.text)
 						.textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
 					if !item.parts.isEmpty {
@@ -83,6 +86,7 @@ struct StoreDetailSheet: View {
 		.onAppear {
 			installed = McpInstaller.installedNames(in: engine.workspace).contains(McpInstaller.serverName(item))
 			pluginInstalled = PluginInstaller.isInstalled(pluginName)
+			pluginMcp = pluginInstalled ? PluginInstaller.installedMcp(pluginName) : []
 		}
 	}
 
@@ -139,7 +143,9 @@ struct StoreDetailSheet: View {
 					sha = try await PluginInstaller.currentSha(owner: own[0], repo: own[1])
 				}
 				let source = try PluginInstaller.source(url: repo, path: path, sha: sha)
-				pluginPlan = try await PluginInstaller.fetchPlan(plugin: name, version: version, source: source)
+				let fetched = try await PluginInstaller.fetchPlan(plugin: name, version: version, source: source)
+				pluginMcp = fetched.mcp
+				pluginPlan = fetched
 			} catch {
 				problem = error.localizedDescription
 			}
@@ -169,6 +175,7 @@ struct StoreDetailSheet: View {
 			try PluginInstaller.remove(pluginName)
 			pluginInstalled = false
 			pluginDone = nil
+			pluginMcp = []
 			engine.reloadSkills()
 		} catch {
 			problem = error.localizedDescription
@@ -190,6 +197,15 @@ struct StoreDetailSheet: View {
 			.font(.system(size: 12, design: .monospaced)).foregroundStyle(FB.text).textSelection(.enabled)
 			.padding(10).frame(maxWidth: .infinity, alignment: .leading)
 			.background(RoundedRectangle(cornerRadius: 8).fill(FB.surfaceTertiary))
+			if !plan.mcp.isEmpty {
+				VStack(alignment: .leading, spacing: 3) {
+					Text(L("plugin.mcpTitle")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+					ForEach(plan.mcp, id: \.name) { server in
+						Text("\(server.name): \(mcpStatus(server))").font(.system(size: 12, design: .monospaced)).foregroundStyle(FB.text)
+							.fixedSize(horizontal: false, vertical: true)
+					}
+				}
+			}
 			if !plan.left.isEmpty {
 				Text(String(format: L("plugin.left"), plan.left.map { L("plugin.left.\($0.rawValue)") }.joined(separator: ", ")))
 					.font(.fbCaption).foregroundStyle(FB.warningText).fixedSize(horizontal: false, vertical: true)
@@ -204,6 +220,52 @@ struct StoreDetailSheet: View {
 		}
 		.padding(14)
 		.background(RoundedRectangle(cornerRadius: 12).stroke(FB.primaryBorder))
+	}
+
+	// What the person needs to know about one MCP server of the plugin: whether yana-rt can run it, and why not.
+	private func mcpStatus(_ server: PluginInstaller.McpServer) -> String {
+		switch server.kind {
+		case .remote(let url): return String(format: L("plugin.mcp.remote"), url)
+		case .local(let command, let args, let pinned):
+			let line = ([command] + args).joined(separator: " ")
+			return pinned ? String(format: L("plugin.mcp.pinned"), line) : String(format: L("plugin.mcp.unpinned"), line)
+		case .other: return L("plugin.mcp.other")
+		}
+	}
+
+	@ViewBuilder
+	private var pluginMcpSection: some View {
+		if pluginInstalled, !pluginMcp.isEmpty {
+			section(L("plugin.mcpTitle")) {
+				ForEach(pluginMcp, id: \.name) { server in
+					HStack(alignment: .top, spacing: 10) {
+						VStack(alignment: .leading, spacing: 2) {
+							Text(server.name).font(.fbBodyMedium).foregroundStyle(FB.text)
+							Text(mcpStatus(server)).font(.fbCaption).foregroundStyle(FB.textSecondary).fixedSize(horizontal: false, vertical: true)
+						}
+						Spacer(minLength: 8)
+						if server.installable {
+							FBButton(title: L("plugin.mcp.add"), variant: .secondary, size: .small) { addMcp(server) }
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Writes the server into this project's .yana-ai/mcp-servers.json, then opens the terminal step where the person
+	// types yes to trust it: the same path as a server from the MCP registry.
+	private func addMcp(_ server: PluginInstaller.McpServer) {
+		do {
+			let entry = try McpInstaller.entry(from: server)
+			try McpInstaller.add(entry, workspace: engine.workspace)
+		} catch {
+			problem = error.localizedDescription
+			return
+		}
+		guard let job = McpInstaller.confirmJob() else { problem = RtError.notInstalled.message; return }
+		terminals.run(job, folder: engine.workspace)
+		close()
 	}
 
 	private func label(_ text: String) -> some View {
