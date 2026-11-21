@@ -204,3 +204,26 @@ final class GitPrefsTests: XCTestCase {
 		XCTAssertNil(GitPrefs.instruction(d))
 	}
 }
+
+// The string table is built with Dictionary(uniqueKeysWithValues:), which crashes the app at launch on a repeated key.
+final class StringTableTests: XCTestCase {
+	func testNoStringKeyIsRepeated() {
+		var seen = Set<String>(), repeated: [String] = []
+		for row in allStringRows where !seen.insert(row.key).inserted { repeated.append(row.key) }
+		XCTAssertEqual(repeated, [])
+	}
+
+	func testEveryRowHasTextInAllThreeLanguages() {
+		let empty = allStringRows.filter { $0.vi.isEmpty || $0.en.isEmpty || $0.ko.isEmpty }.map(\.key)
+		XCTAssertEqual(empty, [])
+	}
+
+	func testFormatStringsTakeTheSameNumberOfArguments() {
+		// Counts %@ and %d, including the numbered forms (%1$@) some languages need to reorder arguments.
+		let spec = try! NSRegularExpression(pattern: "%(\\d+\\$)?[@d]")
+		func count(_ s: String) -> Int { spec.numberOfMatches(in: s, range: NSRange(s.startIndex..., in: s)) }
+		for row in allStringRows where row.en.contains("%") {
+			XCTAssertEqual(Set([row.vi, row.en, row.ko].map(count)).count, 1, row.key)
+		}
+	}
+}

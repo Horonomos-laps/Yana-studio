@@ -18,9 +18,12 @@ func post(_ action: MenuAction) {
 }
 
 struct YanaCommands: Commands {
+	// The menu shortcuts come from the store, so a change in Settings > Shortcuts shows up here at once.
+	@ObservedObject private var shortcuts = ShortcutStore.shared
+
 	var body: some Commands {
 		CommandGroup(replacing: .appSettings) {
-			Button(L("nav.Settings") + "…") { post(.settings) }.keyboardShortcut(",", modifiers: .command)
+			Button(L("nav.Settings") + "…") { post(.settings) }.yanaShortcut(shortcuts.effective(.settings))
 			Button(L("menu.checkUpdates")) { post(.checkUpdates) }
 			Divider()
 			Button(L("menu.uninstall")) { post(.uninstall) }
@@ -29,18 +32,18 @@ struct YanaCommands: Commands {
 			Button(L("menu.tour")) { post(.tour) }
 		}
 		CommandGroup(replacing: .newItem) {
-			Button(L("chat.new")) { post(.newChat) }.keyboardShortcut("n", modifiers: .command)
-			Button(L("menu.openFolder")) { post(.openFolder) }.keyboardShortcut("o", modifiers: .command)
+			Button(L("chat.new")) { post(.newChat) }.yanaShortcut(shortcuts.effective(.newChat))
+			Button(L("menu.openFolder")) { post(.openFolder) }.yanaShortcut(shortcuts.effective(.openFolder))
 			Divider()
-			Button(L("menu.openStudio")) { post(.openStudio) }.keyboardShortcut("e", modifiers: [.command, .shift])
+			Button(L("menu.openStudio")) { post(.openStudio) }.yanaShortcut(shortcuts.effective(.openStudio))
 		}
 		CommandGroup(before: .sidebar) {
-			Button(L("nav.Terminal")) { post(.terminal) }.keyboardShortcut("`", modifiers: .control)
-			Button(L("menu.toggleChatList")) { post(.toggleChatList) }.keyboardShortcut("s", modifiers: [.command, .control])
+			Button(L("nav.Terminal")) { post(.terminal) }.yanaShortcut(shortcuts.effective(.terminal))
+			Button(L("menu.toggleChatList")) { post(.toggleChatList) }.yanaShortcut(shortcuts.effective(.toggleChatList))
 			Divider()
 			ForEach(Array(railEntries.prefix(7).enumerated()), id: \.offset) { index, entry in
 				Button(L("nav.\(entry.id)")) { post(MenuAction(rawValue: "page\(index + 1)") ?? .page1) }
-					.keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
+					.yanaShortcut(ShortcutAction(rawValue: "page\(index + 1)").flatMap { shortcuts.effective($0) })
 			}
 			Divider()
 		}

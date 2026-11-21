@@ -605,7 +605,7 @@ private let settingsSectionRows: [StringRow] = [
 	StringRow("set.about.data", "Yana lưu gì và ở đâu trên máy này.", "What Yana stores, and where on this Mac.", "Yana가 이 Mac 어디에 무엇을 저장하는지."),
 	StringRow("set.about.updates", "Phiên bản yana-rt và yana-ai so với bản mới nhất.", "yana-rt and yana-ai versions against the latest.", "yana-rt, yana-ai 버전과 최신 버전 비교."),
 	StringRow("set.about.system", "yana-rt mà app đang dùng.", "The yana-rt the app runs.", "앱이 실행하는 yana-rt."),
-	StringRow("set.about.shortcuts", "Phím tắt đang có trong app.", "Shortcuts available in the app.", "앱에서 쓸 수 있는 단축키."),
+	StringRow("set.about.shortcuts", "Đổi, bỏ hoặc đặt lại phím tắt của thanh menu; xem các phím cố định.", "Change, clear or restore the menu bar shortcuts, and see the fixed ones.", "메뉴 막대 단축키를 바꾸거나 지우거나 복원하고, 고정 단축키를 확인합니다."),
 	StringRow("set.about.about", "Yana là gì, phiên bản từng phần, giấy phép và thư viện bên ngoài.", "What Yana is, each part's version, license and third-party libraries.", "Yana 소개, 구성 요소별 버전, 라이선스와 외부 라이브러리."),
 	StringRow("set.window", "Cửa sổ", "Window", "창"),
 	StringRow("set.showChatList", "Hiện danh sách chat ở trang Chat", "Show the chat list on the Chat page", "채팅 페이지에 채팅 목록 표시"),

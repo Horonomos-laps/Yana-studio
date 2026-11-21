@@ -232,6 +232,30 @@ func scheduleWindowSnapshot() {
 	}
 }
 
+// `YANA_DUMP_MENU=out.txt` writes every menu item that has a shortcut as "title | key | modifiers" and quits.
+// It shows what the menu bar really bound, including changes made in Settings > Shortcuts.
+func scheduleMenuDump() {
+	guard let path = ProcessInfo.processInfo.environment["YANA_DUMP_MENU"], !path.isEmpty else { return }
+	DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+		var lines: [String] = []
+		func walk(_ menu: NSMenu) {
+			for item in menu.items {
+				if !item.keyEquivalent.isEmpty {
+					let m = item.keyEquivalentModifierMask
+					let mods = (m.contains(.control) ? "C" : "") + (m.contains(.option) ? "O" : "")
+						+ (m.contains(.shift) ? "S" : "") + (m.contains(.command) ? "M" : "")
+					lines.append("\(item.title) | \(item.keyEquivalent) | \(mods)")
+				}
+				if let sub = item.submenu { walk(sub) }
+			}
+		}
+		if let main = NSApp.mainMenu { walk(main) }
+		try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+		print("menu \(path)")
+		exit(0)
+	}
+}
+
 @main
 struct YanaApp: App {
 	@NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -252,6 +276,7 @@ struct YanaApp: App {
 			exit(0)
 		}
 		scheduleWindowSnapshot()
+		scheduleMenuDump()
 	}
 
 	var body: some Scene {

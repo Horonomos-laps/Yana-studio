@@ -96,23 +96,4 @@ struct DataSettings: View {
 	}
 }
 
-struct ShortcutSettings: View {
-	private let rows: [(keys: String, key: String)] = [
-		("⌘T", "set.kNewTab"), ("⌘W", "set.kCloseTab"), ("⌘=  ⌘−", "set.kZoom"),
-		("/", "set.kSkills"), ("↩", "set.kSend"),
-	]
-
-	var body: some View {
-		Form {
-			Section {
-				ForEach(rows, id: \.key) { row in
-					LabeledContent(L(row.key)) {
-						Text(row.keys).font(.system(size: 12, weight: .medium, design: .monospaced))
-							.padding(.horizontal, 8).padding(.vertical, 3)
-							.background(RoundedRectangle(cornerRadius: 6).fill(FB.surfaceSecondary))
-					}
-				}
-			} footer: { SettingsNote(L("set.kNote")) }
-		}
-	}
-}
+// The Shortcuts pane is in ShortcutViews.swift.
