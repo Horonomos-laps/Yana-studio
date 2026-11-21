@@ -55,7 +55,7 @@ extension RtClient {
 		data.branch = text("/usr/bin/git", ["rev-parse", "--abbrev-ref", "HEAD"], in: data.workspace) ?? "unknown"
 		do {
 			data.activity = try run(["observability", "show", "--last", "500"], as: ActivitySummary.self)
-			data.pendingCount = try run(["authority", "pending-approvals"], as: [PendingApproval].self).count
+			data.pendingCount = try waitingApprovals().count
 			data.latestDecisions = Array(try run(["authority", "receipts"], as: [DecisionReceipt].self).suffix(5).reversed())
 		} catch let error as RtError {
 			data.error = error.message

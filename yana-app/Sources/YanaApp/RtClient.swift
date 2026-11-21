@@ -20,9 +20,26 @@ struct ExecutionReceipt: Decodable, Identifiable {
 	var id: String { invocationId }
 }
 
-// Only the fields the screen shows. `pending-approvals` is empty today, so its shape is read loosely.
+// One entry of `yana-rt authority pending-approvals`. Only `approval_id` is required; the rest is read loosely so a
+// field yana-rt adds or drops later does not turn the whole page into an error. The command also lists entries
+// that were already decided or have expired, so `isWaiting` is what counts as "waiting for a person".
 struct PendingApproval: Decodable, Identifiable {
-	let id: String
+	let approvalId: String
+	var authorityReason: String? = nil
+	var pendingCall: PendingCall? = nil
+	var resolved: Bool? = nil
+	var id: String { approvalId }
+
+	struct PendingCall: Decodable {
+		var name: String? = nil
+	}
+
+	var isWaiting: Bool { resolved != true }
+	// "write_file: capability 'file.write' requires explicit human approval", whatever of that is present.
+	var summary: String {
+		[pendingCall?.name, authorityReason?.split(separator: ":", maxSplits: 1).last.map { $0.trimmingCharacters(in: .whitespaces) }]
+			.compactMap { $0 }.joined(separator: ": ")
+	}
 }
 
 struct ApprovalsData {
@@ -94,10 +111,15 @@ enum RtClient {
 		do { return try decoder.decode(T.self, from: data) } catch { throw RtError.badOutput(args.joined(separator: " ")) }
 	}
 
+	// The approvals that still wait for a person; entries already decided are left out.
+	static func waitingApprovals() throws -> [PendingApproval] {
+		try run(["authority", "pending-approvals"], as: [PendingApproval].self).filter(\.isWaiting)
+	}
+
 	static func loadApprovals() -> ApprovalsData {
 		do {
 			var data = ApprovalsData()
-			data.pending = try run(["authority", "pending-approvals"], as: [PendingApproval].self)
+			data.pending = try waitingApprovals()
 			data.decisions = try run(["authority", "receipts"], as: [DecisionReceipt].self).reversed()
 			data.executions = try run(["authority", "executions"], as: [ExecutionReceipt].self).reversed()
 			return data

@@ -69,7 +69,7 @@ struct RightPanel: View {
 			var result = PanelStatus()
 			result.version = RtClient.versionString()
 			result.branch = RtClient.gitBranch(in: workspace)
-			result.pending = (try? RtClient.run(["authority", "pending-approvals"], as: [PendingApproval].self).count) ?? 0
+			result.pending = (try? RtClient.waitingApprovals().count) ?? 0
 			return result
 		}.value
 	}

@@ -37,7 +37,7 @@ struct ApprovalsPage: View {
 						if data.pending.isEmpty {
 							Text(L("appr.nothingWaiting")).font(.fbBody).foregroundStyle(FB.textSecondary)
 						} else {
-							ForEach(data.pending) { Text($0.id).font(.fbBody).foregroundStyle(FB.text) }
+							ForEach(data.pending) { Text($0.summary.isEmpty ? $0.id : $0.summary).font(.fbBody).foregroundStyle(FB.text) }
 						}
 					}
 					.frame(width: 300)
