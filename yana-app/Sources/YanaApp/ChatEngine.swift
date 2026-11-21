@@ -177,6 +177,7 @@ final class ChatEngine: ObservableObject {
 	private static let maxHistoryTurns = 40 // yana-rt's own MAX_HISTORY_TURNS
 	private static let errorTailChars = 400
 	private static let ollamaPath = "/opt/homebrew/bin/ollama"
+	private var turnStartedAt = Date()
 	private var sessionId = UUID().uuidString.lowercased()
 	private var turnProvider = AppSettings.shared.provider
 	private var process: Process?
@@ -382,6 +383,7 @@ final class ChatEngine: ObservableObject {
 		do { try process.run() } catch { failLast("yana-rt could not start: \(error.localizedDescription)"); return }
 		self.process = process
 		running = true
+		turnStartedAt = Date()
 		stdin.fileHandleForWriting.write(body)
 		try? stdin.fileHandleForWriting.close()
 
@@ -483,7 +485,7 @@ final class ChatEngine: ObservableObject {
 	private func finish(status: Int32, stderr: String) {
 		running = false
 		process = nil
-		defer { saveToHistory() } // every finished turn lands in "Recent", errors included
+		defer { saveToHistory(); notifyIfNeeded() } // every finished turn lands in "Recent", errors included
 		guard let last = lines.indices.last else { return }
 		if lines[last].role == .assistant, MemoryStore.shared.enabled {
 			let split = Self.extractProposal(lines[last].text)
@@ -499,6 +501,22 @@ final class ChatEngine: ObservableObject {
 				return
 			}
 			lines[last].error = detail.isEmpty ? "yana-rt exited with code \(status)" : String(detail.suffix(Self.errorTailChars))
+		}
+	}
+
+	// A notification when the turn is over, or waiting for the person, while the app is not in front (Notifier).
+	private func notifyIfNeeded() {
+		guard let line = lines.last, line.role == .assistant else { return }
+		let waiting = line.approval != nil && line.approval?.decided == nil
+		guard Notifier.shouldNotify(enabled: Notifier.enabled, appActive: NSApplication.shared.isActive,
+		                            elapsed: Date().timeIntervalSince(turnStartedAt), needsPerson: waiting) else { return }
+		let chat = title.map { String($0.split(separator: "\n").first ?? "").prefix(40) } ?? ""
+		if let ask = line.approval, waiting {
+			Notifier.post(title: L("notify.approval"), body: "\(ask.capability): \(Notifier.summary(ask.reason, limit: 100))", id: "approval-\(sessionId)")
+		} else if let error = line.error {
+			Notifier.post(title: L("notify.error"), body: Notifier.summary(error, limit: 120), id: "done-\(sessionId)")
+		} else if !line.text.isEmpty {
+			Notifier.post(title: chat.isEmpty ? L("notify.done") : "\(L("notify.done")) · \(chat)", body: Notifier.summary(line.text), id: "done-\(sessionId)")
 		}
 	}
 

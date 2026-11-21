@@ -181,6 +181,8 @@ struct GeneralSettings: View {
 
 struct ChatSettings: View {
 	@ObservedObject private var settings = AppSettings.shared
+	// Notifications when a long turn ends or waits for a decision (Notifier.swift); on until switched off.
+	@AppStorage(Notifier.defaultsKey) private var notify = true
 	// Installed system voices, by display name.
 	private let voices: [(id: String, name: String)] = NSSpeechSynthesizer.availableVoices.map { voice in
 		let name = NSSpeechSynthesizer.attributes(forVoice: voice)[.name] as? String ?? voice.rawValue
@@ -195,6 +197,7 @@ struct ChatSettings: View {
 					Text(L("chat.modePlan")).tag(true)
 				}
 				Toggle(L("set.showTokens"), isOn: $settings.showTokens)
+				Toggle(L("set.notify"), isOn: $notify)
 			} footer: { SettingsNote(L("set.defaultModeNote")) }
 
 			Section {
