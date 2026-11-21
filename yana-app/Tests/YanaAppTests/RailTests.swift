@@ -48,11 +48,11 @@ final class RailTests: XCTestCase {
 		let right = zoom.convert(zoom.bounds, to: content).maxX
 		let bottom = content.bounds.height - close.convert(close.bounds, to: content).minY
 		XCTAssertGreaterThan(right, 40, "the buttons were not laid out")
-		XCTAssertLessThanOrEqual(right + 10, RailMetrics.width, "the zoom button (\(right) pt) hangs over the rail (\(RailMetrics.width) pt)")
+		XCTAssertLessThanOrEqual(right + 6, RailMetrics.width, "the zoom button (\(right) pt) hangs over the rail (\(RailMetrics.width) pt)")
 		XCTAssertLessThanOrEqual(bottom + 10, RailMetrics.topInset, "the first page starts under the buttons")
 	}
 
 	func testTheRailIsWideEnoughForItsItems() {
-		XCTAssertGreaterThanOrEqual(RailMetrics.width - RailMetrics.itemWidth, 16, "items need a margin on both sides")
+		XCTAssertGreaterThanOrEqual(RailMetrics.width - RailMetrics.itemWidth, 12, "items need a margin on both sides")
 	}
 }

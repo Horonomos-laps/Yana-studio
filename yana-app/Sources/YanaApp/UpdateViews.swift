@@ -143,11 +143,11 @@ struct UpdatePill: View {
 					Circle().fill(FB.primary).frame(width: 30, height: 30)
 					FBIcon(name: "download", size: 15, color: FB.onPrimary)
 				}
-				Text(L("upd.pill")).font(.system(size: 10, weight: .medium)).foregroundStyle(FB.primaryText)
 			}
 		}
 		.buttonStyle(.plain)
 		.help(L("upd.title"))
+		.accessibilityLabel(Text(L("upd.pill")))
 		.offset(y: shown ? 0 : 24)
 		.opacity(shown ? 1 : 0)
 		.onAppear {

@@ -1,17 +1,17 @@
 import SwiftUI
 
-// The far-left rail: a flat column with the Yana mark, the pages in two groups, then the update notice and Settings.
-// Each page is an icon with its name under it, so the rail can be read at a glance. The Chat entry shows a live dot while the AI is
+// The far-left rail: a flat, narrow column of icons: the Yana mark, the pages in two groups, then the update notice
+// and Settings. A page's name shows when the pointer rests on its icon. The Chat entry shows a live dot while the AI is
 // working, so it is visible from any page.
 
 enum RailMetrics {
 	// The window's close, minimize and zoom buttons are moved into the top of the rail (TrafficLights.swift), so the
 	// rail only has to be wider than that row with room to spare (RailTests measures it).
-	static let width: CGFloat = 68
+	static let width: CGFloat = 56
 	// Space above the first item, below the buttons.
 	static let topInset: CGFloat = 52
-	static let itemWidth: CGFloat = 52
-	static let itemHeight: CGFloat = 50
+	static let itemWidth: CGFloat = 40
+	static let itemHeight: CGFloat = 40
 	// How many of the first pages form the main group; the others follow after a divider.
 	static let mainGroupSize = 4
 
@@ -32,21 +32,14 @@ struct RailItem: View {
 	// The page's own color (Accent.swift): its icon and, when open, its name and glass tint.
 	var accent: Accent = .blue
 	@State private var hover = false
+	private static let restingOpacity = 0.75
 
 	var body: some View {
-		VStack(spacing: 4) {
-			ZStack(alignment: .topTrailing) {
-				FBIcon(name: icon, size: 20, color: accent.color.opacity(selected ? 1 : 0.82))
-				if busy { RailBusyDot().offset(x: 5, y: -3) }
-				if alert { Circle().fill(FB.error).frame(width: 8, height: 8).offset(x: 5, y: -3) }
-			}
-			.frame(height: 22)
-			Text(label)
-				.font(.system(size: 10.5, weight: selected ? .semibold : .medium))
-				.foregroundStyle(selected ? accent.color : FB.textSecondary)
-				.multilineTextAlignment(.center)
-				.lineLimit(2)
-				.minimumScaleFactor(0.85)
+		// Icon only: the name is the tooltip and the accessibility label.
+		ZStack(alignment: .topTrailing) {
+			FBIcon(name: icon, size: 22, color: accent.color.opacity(selected ? 1 : Self.restingOpacity))
+			if busy { RailBusyDot().offset(x: 5, y: -3) }
+			if alert { Circle().fill(FB.error).frame(width: 8, height: 8).offset(x: 5, y: -3) }
 		}
 		.frame(width: RailMetrics.itemWidth, height: RailMetrics.itemHeight)
 		.modifier(RailItemSurface(selected: selected, hover: hover, tint: accent.color))
@@ -86,7 +79,7 @@ struct IconRail: View {
 		VStack(spacing: 4) {
 			RabbitLogo(cell: 1.4).padding(.bottom, 8).help("Yana")
 			ForEach(Array(RailMetrics.groups(railEntries).enumerated()), id: \.offset) { index, group in
-				if index > 0 { FB.divider.frame(width: 40, height: 1).padding(.vertical, 6) }
+				if index > 0 { FB.divider.frame(width: 28, height: 1).padding(.vertical, 6) }
 				ForEach(group) { entry in
 					RailItem(icon: entry.icon, label: L("nav.\(entry.id)"), selected: selected == entry.id,
 					         busy: entry.id == "Chat" && engine.running, accent: Accent.page(entry.id))
@@ -112,7 +105,7 @@ struct IconRail: View {
 						.frame(width: 520).padding(10)
 					}
 			}
-			FB.divider.frame(width: 40, height: 1).padding(.vertical, 6)
+			FB.divider.frame(width: 28, height: 1).padding(.vertical, 6)
 			RailItem(icon: "settings", label: L("nav.Settings"), selected: selected == "Settings", accent: Accent.page("Settings"))
 				.onTapGesture { selected = "Settings" }
 		}

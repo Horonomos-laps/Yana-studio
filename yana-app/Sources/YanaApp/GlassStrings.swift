@@ -14,11 +14,12 @@ let glassRows: [StringRow] = [
 	StringRow("set.glassOff", "Đang dùng giao diện phẳng vì Mac chưa lên macOS 26, hoặc đã bật “Giảm độ trong suốt” trong Cài đặt hệ thống.", "The flat look is in use because this Mac is older than macOS 26 or “Reduce transparency” is on in System Settings.", "macOS 26 미만이거나 시스템 설정에서 \"투명도 줄이기\"가 켜져 있어 일반 스타일을 사용 중입니다."),
 ]
 
-// The surface behind a page in the icon rail. The rail is a plain flat column (no glass): the open page is a tile
-// washed with its own color, a page under the pointer gets a lighter wash of the same color.
+// The surface behind a page in the icon rail. The rail is a plain flat column (no glass, no color): the open page
+// is a tile with a neutral gray wash, a page under the pointer gets a lighter one. The page's color stays in its
+// icon and name only.
 struct RailItemSurface: ViewModifier {
-	static let selectedWash = 0.14
-	static let hoverWash = 0.07
+	static let selectedWash = 0.08
+	static let hoverWash = 0.04
 	static let corner: CGFloat = 12
 	let selected: Bool
 	let hover: Bool
@@ -27,7 +28,7 @@ struct RailItemSurface: ViewModifier {
 	func body(content: Content) -> some View {
 		content.background(
 			RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
-				.fill(tint.opacity(selected ? Self.selectedWash : hover ? Self.hoverWash : 0))
+				.fill(Color.primary.opacity(selected ? Self.selectedWash : hover ? Self.hoverWash : 0))
 		)
 	}
 }
