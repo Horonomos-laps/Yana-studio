@@ -23,6 +23,9 @@ enum LiquidGlass {
 		         reduceTransparency: NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency, rendering: isRenderingForImage)
 	}
 
+	// Glass takes its color from what lies behind it, which is how it picked up a yellow cast (the wallpaper, the
+	// display). A pure white layer under every glass surface at this strength keeps the whites white.
+	static let whiteBacking = 0.75
 	// Space between a floating panel and the window edge.
 	static let panelInset: CGFloat = 8
 	static let panelRadius: CGFloat = 24
@@ -38,7 +41,9 @@ struct YanaGlass<S: Shape>: ViewModifier {
 
 	func body(content: Content) -> some View {
 		if LiquidGlass.active, #available(macOS 26.0, *) {
-			content.glassEffect(style, in: shape)
+			content
+				.glassEffect(style, in: shape)
+				.background { shape.fill(Color.white.opacity(LiquidGlass.whiteBacking)) }
 		} else {
 			content
 				.background(shape.fill(FB.canvas))
@@ -65,7 +70,12 @@ struct FloatingPanel: ViewModifier {
 			let shape = RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous)
 			content
 				.clipShape(shape)
-				.background { Color.clear.glassEffect(.regular, in: shape) }
+				.background {
+					ZStack {
+						shape.fill(Color.white.opacity(LiquidGlass.whiteBacking))
+						Color.clear.glassEffect(.regular, in: shape)
+					}
+				}
 				.padding(EdgeInsets(top: LiquidGlass.panelInset, leading: 2, bottom: LiquidGlass.panelInset, trailing: LiquidGlass.panelInset))
 		} else {
 			content
@@ -95,9 +105,13 @@ struct SidePanelBackground: ViewModifier {
 		if LiquidGlass.active, #available(macOS 26.0, *) {
 			content.background {
 				Color.clear.overlay {
-					RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous)
-						.fill(Color.clear)
-						.glassEffect(.regular, in: RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous))
+					ZStack {
+						RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous)
+							.fill(Color.white.opacity(LiquidGlass.whiteBacking))
+						RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous)
+							.fill(Color.clear)
+							.glassEffect(.regular, in: RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous))
+					}
 						.padding(EdgeInsets(top: LiquidGlass.panelInset, leading: leadingInset, bottom: LiquidGlass.panelInset, trailing: 2))
 				}
 			}

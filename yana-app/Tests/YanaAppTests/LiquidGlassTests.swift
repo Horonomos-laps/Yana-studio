@@ -2,6 +2,11 @@ import XCTest
 @testable import YanaApp
 
 final class LiquidGlassTests: XCTestCase {
+	func testTheWhiteLayerUnderGlassIsStrongEnoughToKeepWhitesWhiteButLeavesTheGlass() {
+		XCTAssertGreaterThanOrEqual(LiquidGlass.whiteBacking, 0.5)
+		XCTAssertLessThan(LiquidGlass.whiteBacking, 1)
+	}
+
 	func testItIsOnOnlyWhenEveryConditionHolds() {
 		XCTAssertTrue(LiquidGlass.isActive(enabled: true, osMajor: 26, reduceTransparency: false, rendering: false))
 		XCTAssertTrue(LiquidGlass.isActive(enabled: true, osMajor: 27, reduceTransparency: false, rendering: false))
