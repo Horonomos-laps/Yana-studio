@@ -29,6 +29,7 @@ struct Chip: View {
 struct ChatHome: View {
 	@EnvironmentObject private var engine: ChatEngine
 	@State private var text = ""
+	private static let suggestionsMaxWidth: CGFloat = 760
 	// Speaking into the box (Dictation.swift). Audio stays on this Mac unless allowed in Settings > Chat.
 	@StateObject private var dictation = DictationEngine()
 	@AppStorage("yana.dictation.allowServer") private var dictationServer = false
@@ -271,6 +272,11 @@ struct ChatHome: View {
 				Text(L("chat.heading")).font(.system(size: 30, weight: .semibold)).foregroundStyle(FB.text)
 					.padding(.bottom, 22)
 				inputArea
+				// Cards to start from; a click fills the box (it does not send) and hands the focus to typing.
+				if ChatSuggestion.visible(chatIsEmpty: engine.lines.isEmpty, draft: text) {
+					SuggestionCards { text = $0 }
+						.padding(.horizontal, 8).padding(.top, 18).frame(maxWidth: Self.suggestionsMaxWidth)
+				}
 				// Equal space above and below: heading and composer sit in the vertical middle.
 				Spacer(minLength: 0)
 			} else {
