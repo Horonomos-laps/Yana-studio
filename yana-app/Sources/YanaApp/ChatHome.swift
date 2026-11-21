@@ -29,6 +29,9 @@ struct Chip: View {
 struct ChatHome: View {
 	@EnvironmentObject private var engine: ChatEngine
 	@State private var text = ""
+	// Speaking into the box (Dictation.swift). Audio stays on this Mac unless allowed in Settings > Chat.
+	@StateObject private var dictation = DictationEngine()
+	@AppStorage("yana.dictation.allowServer") private var dictationServer = false
 	@State private var showModels = false
 	@State private var showKeys = false
 	@State private var keyTarget: KeyTarget? = nil
@@ -312,8 +315,12 @@ struct ChatHome: View {
 					.font(.system(size: 15))
 					.lineLimit(1 ... 6)
 					.onSubmit(send)
-					.onChange(of: text) { _, new in if new.hasPrefix("/") { engine.loadSkillsIfNeeded() } }
+					.onChange(of: text) { _, new in
+						dictation.userEdited(new)
+						if new.hasPrefix("/") { engine.loadSkillsIfNeeded() }
+					}
 			}
+			dictationStatus
 
 			HStack(spacing: 4) {
 				FBIconButton(icon: "plus", variant: .ghost, size: .small, tooltip: L("plus.title")) { showPlus = true }
@@ -351,6 +358,7 @@ struct ChatHome: View {
 							keyTarget = nil
 						}
 					}
+				micButton
 				Button(action: engine.running ? engine.stop : send) {
 					FBIcon(name: engine.running ? "stop" : "arrow-up", size: 15, color: FB.onPrimary)
 						.frame(width: 32, height: 32)
@@ -363,6 +371,36 @@ struct ChatHome: View {
 		.padding(EdgeInsets(top: 16, leading: 18, bottom: 10, trailing: 10))
 		.glassCard(radius: 24)
 		.overlay(RoundedRectangle(cornerRadius: 24).stroke(FB.primary, lineWidth: 2).opacity(dropTargeted ? 1 : 0))
+		.onReceive(NotificationCenter.default.publisher(for: .yanaDictateNow)) { _ in toggleDictation() }
+		.onDisappear { dictation.stop() }
+	}
+
+	// The microphone: red while listening. Pressing it again, sending, or typing by hand ends the run.
+	private var micButton: some View {
+		Button(action: toggleDictation) {
+			FBIcon(name: "mic", size: 15, color: dictation.listening ? FB.onPrimary : FB.textSecondary)
+				.frame(width: 32, height: 32)
+				.background(Circle().fill(dictation.listening ? FB.error : .clear))
+		}
+		.buttonStyle(.plain)
+		.help(dictation.listening ? L("dict.stop") : L("dict.start"))
+		.accessibilityLabel(Text(dictation.listening ? L("dict.stop") : L("dict.start")))
+	}
+
+	// "Listening…", or why dictation did not start, with a shortcut to the System Settings pane that fixes it.
+	@ViewBuilder
+	private var dictationStatus: some View {
+		if dictation.listening {
+			Text(L("dict.listening")).font(.fbCaption).foregroundStyle(FB.errorText)
+		} else if case .failed(let failure) = dictation.state {
+			HStack(spacing: 8) {
+				Text(failure.messageKey.map { L($0) } ?? { if case .other(let why) = failure { return why } else { return "" } }())
+					.font(.fbCaption).foregroundStyle(FB.warningText)
+				if let url = failure.settingsURL {
+					Button(L("dict.openSettings")) { NSWorkspace.shared.open(url) }.buttonStyle(.link).font(.fbCaption)
+				}
+			}
+		}
 	}
 
 	// Thumbnails of the images waiting to be sent, each with a remove button.
@@ -501,9 +539,15 @@ struct ChatHome: View {
 			return
 		}
 		guard canSend else { return }
+		dictation.stop()
 		let message = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxInputChars))
 		text = ""
 		engine.send(message)
+	}
+
+	private func toggleDictation() {
+		dictation.clearFailure()
+		dictation.toggle(draft: text, language: Loc.shared.lang, allowServer: dictationServer) { text = $0 }
 	}
 }
 

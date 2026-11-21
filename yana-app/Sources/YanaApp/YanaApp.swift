@@ -146,6 +146,11 @@ struct RootView: View {
 		case .openStudio: editor.open(folder: engine.workspace)
 		case .terminal: terminals.wantsPanel = true; selected = "Chat"
 		case .toggleChatList: chatSidebar.toggle(); selected = "Chat"
+		case .dictate:
+			// The chat box does the listening, so the chat page has to be showing first.
+			let wait = selected == "Chat" ? 0.0 : 0.35
+			selected = "Chat"
+			DispatchQueue.main.asyncAfter(deadline: .now() + wait) { NotificationCenter.default.post(name: .yanaDictateNow, object: nil) }
 		case .pinChat:
 			// Only a chat that is already saved can be pinned; a chat with no messages yet is not.
 			let history = ChatHistoryStore.shared

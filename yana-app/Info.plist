@@ -16,5 +16,9 @@
 	<string>14.0</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Yana uses the microphone so you can dictate a message into the chat box.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Yana turns your speech into text for the chat box. This happens on your Mac unless you allow Apple's servers in Settings.</string>
 </dict>
 </plist>

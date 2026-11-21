@@ -189,6 +189,8 @@ struct ChatSettings: View {
 	@ObservedObject private var settings = AppSettings.shared
 	// Notifications when a long turn ends or waits for a decision (Notifier.swift); on until switched off.
 	@AppStorage(Notifier.defaultsKey) private var notify = true
+	// Speech to text may use Apple's servers only for a language with no on-device model (Dictation.swift).
+	@AppStorage("yana.dictation.allowServer") private var dictationServer = false
 	// Installed system voices, by display name.
 	private let voices: [(id: String, name: String)] = NSSpeechSynthesizer.availableVoices.map { voice in
 		let name = NSSpeechSynthesizer.attributes(forVoice: voice)[.name] as? String ?? voice.rawValue
@@ -212,6 +214,10 @@ struct ChatSettings: View {
 					ForEach(voices, id: \.id) { Text($0.name).tag($0.id) }
 				}
 			} header: { Text(L("msg.read")) } footer: { SettingsNote(L("set.voiceNote")) }
+
+			Section {
+				Toggle(L("set.dictServer"), isOn: $dictationServer)
+			} header: { Text(L("set.dict")) } footer: { SettingsNote(L("set.dictNote")) }
 		}
 	}
 }
