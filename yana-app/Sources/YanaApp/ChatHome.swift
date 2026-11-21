@@ -69,6 +69,7 @@ struct ChatHome: View {
 	private var plusMenu: some View {
 		VStack(alignment: .leading, spacing: 2) {
 			plusItem("image", L("plus.images"), L("plus.imagesSub")) { pickImages() }
+			plusItem("monitor", L("appshot.title"), L("appshot.sub")) { takeAppshot() }
 			plusItem("folder", L("plus.folder"), URL(fileURLWithPath: engine.workspace).lastPathComponent) { chooseFolder() }
 			plusItem("zap", L("plus.skills"), L("plus.skillsSub")) { text = "/"; engine.loadSkillsIfNeeded() }
 			plusItem(engine.planMode ? "zap" : "eye", engine.planMode ? L("chat.modeAct") : L("chat.modePlan"), L("plus.modeSub")) {
@@ -372,6 +373,7 @@ struct ChatHome: View {
 		.glassCard(radius: 24)
 		.overlay(RoundedRectangle(cornerRadius: 24).stroke(FB.primary, lineWidth: 2).opacity(dropTargeted ? 1 : 0))
 		.onReceive(NotificationCenter.default.publisher(for: .yanaDictateNow)) { _ in toggleDictation() }
+		.onReceive(NotificationCenter.default.publisher(for: .yanaAppshotNow)) { _ in takeAppshot() }
 		.onDisappear { dictation.stop() }
 	}
 
@@ -543,6 +545,20 @@ struct ChatHome: View {
 		let message = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxInputChars))
 		text = ""
 		engine.send(message)
+	}
+
+	// Attaches a picture of the window behind Yana (Appshot.swift). It is an ordinary attachment: the thumbnail
+	// shows in the box and can be removed, and nothing is sent until the message is.
+	private func takeAppshot() {
+		engine.attachError = nil
+		Task {
+			switch await Appshot.capture() {
+			case .success(let shot): engine.attach(shot.image, name: shot.name)
+			case .failure(let failure):
+				if let key = failure.messageKey { engine.attachError = L(key) }
+				else if case .captureFailed(let why) = failure { engine.attachError = "\(L("appshot.failed")): \(why)" }
+			}
+		}
 	}
 
 	private func toggleDictation() {

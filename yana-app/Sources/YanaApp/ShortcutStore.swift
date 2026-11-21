@@ -62,7 +62,7 @@ struct Shortcut: Codable, Equatable, Hashable {
 
 // The actions that can be rebound. Each raw value is also the MenuAction the menu posts (AppCommands.swift).
 enum ShortcutAction: String, CaseIterable, Identifiable {
-	case newChat, openFolder, openStudio, terminal, toggleChatList, pinChat, dictate, settings
+	case newChat, openFolder, openStudio, terminal, toggleChatList, pinChat, dictate, appshot, settings
 	case page1, page2, page3, page4, page5, page6, page7
 	var id: String { rawValue }
 
@@ -75,6 +75,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
 		case .toggleChatList: return Shortcut(key: "s", command: true, control: true)
 		case .pinChat: return Shortcut(key: "p", command: true, option: true)
 		case .dictate: return Shortcut(key: "d", shift: true, control: true)
+		case .appshot: return Shortcut(key: "a", command: true, option: true)
 		case .settings: return Shortcut(key: ",", command: true)
 		case .page1: return Shortcut(key: "1", command: true)
 		case .page2: return Shortcut(key: "2", command: true)
@@ -95,6 +96,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
 		case .toggleChatList: return L("menu.toggleChatList")
 		case .pinChat: return L("history.pinToggle")
 		case .dictate: return L("dict.start")
+		case .appshot: return L("appshot.title")
 		case .settings: return L("nav.Settings")
 		default:
 			let index = (Int(rawValue.dropFirst(4)) ?? 1) - 1

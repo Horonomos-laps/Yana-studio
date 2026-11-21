@@ -151,6 +151,11 @@ struct RootView: View {
 			let wait = selected == "Chat" ? 0.0 : 0.35
 			selected = "Chat"
 			DispatchQueue.main.asyncAfter(deadline: .now() + wait) { NotificationCenter.default.post(name: .yanaDictateNow, object: nil) }
+		case .appshot:
+			// The picture is of the window behind Yana, so Yana stays where it is; the chat box attaches it.
+			let wait = selected == "Chat" ? 0.0 : 0.35
+			selected = "Chat"
+			DispatchQueue.main.asyncAfter(deadline: .now() + wait) { NotificationCenter.default.post(name: .yanaAppshotNow, object: nil) }
 		case .pinChat:
 			// Only a chat that is already saved can be pinned; a chat with no messages yet is not.
 			let history = ChatHistoryStore.shared
