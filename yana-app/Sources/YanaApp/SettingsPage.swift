@@ -73,7 +73,7 @@ struct SettingsPage: View {
 					.padding(EdgeInsets(top: 0, leading: 2, bottom: 8, trailing: 2))
 					ForEach(shown) { item in
 						if item.startsGroup && !searching { FB.divider.frame(height: 1).padding(.vertical, 6).padding(.horizontal, 10) }
-						SettingsNavRow(icon: item.icon, title: item.title, selected: item == section)
+						SettingsNavRow(icon: item.icon, title: item.title, selected: item == section, accent: Accent.section(item))
 							.onTapGesture { section = item }
 					}
 					if shown.isEmpty {
@@ -123,9 +123,10 @@ private struct PaneHeader: View {
 
 	var body: some View {
 		HStack(spacing: 14) {
-			FBIcon(name: section.icon, size: 22, color: FB.primaryText)
+			FBIcon(name: section.icon, size: 22, color: .white)
 				.frame(width: 44, height: 44)
-				.background(RoundedRectangle(cornerRadius: 11).fill(FB.primarySubtle))
+				.background(RoundedRectangle(cornerRadius: 11).fill(LinearGradient(
+					colors: [Accent.section(section).color, Accent.section(section).color.opacity(0.78)], startPoint: .top, endPoint: .bottom)))
 			VStack(alignment: .leading, spacing: 3) {
 				Text(section.title).font(.system(size: 18, weight: .semibold)).foregroundStyle(FB.text)
 				Text(section.subtitle).font(.fbBody).foregroundStyle(FB.textSecondary)
@@ -139,13 +140,15 @@ private struct SettingsNavRow: View {
 	let icon: String
 	let title: String
 	let selected: Bool
+	var accent: Accent = .blue
 	@State private var hover = false
 
 	var body: some View {
 		HStack(spacing: 10) {
-			FBIcon(name: icon, size: 13, color: selected ? FB.onPrimary : FB.primaryText)
+			// A colored tile like System Settings: solid with a white icon, so each section has its own color.
+			FBIcon(name: icon, size: 13, color: .white)
 				.frame(width: 24, height: 24)
-				.background(RoundedRectangle(cornerRadius: 6).fill(selected ? FB.primary : FB.primarySubtle))
+				.background(RoundedRectangle(cornerRadius: 6).fill(accent.color.opacity(selected ? 1 : 0.88)))
 			Text(title).font(.system(size: 13, weight: selected ? .semibold : .regular)).foregroundStyle(FB.text)
 			Spacer(minLength: 0)
 		}
@@ -171,6 +174,7 @@ struct GeneralSettings: View {
 	@ObservedObject private var loc = Loc.shared
 	@ObservedObject private var settings = AppSettings.shared
 	@AppStorage("yana.ui.chatSidebar") private var chatSidebar = true
+	@AppStorage(LiquidGlass.enabledKey) private var liquidGlass = true
 
 	var body: some View {
 		Form {
@@ -198,6 +202,10 @@ struct GeneralSettings: View {
 
 			Section {
 				Toggle(L("set.showChatList"), isOn: $chatSidebar)
+				Toggle(L("set.glass"), isOn: $liquidGlass)
+				if liquidGlass && !LiquidGlass.active {
+					Text(L("set.glassOff")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+				}
 				Toggle(L("set.updatesOnLaunch"), isOn: $settings.checkUpdatesOnLaunch)
 			} header: { Text(L("set.window")) }
 		}

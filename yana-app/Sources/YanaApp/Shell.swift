@@ -49,10 +49,7 @@ struct GlassCard: ViewModifier {
 	var radius: CGFloat
 
 	func body(content: Content) -> some View {
-		content
-			.background(RoundedRectangle(cornerRadius: radius).fill(FB.canvas))
-			.overlay(RoundedRectangle(cornerRadius: radius).stroke(dividerColor, lineWidth: 1))
-			.shadow(color: FB.shadow, radius: 14, y: 4)
+		content.yanaGlass(in: RoundedRectangle(cornerRadius: radius, style: .continuous))
 	}
 }
 
@@ -100,7 +97,7 @@ struct ChatSidebar: View {
 				.opacity(engine.running ? 0.4 : 1)
 
 			SidebarHeading(L("chat.projects"))
-			SidebarRow(icon: "folder", title: URL(fileURLWithPath: engine.workspace).lastPathComponent, strong: false)
+			SidebarRow(icon: "folder", title: URL(fileURLWithPath: engine.workspace).lastPathComponent, strong: false, accent: Accent.amber.color)
 				.help(engine.workspace)
 
 			// Saved chats (ChatHistory.swift), newest first; the open one is highlighted. Right-click deletes.
@@ -131,7 +128,7 @@ struct ChatSidebar: View {
 		.padding(EdgeInsets(top: 38, leading: 12, bottom: 14, trailing: 12))
 		.frame(width: 252)
 		.frame(maxHeight: .infinity)
-		.background(SidebarBackground(color: sidebarColor))
+		.sidePanelBackground(color: sidebarColor, leadingInset: 2)
 		.sheet(item: $renaming) { chat in
 			RenameSheet(text: $renameText, cancel: { renaming = nil }) {
 				history.rename(chat.id, to: renameText)
@@ -332,11 +329,12 @@ struct SidebarRow: View {
 	let icon: String
 	let title: String
 	let strong: Bool
+	var accent: Color? = nil
 	@State private var hover = false
 
 	var body: some View {
 		HStack(spacing: 9) {
-			FBIcon(name: icon, size: 15, color: strong ? FB.primaryText : FB.textSecondary)
+			FBIcon(name: icon, size: 15, color: accent ?? (strong ? FB.primaryText : FB.textSecondary))
 			Text(title).font(.system(size: 13, weight: strong ? .semibold : .regular)).foregroundStyle(FB.text).lineLimit(1)
 			Spacer(minLength: 0)
 		}

@@ -70,9 +70,10 @@ struct RootView: View {
 				if selected == "Chat" && chatSidebar { ChatSidebar { chatSidebar = false } }
 				page
 					.frame(maxWidth: .infinity, maxHeight: .infinity)
-					.background(FB.canvas)
 			}
 		}
+		// Under everything: the soft backdrop that Liquid Glass refracts, or flat white when it is off.
+		.background(GlassBackdrop())
 		// A new id on a language change rebuilds the whole tree so every L(...) is read again.
 		// `selected` lives on RootView, outside this subtree, so the open page is kept.
 		.task {

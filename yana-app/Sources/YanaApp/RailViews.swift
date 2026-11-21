@@ -29,29 +29,30 @@ struct RailItem: View {
 	var busy = false
 	// A red dot on the icon: something here needs a look.
 	var alert = false
+	// The page's own color (Accent.swift): its icon and, when open, its name and glass tint.
+	var accent: Accent = .blue
 	@State private var hover = false
 
 	var body: some View {
 		VStack(spacing: 4) {
 			ZStack(alignment: .topTrailing) {
-				FBIcon(name: icon, size: 20, color: selected ? FB.primaryText : FB.textSecondary)
+				FBIcon(name: icon, size: 20, color: accent.color.opacity(selected ? 1 : 0.82))
 				if busy { RailBusyDot().offset(x: 5, y: -3) }
 				if alert { Circle().fill(FB.error).frame(width: 8, height: 8).offset(x: 5, y: -3) }
 			}
 			.frame(height: 22)
 			Text(label)
 				.font(.system(size: 10.5, weight: selected ? .semibold : .medium))
-				.foregroundStyle(selected ? FB.primaryText : FB.textSecondary)
+				.foregroundStyle(selected ? accent.color : FB.textSecondary)
 				.multilineTextAlignment(.center)
 				.lineLimit(2)
 				.minimumScaleFactor(0.85)
 		}
 		.frame(width: RailMetrics.itemWidth, height: RailMetrics.itemHeight)
-		.background(RoundedRectangle(cornerRadius: 12).fill(selected ? FB.canvas : hover ? FB.hoverOnChrome : .clear))
-		.overlay(RoundedRectangle(cornerRadius: 12).stroke(selected ? FB.primaryBorder : .clear, lineWidth: 1))
+		.modifier(RailItemSurface(selected: selected, hover: hover, tint: accent.color))
 		.overlay(alignment: .leading) {
 			// A short bar on the left edge marks the page that is open.
-			RoundedRectangle(cornerRadius: 1.5).fill(FB.primary).frame(width: 3, height: 22)
+			RoundedRectangle(cornerRadius: 1.5).fill(accent.color).frame(width: 3, height: 22)
 				.offset(x: -5).opacity(selected ? 1 : 0)
 		}
 		.shadow(color: selected ? FB.shadow : .clear, radius: 6, y: 2)
@@ -94,7 +95,7 @@ struct IconRail: View {
 				if index > 0 { FB.divider.frame(width: 40, height: 1).padding(.vertical, 6) }
 				ForEach(group) { entry in
 					RailItem(icon: entry.icon, label: L("nav.\(entry.id)"), selected: selected == entry.id,
-					         busy: entry.id == "Chat" && engine.running)
+					         busy: entry.id == "Chat" && engine.running, accent: Accent.page(entry.id))
 						.onTapGesture { selected = entry.id }
 				}
 			}
@@ -105,7 +106,7 @@ struct IconRail: View {
 			}
 			// Install/update notice, folded into one button (red dot) instead of a banner over the content.
 			if runtime.showsBanner {
-				RailItem(icon: "download", label: L("rt.updateButton"), selected: showUpdate, alert: true)
+				RailItem(icon: "download", label: L("rt.updateButton"), selected: showUpdate, alert: true, accent: .green)
 					.onTapGesture { showUpdate.toggle() }
 					.popover(isPresented: $showUpdate, arrowEdge: .trailing) {
 						// Install runs in the app's own terminal panel; the app keeps working meanwhile.
@@ -118,13 +119,13 @@ struct IconRail: View {
 					}
 			}
 			FB.divider.frame(width: 40, height: 1).padding(.vertical, 6)
-			RailItem(icon: "settings", label: L("nav.Settings"), selected: selected == "Settings")
+			RailItem(icon: "settings", label: L("nav.Settings"), selected: selected == "Settings", accent: Accent.page("Settings"))
 				.onTapGesture { selected = "Settings" }
 		}
 		.padding(EdgeInsets(top: RailMetrics.topInset, leading: (RailMetrics.width - RailMetrics.itemWidth) / 2, bottom: 14,
 		                    trailing: (RailMetrics.width - RailMetrics.itemWidth) / 2))
 		.frame(width: RailMetrics.width)
 		.frame(maxHeight: .infinity)
-		.background(SidebarBackground(color: railBackground))
+		.sidePanelBackground(color: railBackground)
 	}
 }
