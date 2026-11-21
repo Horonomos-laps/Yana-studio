@@ -1,10 +1,10 @@
 import SwiftUI
 
 // The picture behind the install window of Yana-<version>.dmg (`YanaApp --dmg-background out.png`, 2x).
-// 640 x 420 pt, Finder places Yana.app at (160, 200) and the Applications link at (480, 200) on top of it
-// (package.sh), so the arrow and the two pedestals below line up with those icons.
+// 640 x 460 pt, Finder places Yana.app at (160, 200), the Applications link at (480, 200) and the install guide
+// picture at (320, 322) on top of it (package.sh), so the arrow and the two pedestals line up with the first two.
 struct DmgBackground: View {
-	static let size = CGSize(width: 640, height: 420)
+	static let size = CGSize(width: 640, height: 460)
 	static let appCenter = CGPoint(x: 160, y: 200)
 	static let applicationsCenter = CGPoint(x: 480, y: 200)
 	private static let pedestal: CGFloat = 150
@@ -19,7 +19,7 @@ struct DmgBackground: View {
 			pedestal(at: Self.appCenter)
 			pedestal(at: Self.applicationsCenter)
 			arrow.position(x: 320, y: Self.appCenter.y)
-			footer.frame(width: Self.size.width).offset(y: 352)
+			footer.frame(width: Self.size.width).offset(y: 408)
 		}
 		.frame(width: Self.size.width, height: Self.size.height)
 	}
@@ -52,11 +52,11 @@ struct DmgBackground: View {
 		}
 	}
 
-	// The app is not signed with a Developer ID, so the first open needs one extra step.
+	// The app is not signed with a Developer ID, so macOS may block the first open. The picture above says what to do.
 	private var footer: some View {
 		VStack(spacing: 3) {
-			Text("Lần đầu mở: chuột phải vào Yana trong Applications, chọn Mở.")
-			Text("First launch: right-click Yana in Applications and choose Open.")
+			Text("Bị macOS chặn khi mở lần đầu? Bấm vào ảnh hướng dẫn ở trên.")
+			Text("Blocked on first launch? Open the guide picture above.")
 		}
 		.font(.system(size: 11)).foregroundStyle(Self.muted)
 	}

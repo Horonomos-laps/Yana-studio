@@ -91,9 +91,13 @@ ditto -c -k --keepParent "$app" "$zip_out"
 stage="$(mktemp -d)"
 cp -R "$app" "$stage/"
 ln -s /Applications "$stage/Applications"
+# The install guide, shown as a picture in the window: a click on it opens it like any image. The name is plain
+# ASCII on purpose, because Finder looks the item up by name below and accented names differ between Unicode forms.
+guide_name="Huong dan - Read me first.png"
+cp "$here/dmg/install-guide.png" "$stage/$guide_name"
 mkdir -p "$stage/.background"
 "$bin_dir/YanaApp" --dmg-background "$icon_dir/bg@2x.png" >/dev/null
-sips -z 420 640 "$icon_dir/bg@2x.png" --out "$icon_dir/bg.png" >/dev/null
+sips -z 460 640 "$icon_dir/bg@2x.png" --out "$icon_dir/bg.png" >/dev/null
 tiffutil -cathidpicheck "$icon_dir/bg.png" "$icon_dir/bg@2x.png" -out "$stage/.background/background.tiff" >/dev/null
 
 volname="Yana $version"
@@ -108,7 +112,7 @@ tell application "Finder"
 		set current view of container window to icon view
 		set toolbar visible of container window to false
 		set statusbar visible of container window to false
-		set bounds of container window to {200, 120, 840, 562}
+		set bounds of container window to {200, 120, 840, 602}
 		set opts to the icon view options of container window
 		set arrangement of opts to not arranged
 		set icon size of opts to 112
@@ -116,6 +120,7 @@ tell application "Finder"
 		set background picture of opts to file ".background:background.tiff"
 		set position of item "Yana.app" of container window to {160, 200}
 		set position of item "Applications" of container window to {480, 200}
+		set position of item "$guide_name" of container window to {320, 322}
 		close
 		open
 		update without registering applications
