@@ -20,6 +20,13 @@ struct SavedChat: Codable, Identifiable, Equatable {
 	var provider: String
 	var model: String?
 	var lines: [SavedLine]
+	// Set by the person in the sidebar. Optional, so chats saved before these existed still load; the engine
+	// keeps them when it saves the chat again (ChatEngine.saveToHistory).
+	var customTitle: String? = nil
+	var pinned: Bool? = nil
+
+	var displayTitle: String { customTitle.flatMap { $0.isEmpty ? nil : $0 } ?? title }
+	var isPinned: Bool { pinned == true }
 }
 
 @MainActor
@@ -56,6 +63,43 @@ final class ChatHistoryStore: ObservableObject {
 	}
 
 	func chat(_ id: String) -> SavedChat? { chats.first { $0.id == id } }
+
+	// Pinned chats first, then the newest.
+	var ordered: [SavedChat] { chats.filter(\.isPinned) + chats.filter { !$0.isPinned } }
+
+	// The chats that match a search, in the same order; an empty query is every chat.
+	func search(_ query: String) -> [SavedChat] {
+		ordered.filter { ChatLibrary.matches(title: $0.displayTitle, lines: $0.lines.map(\.text), query: query) }
+	}
+
+	func rename(_ id: String, to title: String) {
+		guard var chat = chat(id) else { return }
+		let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+		chat.customTitle = trimmed.isEmpty ? nil : String(trimmed.prefix(Self.titleChars))
+		persist(chat)
+	}
+
+	func setPinned(_ id: String, _ pinned: Bool) {
+		guard var chat = chat(id) else { return }
+		chat.pinned = pinned ? true : nil
+		persist(chat)
+	}
+
+	// Writes a changed chat back without moving it to the top: only a new message does that.
+	private func persist(_ chat: SavedChat) {
+		guard Self.validID(chat.id), let index = chats.firstIndex(where: { $0.id == chat.id }) else { return }
+		do {
+			try encoder.encode(chat).write(to: url(chat.id), options: .atomic)
+			chats[index] = chat
+		} catch {
+			lastError = "\(L("history.saveFailed")): \(error.localizedDescription)"
+		}
+	}
+
+	func markdown(_ chat: SavedChat) -> String {
+		ChatLibrary.markdown(title: chat.displayTitle, provider: chat.provider, model: chat.model, updated: chat.updated,
+		                     lines: chat.lines.map { (user: $0.user, text: $0.text) })
+	}
 
 	func delete(_ id: String) {
 		guard Self.validID(id) else { return }

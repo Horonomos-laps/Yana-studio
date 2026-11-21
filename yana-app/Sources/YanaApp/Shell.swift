@@ -130,6 +130,12 @@ struct ChatSidebar: View {
 	@EnvironmentObject private var engine: ChatEngine
 	@ObservedObject private var history = ChatHistoryStore.shared
 	let collapse: () -> Void
+	@State private var query = ""
+	@State private var renaming: SavedChat?
+	@State private var renameText = ""
+
+	// Pinned chats first, then the newest; filtered by the search box (title and every message).
+	private var shown: [SavedChat] { history.search(query) }
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 4) {
@@ -152,22 +158,31 @@ struct ChatSidebar: View {
 
 			// Saved chats (ChatHistory.swift), newest first; the open one is highlighted. Right-click deletes.
 			SidebarHeading(L("chat.recent"))
+			searchField
 			ScrollView {
 				LazyVStack(alignment: .leading, spacing: 2) {
-					if engine.title != nil && history.chat(engine.currentChatID) == nil {
+					if query.isEmpty, engine.title != nil && history.chat(engine.currentChatID) == nil {
 						RecentRow(title: engine.title ?? "", date: nil, current: true)
 					}
-					ForEach(history.chats) { chat in
-						RecentRow(title: chat.title, date: chat.updated, current: chat.id == engine.currentChatID)
+					ForEach(shown) { chat in
+						RecentRow(title: chat.displayTitle, date: chat.updated, current: chat.id == engine.currentChatID,
+						          pinned: chat.isPinned, snippet: ChatLibrary.snippet(lines: chat.lines.map(\.text), query: query, radius: 24))
 							.onTapGesture { engine.open(chat) }
 							.contextMenu {
+								Button(chat.isPinned ? L("history.unpin") : L("history.pin")) { history.setPinned(chat.id, !chat.isPinned) }
+								Button(L("history.rename")) { renameText = chat.displayTitle; renaming = chat }
+								Button(L("history.export")) { export(chat) }
+								Divider()
 								Button(L("history.delete"), role: .destructive) {
 									if chat.id == engine.currentChatID { engine.reset() }
 									history.delete(chat.id)
 								}
 							}
 					}
-					if history.chats.isEmpty && engine.title == nil {
+					if shown.isEmpty && !query.isEmpty {
+						Text(L("history.noMatch")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+							.padding(.horizontal, 10).padding(.vertical, 6)
+					} else if history.chats.isEmpty && engine.title == nil {
 						Text(L("chat.noChats")).font(.fbCaption).foregroundStyle(FB.textSecondary)
 							.padding(.horizontal, 10).padding(.vertical, 6)
 					}
@@ -180,26 +195,88 @@ struct ChatSidebar: View {
 		.frame(width: 252)
 		.frame(maxHeight: .infinity)
 		.background(SidebarBackground(color: sidebarColor))
+		.sheet(item: $renaming) { chat in
+			RenameSheet(text: $renameText, cancel: { renaming = nil }) {
+				history.rename(chat.id, to: renameText)
+				renaming = nil
+			}
+		}
+	}
+
+	// Searches the titles and every message of the saved chats, ignoring case and accents.
+	private var searchField: some View {
+		HStack(spacing: 6) {
+			FBIcon(name: "search", size: 13, color: FB.textTertiary)
+			TextField(L("history.search"), text: $query).textFieldStyle(.plain).font(.system(size: 13))
+			if !query.isEmpty {
+				Button { query = "" } label: { FBIcon(name: "close", size: 11, color: FB.textTertiary) }.buttonStyle(.plain)
+			}
+		}
+		.padding(.horizontal, 10).frame(height: 30)
+		.background(RoundedRectangle(cornerRadius: 9).fill(FB.hoverOnChrome))
+		.padding(.bottom, 4)
+	}
+
+	// Saves one chat as a Markdown file wherever the person picks.
+	private func export(_ chat: SavedChat) {
+		let panel = NSSavePanel()
+		panel.nameFieldStringValue = ChatLibrary.fileName(for: chat.displayTitle)
+		panel.canCreateDirectories = true
+		guard panel.runModal() == .OK, let url = panel.url else { return }
+		do {
+			try Data(history.markdown(chat).utf8).write(to: url, options: .atomic)
+		} catch {
+			let alert = NSAlert()
+			alert.messageText = L("history.exportFailed")
+			alert.informativeText = error.localizedDescription
+			alert.runModal()
+		}
 	}
 }
 
-// One saved chat in "Recent": its first message and when it was last used.
+struct RenameSheet: View {
+	@Binding var text: String
+	let cancel: () -> Void
+	let save: () -> Void
+
+	var body: some View {
+		VStack(alignment: .leading, spacing: 14) {
+			Text(L("history.rename")).font(.system(size: 16, weight: .semibold)).foregroundStyle(FB.text)
+			TextField(L("history.renameHint"), text: $text).textFieldStyle(.roundedBorder).onSubmit(save)
+			HStack {
+				Spacer()
+				FBButton(title: L("store.cancel"), variant: .secondary, size: .small, action: cancel)
+				FBButton(title: L("history.save"), variant: .primary, size: .small, action: save)
+			}
+		}
+		.padding(20).frame(width: 360).background(FB.canvas)
+	}
+}
+
+// One saved chat in "Recent": its title, a pin when pinned, and when it was last used; while searching, the
+// words around the match.
 struct RecentRow: View {
 	let title: String
 	let date: Date?
 	let current: Bool
+	var pinned = false
+	var snippet: String? = nil
 	@State private var hover = false
 
 	var body: some View {
 		HStack(spacing: 8) {
-			Text(title).font(.system(size: 13, weight: current ? .semibold : .regular)).foregroundStyle(FB.text).lineLimit(1)
+			if pinned { FBIcon(name: "pin", size: 11, color: FB.textTertiary) }
+			VStack(alignment: .leading, spacing: 1) {
+				Text(title).font(.system(size: 13, weight: current ? .semibold : .regular)).foregroundStyle(FB.text).lineLimit(1)
+				if let snippet { Text(snippet).font(.system(size: 11)).foregroundStyle(FB.textTertiary).lineLimit(1) }
+			}
 			Spacer(minLength: 4)
 			if let date {
 				Text(date, format: .relative(presentation: .numeric)).font(.system(size: 10)).foregroundStyle(FB.textTertiary).lineLimit(1)
 			}
 		}
 		.padding(.horizontal, 10)
-		.frame(height: 30)
+		.frame(height: snippet == nil ? 30 : 42)
 		.background(RoundedRectangle(cornerRadius: 9).fill(current ? FB.primarySubtle : (hover ? FB.hoverOnChrome : .clear)))
 		.contentShape(Rectangle())
 		.onHover { hover = $0 }

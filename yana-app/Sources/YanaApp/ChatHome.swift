@@ -277,7 +277,9 @@ struct ChatHome: View {
 			ScrollView {
 				LazyVStack(alignment: .leading, spacing: 18) {
 					ForEach(engine.lines) { line in
-						MessageView(line: line, running: engine.running, decide: engine.decide).id(line.id)
+						MessageView(line: line, running: engine.running, decide: engine.decide,
+						            canRegenerate: engine.canReplay && line.id == engine.lines.last?.id,
+						            canEdit: engine.canReplay && line.id == engine.lastUserLineID).id(line.id)
 					}
 				}
 				.frame(maxWidth: 760)
@@ -286,6 +288,10 @@ struct ChatHome: View {
 			}
 			.onChange(of: engine.lines.last?.text) { _, _ in
 				if let last = engine.lines.last { proxy.scrollTo(last.id, anchor: .bottom) }
+			}
+			// The edit button on the last question hands its text back to the chat box.
+			.onChange(of: engine.draft) { _, new in
+				if let new { text = new; engine.draft = nil }
 			}
 		}
 	}
@@ -505,6 +511,10 @@ struct MessageView: View {
 	let line: ChatLine
 	let running: Bool
 	let decide: (Bool, ApprovalScope) -> Void
+	// Set for the last reply (ask it again) and the last question (edit it): see ChatEngine.canReplay.
+	var canRegenerate = false
+	var canEdit = false
+	@EnvironmentObject private var engine: ChatEngine
 
 	var body: some View {
 		if line.role == .user {
@@ -524,16 +534,19 @@ struct MessageView: View {
 						.padding(.horizontal, 14).padding(.vertical, 10)
 						.background(RoundedRectangle(cornerRadius: 18).fill(FB.primarySubtle))
 				}
+				if canEdit {
+					FBIconButton(icon: "edit", variant: .ghost, size: .small, tooltip: L("msg.edit")) { engine.editLast() }
+				}
 			}
 			.padding(.leading, 120)
 			.frame(maxWidth: .infinity, alignment: .trailing)
 		} else {
 			VStack(alignment: .leading, spacing: 10) {
 				if !line.text.isEmpty {
-						RichText(text: line.text)
-							.frame(maxWidth: .infinity, alignment: .leading)
+					RichText(text: line.text)
+						.frame(maxWidth: .infinity, alignment: .leading)
 					HStack(spacing: 8) {
-						MessageActions(text: line.text)
+						MessageActions(text: line.text, canRegenerate: canRegenerate)
 						if AppSettings.shared.showTokens, line.inputTokens + line.outputTokens > 0 {
 							Text("↑ \(line.inputTokens)  ↓ \(line.outputTokens) \(L("usage.tokens"))")
 								.font(.fbCaption).foregroundStyle(FB.textTertiary)
@@ -561,6 +574,7 @@ struct MessageView: View {
 // Under each reply: copy to the clipboard, and read aloud with the macOS voice (on this Mac, no network).
 struct MessageActions: View {
 	let text: String
+	var canRegenerate = false
 	@EnvironmentObject private var engine: ChatEngine
 	@State private var copied = false
 	@StateObject private var speaker = Speaker()
@@ -576,6 +590,9 @@ struct MessageActions: View {
 			}
 			FBIconButton(icon: speaker.speaking ? "stop" : "volume", variant: .ghost, size: .small,
 			             tooltip: speaker.speaking ? L("msg.stopReading") : L("msg.read")) { speaker.toggle(text) }
+			if canRegenerate {
+				FBIconButton(icon: "refresh", variant: .ghost, size: .small, tooltip: L("msg.regenerate")) { engine.regenerate() }
+			}
 		}
 	}
 }

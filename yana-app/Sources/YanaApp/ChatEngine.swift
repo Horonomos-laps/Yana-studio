@@ -33,6 +33,10 @@ struct ChatLine: Identifiable {
 	// Long-term memory: what the reply drew on, and a fact Yana proposes to remember (user decides).
 	var memoryUsed: String? = nil
 	var memoryProposal: String? = nil
+	// A user message: what was typed, and whether nothing but that text went out with it (no image, document,
+	// video note or quote). Only such a message can be asked again or edited, because the rest cannot be rebuilt.
+	var raw: String? = nil
+	var replayable = false
 }
 
 @MainActor
@@ -201,6 +205,11 @@ final class ChatEngine: ObservableObject {
 		sessionId = chat.id
 		lines = chat.lines.map { line in
 			var restored = ChatLine(role: line.user ? .user : .assistant, text: line.text)
+			// A saved question with no attachment or quote marker is plain typed text, so it can be asked again.
+			if line.user, !line.text.contains("📎 "), !line.text.hasPrefix("↩︎") {
+				restored.raw = line.text
+				restored.replayable = true
+			}
 			restored.error = line.error
 			restored.inputTokens = line.inputTokens
 			restored.outputTokens = line.outputTokens
@@ -215,8 +224,14 @@ final class ChatEngine: ObservableObject {
 			SavedLine(user: $0.role == .user, text: $0.text, error: $0.error, inputTokens: $0.inputTokens, outputTokens: $0.outputTokens)
 		}
 		let firstLine = title.split(separator: "\n").first.map(String.init) ?? title
-		ChatHistoryStore.shared.save(SavedChat(id: sessionId, title: String(firstLine.prefix(ChatHistoryStore.titleChars)),
-		                                       updated: Date(), provider: turnProvider, model: model, lines: saved))
+		var chat = SavedChat(id: sessionId, title: String(firstLine.prefix(ChatHistoryStore.titleChars)),
+		                     updated: Date(), provider: turnProvider, model: model, lines: saved)
+		// A name or a pin the person set must survive the next save.
+		if let existing = ChatHistoryStore.shared.chat(sessionId) {
+			chat.customTitle = existing.customTitle
+			chat.pinned = existing.pinned
+		}
+		ChatHistoryStore.shared.save(chat)
 	}
 
 	// Reads the pulled models from `ollama list` (first column, header skipped). Empty when Ollama is missing.
@@ -261,7 +276,10 @@ final class ChatEngine: ObservableObject {
 		attachError = nil
 		let quoteLine = quoted.map { "↩︎ " + Self.quotePreview($0) }
 		let shown = ([quoteLine ?? "", text] + docs.map { "📎 \($0.name)" }).filter { !$0.isEmpty }.joined(separator: "\n")
-		lines.append(ChatLine(role: .user, text: shown, images: sending.map(\.preview)))
+		var userLine = ChatLine(role: .user, text: shown, images: sending.map(\.preview))
+		userLine.raw = text
+		userLine.replayable = sending.isEmpty && docs.isEmpty && notes.isEmpty && quoted == nil
+		lines.append(userLine)
 		lines.append(ChatLine(role: .assistant, text: ""))
 		let task = ([Self.withQuote(withDocuments(text, docs), quoted)] + notes).filter { !$0.isEmpty }.joined(separator: "\n\n")
 		var payload: [String: Any] = ["task": task, "session_id": sessionId, "history": Array(history), "mode": planMode ? "plan" : "act"]
@@ -319,6 +337,35 @@ final class ChatEngine: ObservableObject {
 	}
 
 	func stop() { process?.terminate() }
+
+	// Text to put back in the chat box (the edit button); the chat page takes it and clears it.
+	@Published var draft: String? = nil
+
+	private var lastUserIndex: Int? { lines.lastIndex { $0.role == .user } }
+
+	// The last question can be asked again or edited when the turn is over, no approval is waiting, and only its
+	// own text went out with it.
+	var canReplay: Bool {
+		guard !running, lines.last?.role == .assistant, let index = lastUserIndex, lines[index].replayable, lines[index].raw != nil else { return false }
+		return !lines.contains { $0.approval != nil && $0.approval?.decided == nil }
+	}
+
+	var lastUserLineID: UUID? { lastUserIndex.map { lines[$0].id } }
+
+	// Asks the last question again: its reply is dropped and the same text is sent, so the model answers from
+	// the same history as the first time.
+	func regenerate() {
+		guard canReplay, let index = lastUserIndex, let text = lines[index].raw else { return }
+		lines.removeSubrange(index...)
+		send(text)
+	}
+
+	// Takes the last question back into the chat box to change it: it and its reply leave the chat.
+	func editLast() {
+		guard canReplay, let index = lastUserIndex, let text = lines[index].raw else { return }
+		lines.removeSubrange(index...)
+		draft = text
+	}
 
 	private func start(_ args: [String], input: [String: Any]) {
 		guard let binary = RtClient.binaryPath() else { failLast(RtError.notInstalled.message); return }
