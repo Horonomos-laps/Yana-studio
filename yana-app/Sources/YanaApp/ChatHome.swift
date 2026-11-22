@@ -31,6 +31,7 @@ struct ChatHome: View {
 	@State private var text = ""
 	@State private var atBottom = true
 	@AppStorage("yana.ui.suggestions") private var showSuggestions = true
+	@Environment(\.accessibilityReduceMotion) private var reduceMotion
 	// Room above the first message for the chat's title and its menu.
 	private static let conversationTopInset: CGFloat = 84
 	private static let suggestionsMaxWidth: CGFloat = 760
@@ -369,10 +370,17 @@ struct ChatHome: View {
 				// ImageRenderer cannot draw a live text field, so the image shows the placeholder as plain text.
 				Text(L("chat.placeholder")).font(.system(size: 15)).foregroundStyle(FB.textTertiary)
 			} else {
-				TextField(L("chat.placeholder"), text: $text, axis: .vertical)
+				// On the empty chat the hint types example requests by itself (TypingPlaceholder.swift); the field's own
+				// hint is left empty then so the two never overlap.
+				let typing = TypingPlaceholder.isActive(text: text, chatIsEmpty: engine.lines.isEmpty, enabled: showSuggestions,
+				                                        reduceMotion: reduceMotion)
+				TextField(typing ? "" : L("chat.placeholder"), text: $text, axis: .vertical)
 					.textFieldStyle(.plain)
 					.font(.system(size: 15))
 					.lineLimit(1 ... 6)
+					.overlay(alignment: .topLeading) {
+						if typing { TypingPlaceholderView(examples: ChatSuggestion.all.map { L($0.promptKey) }).allowsHitTesting(false) }
+					}
 					.onSubmit(send)
 					.onChange(of: text) { _, new in
 						dictation.userEdited(new)
