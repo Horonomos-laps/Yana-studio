@@ -18,7 +18,7 @@ struct NotchView: View {
 		ZStack(alignment: .top) {
 			// Closed it is solid black so it merges with the camera housing; open it is frosted glass you can see through.
 			if model.isOpen && !solid {
-				NotchFrost().overlay(Color.black.opacity(0.28)).transition(.opacity)
+				NotchGlass(shape: shape).transition(.opacity)
 			} else {
 				Color.black
 			}
@@ -136,6 +136,23 @@ private struct EqualizerBars: View {
 						.frame(width: 2.5, height: active ? 5 + 9 * abs(sin(t * 6 + Double(i) * 1.3)) : 4)
 				}
 			}
+		}
+	}
+}
+
+// The open panel's background. On macOS 26 it is real Liquid Glass (clear glass with a light dark tint so white text
+// stays readable) over the frosted material; on older systems only the frosted material with a darker tint.
+struct NotchGlass: View {
+	let shape: NotchShape
+
+	var body: some View {
+		if #available(macOS 26.0, *) {
+			ZStack {
+				NotchFrost()
+				Color.clear.glassEffect(Glass.clear.tint(Color.black.opacity(0.22)), in: shape)
+			}
+		} else {
+			NotchFrost().overlay(Color.black.opacity(0.28))
 		}
 	}
 }
