@@ -162,9 +162,9 @@ private let pageRows: [StringRow] = [
 	StringRow("tasks.tasks", "Công việc", "Tasks", "작업"),
 	StringRow("tasks.leases", "Ủy quyền", "Leases", "위임"),
 	StringRow("tasks.noTasks",
-		"Chưa có công việc nào. Tạo bằng lệnh yana-rt task create.",
-		"No tasks yet. Create one with yana-rt task create.",
-		"아직 작업이 없습니다. yana-rt task create로 만드세요."),
+		"Chưa có công việc nào. Gõ tên ở ô phía trên rồi bấm Thêm.",
+		"No tasks yet. Type a name in the box above and press Add.",
+		"작업이 아직 없습니다. 위 입력란에 이름을 쓰고 추가를 누르세요."),
 	StringRow("tasks.noLeases", "Chưa có ủy quyền nào.", "No leases.", "위임이 없습니다."),
 	StringRow("skills.subtitle", "Kỹ năng trong core/skills của workspace này.", "Skills in this workspace's core/skills.", "이 워크스페이스의 core/skills에 있는 스킬입니다."),
 	StringRow("skills.search", "Tìm kỹ năng", "Search skills", "스킬 검색"),
@@ -547,7 +547,7 @@ private let panelRows: [StringRow] = [
 		"이 Mac에는 Homebrew가 없고 Rust(cargo, yana-rt용) 또는 pipx(yana-ai용)가 없어 Yana가 직접 설치할 수 없습니다. 공식 페이지에서 설치한 뒤 다시 확인을 누르세요."),
 	StringRow("rt.openRust", "Mở trang cài Rust", "Open the Rust install page", "Rust 설치 페이지 열기"),
 	StringRow("nav.Usage", "Sử dụng", "Usage", "사용량"),
-	StringRow("usage.subtitle", "Token đã dùng, đọc từ sổ chi phí của yana-rt (.yana-ai/ledger.jsonl).", "Tokens used, read from yana-rt's cost ledger (.yana-ai/ledger.jsonl).", "yana-rt 비용 원장(.yana-ai/ledger.jsonl)에서 읽은 토큰 사용량입니다."),
+	StringRow("usage.subtitle", "Token đã dùng: từ các chat trong ứng dụng, và từ sổ chi phí của yana-rt (.yana-ai/ledger.jsonl).", "Tokens used: by the chats in this app, and from yana-rt's cost ledger (.yana-ai/ledger.jsonl).", "사용한 토큰: 앱 안의 채팅과 yana-rt 비용 원장(.yana-ai/ledger.jsonl) 기준입니다."),
 	StringRow("usage.estimateNote",
 		"Số token là số thật model báo về. Số tiền là ước tính của yana-rt theo bảng giá hạng (standard: 3 USD vào, 15 USD ra cho mỗi triệu token), không phải hoá đơn; model chạy trên máy cũng bị tính theo bảng này. Chat gửi từ app này chưa được ghi vào sổ.",
 		"Token counts are what the models reported. Dollar amounts are yana-rt's estimate from tier rates (standard: $3 in, $15 out per million tokens), not a bill; local models are priced the same way. Chats sent from this app are not written to the ledger yet.",
@@ -744,4 +744,4 @@ private let settingsSectionRows: [StringRow] = [
 	StringRow("set.aboutNote", "Thư viện bên ngoài trong app và giấy phép của chúng.", "Third-party libraries in the app and their licenses.", "앱에 포함된 외부 라이브러리와 라이선스."),
 ]
 
-let allStringRows: [StringRow] = navRows + commonRows + homeRows + approvalRows + settingsRows + chatRows + pageRows + toolRows + panelRows + settingsSectionRows + devSettingsRows + sidebarRows + dictationRows + appshotRows + sandboxRows + featureRows + glassRows + suggestionRows + appearanceRows
+let allStringRows: [StringRow] = navRows + commonRows + homeRows + approvalRows + settingsRows + chatRows + pageRows + toolRows + panelRows + settingsSectionRows + devSettingsRows + sidebarRows + dictationRows + appshotRows + sandboxRows + featureRows + glassRows + suggestionRows + appearanceRows + taskCreateRows

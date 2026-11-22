@@ -186,10 +186,42 @@ struct TasksPage: View {
 	@State private var tasks: [LooseItem] = []
 	@State private var leases: [LooseItem] = []
 	@State private var error: String? = nil
+	@State private var draft = ""
+	@State private var adding = false
+	@State private var addError: String? = nil
+
+	// A new task goes into the workspace's task list through yana-rt (TaskCreate.swift).
+	private var addRow: some View {
+		HStack(spacing: 8) {
+			TextField("", text: $draft, prompt: Text(L("tasks.addPrompt"))).textFieldStyle(.plain).font(.fbBody)
+				.padding(.horizontal, 10).frame(height: FB.heightMedium)
+				.background(RoundedRectangle(cornerRadius: FB.radiusLG).fill(FB.surfaceSecondary))
+				.overlay(RoundedRectangle(cornerRadius: FB.radiusLG).stroke(FB.border))
+				.onSubmit(add)
+			FBButton(title: L("tasks.add"), variant: .primary, icon: "plus", action: add)
+		}
+	}
+
+	private func add() {
+		guard !adding else { return }
+		adding = true
+		let name = draft
+		Task {
+			let failure = await Task.detached { RtClient.createTask(name: name) }.value
+			adding = false
+			addError = failure
+			if failure == nil {
+				draft = ""
+				await load()
+			}
+		}
+	}
 
 	var body: some View {
 		PageScroll {
 			PageHeader(title: L("nav.Tasks"), subtitle: L("tasks.subtitle")) { Task { await load() } }
+			addRow
+			if let addError { FBAlert(kind: .error, text: addError, closable: false) }
 			if let error { FBAlert(kind: .error, text: error, closable: false) }
 			if !loaded {
 				Loading()
