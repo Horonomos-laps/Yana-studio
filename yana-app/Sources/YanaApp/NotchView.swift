@@ -61,7 +61,7 @@ private struct OpenPanel: View {
 				}
 			}
 			.font(.system(size: 13, weight: .semibold))
-			.foregroundStyle(.white.opacity(0.75))
+			.foregroundStyle(.secondary)
 			.frame(height: max(notch.height, 28))
 
 			Group {
@@ -85,7 +85,7 @@ private struct OpenPanel: View {
 	// Three dots like a page control: the filled one is where you are; each one is a button.
 	private func dot(_ value: NotchTab) -> some View {
 		Button { withAnimation(.notchHover) { model.tab = value } } label: {
-			Circle().fill(model.tab == value ? Color.white : Color.white.opacity(0.35)).frame(width: 8, height: 8)
+			Circle().fill(model.tab == value ? Color.primary : Color.primary.opacity(0.3)).frame(width: 8, height: 8)
 		}
 		.buttonStyle(.plain)
 		.help(title(value))
@@ -140,8 +140,9 @@ private struct EqualizerBars: View {
 	}
 }
 
-// The open panel's background. On macOS 26 it is real Liquid Glass (clear glass with a light dark tint so white text
-// stays readable) over the frosted material; on older systems only the frosted material with a darker tint.
+// The open panel's background: real Liquid Glass on macOS 26 over a light-following frosted material, so the desktop
+// shows through and the panel is bright in light mode and dark in dark mode. Text uses the primary color and follows.
+// Older systems get the frosted material alone.
 struct NotchGlass: View {
 	let shape: NotchShape
 
@@ -149,10 +150,10 @@ struct NotchGlass: View {
 		if #available(macOS 26.0, *) {
 			ZStack {
 				NotchFrost()
-				Color.clear.glassEffect(Glass.clear.tint(Color.black.opacity(0.22)), in: shape)
+				Color.clear.glassEffect(Glass.regular, in: shape)
 			}
 		} else {
-			NotchFrost().overlay(Color.black.opacity(0.28))
+			NotchFrost()
 		}
 	}
 }
@@ -161,7 +162,7 @@ struct NotchGlass: View {
 struct NotchFrost: NSViewRepresentable {
 	func makeNSView(context: Context) -> NSVisualEffectView {
 		let view = NSVisualEffectView()
-		view.material = .hudWindow
+		view.material = .popover
 		view.blendingMode = .behindWindow
 		view.state = .active
 		return view
