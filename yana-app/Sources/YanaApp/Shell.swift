@@ -76,6 +76,10 @@ struct ChatSidebar: View {
 	@AppStorage("yana.ui.sidebar.recentCollapsed") private var recentCollapsed = false
 	@State private var showAllRecent = false
 	@State private var showArchived = false
+	// The search box opens from the magnifier in the header, like ChatGPT's, instead of always taking a row.
+	@State private var showSearch = false
+	@FocusState private var searchFocused: Bool
+	@AppStorage("yana.ui.sidebar.projectsCollapsed") private var projectsCollapsed = false
 	private var searching: Bool { !ChatLibrary.normalize(query).isEmpty }
 	private var sections: [ChatSection] {
 		ChatSections.build(chats: history.chats, query: query, showAllRecent: showAllRecent, showArchived: showArchived)
@@ -84,25 +88,32 @@ struct ChatSidebar: View {
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 4) {
-			HStack(spacing: 8) {
-				RabbitLogo(cell: 1.3)
-				Text("Yana").font(.system(size: 19, weight: .semibold)).foregroundStyle(FB.text)
+			HStack(spacing: 4) {
+				Text("Yana").font(.system(size: 22, weight: .semibold)).foregroundStyle(FB.text)
 				Spacer()
+				FBIconButton(icon: "search", variant: showSearch ? .secondary : .ghost, size: .small, tooltip: L("history.search")) {
+					showSearch.toggle()
+					if showSearch { searchFocused = true } else { query = "" }
+				}
 				FBIconButton(icon: "sidebar", variant: .ghost, size: .small, tooltip: L("sidebar.hide"), action: collapse)
 			}
-			.padding(EdgeInsets(top: 4, leading: 6, bottom: 10, trailing: 2))
+			.padding(EdgeInsets(top: 4, leading: 8, bottom: 10, trailing: 2))
 
 			// Clears the conversation and starts a new yana-rt session id.
-			SidebarRow(icon: "edit", title: L("chat.new"), strong: true)
+			SidebarRow(icon: "edit", title: L("chat.new"), strong: false)
 				.onTapGesture { engine.reset() }
 				.opacity(engine.running ? 0.4 : 1)
 
-			SidebarHeading(L("chat.projects"))
-			SidebarRow(icon: "folder", title: URL(fileURLWithPath: engine.workspace).lastPathComponent, strong: false, accent: Accent.amber.color)
-				.help(engine.workspace)
+			SidebarSectionHeader(title: L("chat.projects"), count: 1, collapsed: projectsCollapsed, foldable: true, plain: true) {
+				projectsCollapsed.toggle()
+			}
+			if !projectsCollapsed {
+				SidebarRow(icon: "folder", title: URL(fileURLWithPath: engine.workspace).lastPathComponent, strong: false, accent: Accent.amber.color)
+					.help(engine.workspace)
+			}
 
 			// Saved chats (ChatHistory.swift), newest first; the open one is highlighted. Right-click deletes.
-			searchField
+			if showSearch || searching { searchField }
 			ScrollView {
 				LazyVStack(alignment: .leading, spacing: 2) {
 					if query.isEmpty, engine.title != nil && history.chat(engine.currentChatID) == nil {
@@ -145,7 +156,7 @@ struct ChatSidebar: View {
 		let collapsed = kind == .pinned ? pinnedCollapsed : kind == .recent ? recentCollapsed : false
 		let title = kind == .pinned ? L("chat.pinned") : kind == .recent ? L("chat.recent") : L("chat.archived")
 		SidebarSectionHeader(title: title, count: section.chats.count + section.hidden,
-		                     collapsed: collapsed && !searching, foldable: !searching && kind != .archived) {
+		                     collapsed: collapsed && !searching, foldable: !searching && kind != .archived, plain: true) {
 			if kind == .pinned { pinnedCollapsed.toggle() } else if kind == .recent { recentCollapsed.toggle() }
 		}
 		if searching || !collapsed {
@@ -186,7 +197,7 @@ struct ChatSidebar: View {
 	private var searchField: some View {
 		HStack(spacing: 6) {
 			FBIcon(name: "search", size: 13, color: FB.textTertiary)
-			TextField(L("history.search"), text: $query).textFieldStyle(.plain).font(.system(size: 13))
+			TextField(L("history.search"), text: $query).textFieldStyle(.plain).font(.system(size: 13)).focused($searchFocused)
 			if !query.isEmpty {
 				Button { query = "" } label: { FBIcon(name: "close", size: 11, color: FB.textTertiary) }.buttonStyle(.plain)
 			}
@@ -234,11 +245,11 @@ struct RecentRow: View {
 	var body: some View {
 		HStack(spacing: 8) {
 			VStack(alignment: .leading, spacing: 1) {
-				Text(title).font(.system(size: 13, weight: current ? .semibold : .regular)).foregroundStyle(FB.text).lineLimit(1)
+				Text(title).font(.system(size: 13.5, weight: current ? .medium : .regular)).foregroundStyle(FB.text).lineLimit(1)
 				if let snippet { Text(snippet).font(.system(size: 11)).foregroundStyle(FB.textTertiary).lineLimit(1) }
 			}
 			Spacer(minLength: 4)
-			// While the pointer is on the row, the date gives way to a pin button.
+			// While the pointer is on the row, a pin button shows (no date: the list is ordered by it already).
 			if hover, let togglePin {
 				Button(action: togglePin) {
 					FBIcon(name: "pin", size: 13, color: pinned ? FB.primaryText : FB.textSecondary)
@@ -246,13 +257,11 @@ struct RecentRow: View {
 				}
 				.buttonStyle(.plain)
 				.help(pinned ? L("history.unpin") : L("history.pin"))
-			} else if let date {
-				Text(date, format: .relative(presentation: .numeric)).font(.system(size: 10)).foregroundStyle(FB.textTertiary).lineLimit(1)
 			}
 		}
 		.padding(.horizontal, 10)
-		.frame(height: snippet == nil ? 30 : 42)
-		.background(RoundedRectangle(cornerRadius: 9).fill(current ? FB.primarySubtle : (hover ? FB.hoverOnChrome : .clear)))
+		.frame(height: snippet == nil ? 34 : 44)
+		.background(RoundedRectangle(cornerRadius: 10).fill(current ? Color.primary.opacity(0.08) : (hover ? Color.primary.opacity(0.04) : .clear)))
 		.contentShape(Rectangle())
 		.onHover { hover = $0 }
 		.help(title)
@@ -265,11 +274,23 @@ struct SidebarSectionHeader: View {
 	let count: Int
 	let collapsed: Bool
 	let foldable: Bool
+	// Plain: just the muted name, with the chevron shown only while the pointer is on it (the ChatGPT look).
+	var plain = false
 	let toggle: () -> Void
 	@State private var hover = false
 
 	var body: some View {
 		Button(action: toggle) {
+			if plain {
+				HStack(spacing: 5) {
+					Text(title).font(.system(size: 13)).foregroundStyle(FB.textTertiary)
+					Spacer(minLength: 0)
+					FBIcon(name: collapsed ? "chevron-right" : "chevron-down", size: 10, color: FB.textTertiary)
+						.opacity(hover && foldable ? 1 : 0)
+				}
+				.padding(EdgeInsets(top: 14, leading: 10, bottom: 4, trailing: 10))
+				.contentShape(Rectangle())
+			} else {
 			HStack(spacing: 5) {
 				FBIcon(name: collapsed ? "chevron-right" : "chevron-down", size: 10, color: FB.textTertiary)
 					.opacity(foldable ? 1 : 0)
@@ -279,6 +300,7 @@ struct SidebarSectionHeader: View {
 			}
 			.padding(EdgeInsets(top: 12, leading: 8, bottom: 4, trailing: 8))
 			.contentShape(Rectangle())
+			}
 		}
 		.buttonStyle(.plain)
 		.disabled(!foldable)
