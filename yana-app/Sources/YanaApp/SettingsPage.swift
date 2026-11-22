@@ -61,9 +61,10 @@ struct SettingsPage: View {
 
 	var body: some View {
 		HStack(spacing: 0) {
-			ScrollView {
+			VStack(alignment: .leading, spacing: 0) {
+				// The top of the column stays put, below the window buttons that sit in it; only the list of
+				// sections scrolls. When all of it scrolled, Back and the title slid up under the buttons.
 				VStack(alignment: .leading, spacing: 2) {
-					// Below the window buttons, which sit in the top of this panel now that the icon rail is not there.
 					Button(action: back) {
 						HStack(spacing: 6) {
 							FBIcon(name: "arrow-left", size: 14, color: FB.textSecondary)
@@ -86,6 +87,10 @@ struct SettingsPage: View {
 					.padding(.horizontal, 10).frame(height: 30)
 					.background(RoundedRectangle(cornerRadius: 9).fill(FB.hoverOnChrome))
 					.padding(EdgeInsets(top: 0, leading: 2, bottom: 8, trailing: 2))
+				}
+				.padding(EdgeInsets(top: 46, leading: 14, bottom: 4, trailing: 14))
+				ScrollView {
+					VStack(alignment: .leading, spacing: 2) {
 					ForEach(shown) { item in
 						if item.startsGroup && !searching { FB.divider.frame(height: 1).padding(.vertical, 6).padding(.horizontal, 10) }
 						SettingsNavRow(icon: item.icon, title: item.title, selected: item == section, accent: Accent.section(item))
@@ -94,8 +99,9 @@ struct SettingsPage: View {
 					if shown.isEmpty {
 						Text(L("set.noMatch")).font(.fbCaption).foregroundStyle(FB.textSecondary).padding(.horizontal, 10).padding(.vertical, 6)
 					}
+					}
+					.padding(EdgeInsets(top: 0, leading: 14, bottom: 14, trailing: 14))
 				}
-				.padding(EdgeInsets(top: 46, leading: 14, bottom: 14, trailing: 14))
 			}
 			.frame(width: 240)
 			.sidePanelBackground(color: FB.chrome, leadingInset: LiquidGlass.panelInset)
