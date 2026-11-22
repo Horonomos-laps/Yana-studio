@@ -307,10 +307,15 @@ final class ChatEngine: ObservableObject {
 		if let git = GitPrefs.instruction() { system.append(git) }
 		if !system.isEmpty { payload["system"] = system.joined(separator: "\n\n") }
 		let settings = AppSettings.shared
+		// A provider the person added becomes "custom" with its own address; yana-rt needs no change (CustomProviders.swift).
+		guard let wire = CustomProviders.wire(for: provider, builtinBase: settings.baseURL, list: CustomProviderStore.shared.items) else {
+			failLast(L("prov.removed"))
+			return
+		}
 		if let key = settings.apiKey(provider) { payload["api_key"] = key }
-		if provider == "custom" {
-			payload["base_url"] = settings.baseURL
-			payload["custom_keyless"] = !settings.hasKey("custom")
+		if wire.isCustom {
+			payload["base_url"] = wire.baseURL ?? ""
+			payload["custom_keyless"] = !settings.hasKey(provider)
 		}
 		if let value = settings.maxTokensValue { payload["max_tokens"] = value }
 		if let value = settings.temperatureValue { payload["temperature"] = value }
@@ -319,7 +324,7 @@ final class ChatEngine: ObservableObject {
 		// Auto mode: name the lease subject so yana-rt can find the leases the user granted (AutoRun.swift).
 		if AutoRunStore.shared.isOn { payload["agent_id"] = AutoRunStore.subject }
 		turnProvider = provider
-		var args = ["chat", "--headless", "--provider", provider]
+		var args = ["chat", "--headless", "--provider", wire.provider]
 		if let model { args += ["--model", model] }
 		start(args, input: payload)
 	}
@@ -339,7 +344,9 @@ final class ChatEngine: ObservableObject {
 			payload["scope"] = scope.rawValue
 		}
 		if let key = AppSettings.shared.apiKey(turnProvider) { payload["api_key"] = key }
-		start(["chat", "--resume-approval", "--provider", turnProvider], input: payload)
+		let resumeProvider = CustomProviders.wire(for: turnProvider, builtinBase: AppSettings.shared.baseURL,
+		                                          list: CustomProviderStore.shared.items)?.provider ?? turnProvider
+		start(["chat", "--resume-approval", "--provider", resumeProvider], input: payload)
 	}
 
 	func stop() { process?.terminate() }

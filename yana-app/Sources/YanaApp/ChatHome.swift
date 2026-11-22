@@ -398,7 +398,7 @@ struct ChatHome: View {
 				Spacer(minLength: 8)
 				// Reasoning depth: on only for a provider and model yana-rt says take it (Reasoning.swift).
 				ReasoningChip(store: ReasoningStore.shared, engine: engine)
-				Chip(icon: "cpu", title: engine.model.map { "\(engine.provider) · \($0)" } ?? L("model.choose"), trailing: "chevron-down")
+				Chip(icon: "cpu", title: engine.model.map { "\(CustomProviders.displayName(engine.provider)) · \($0)" } ?? L("model.choose"), trailing: "chevron-down")
 					.onTapGesture { showModels = true }
 					.popover(isPresented: $showModels, arrowEdge: Self.popoverEdge) {
 						ModelPicker(engine: engine, openSettings: openSettings) { showModels = false }

@@ -7,6 +7,8 @@ struct ModelSettings: View {
 	@EnvironmentObject private var engine: ChatEngine
 	@State private var editing: KeyTarget? = nil
 	@State private var keyDraft = ""
+	@ObservedObject private var customStore = CustomProviderStore.shared
+	@State private var providerSheet: ProviderSheetTarget? = nil
 
 	private var keyProviders: [ProviderInfo] { providerCatalog.filter { $0.kind != .local } }
 
@@ -15,6 +17,7 @@ struct ModelSettings: View {
 			Section {
 				Picker(L("set.provider"), selection: $settings.provider) {
 					ForEach(providerCatalog) { Text($0.id).tag($0.id) }
+					ForEach(customStore.items) { Text($0.name).tag($0.id) }
 				}
 				TextField(L("set.model"), text: $settings.model, prompt: Text(L("set.modelPrompt")))
 				if settings.provider == "custom" {
@@ -25,6 +28,26 @@ struct ModelSettings: View {
 			} header: { Text(L("set.defaults")) } footer: {
 				SettingsNote("\(L("set.providerNote")) \(L("set.maxTokensNote")) \(L("set.temperatureNote"))")
 			}
+
+			Section {
+				if customStore.items.isEmpty {
+					Text(L("prov.none")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+				}
+				ForEach(customStore.items) { item in
+					LabeledContent(item.name) {
+						HStack(spacing: 8) {
+							Text(URL(string: item.baseURL)?.host ?? item.baseURL).font(.fbCaption).foregroundStyle(FB.textSecondary)
+								.lineLimit(1).truncationMode(.middle)
+							Button(L("prov.edit")) { providerSheet = ProviderSheetTarget(editing: item) }
+							Button(L("set.remove")) { customStore.remove(item.id) }
+						}
+					}
+				}
+				Button(L("prov.add")) { providerSheet = ProviderSheetTarget(editing: nil) }
+					.sheet(item: $providerSheet) { target in
+						CustomProviderSheet(editing: target.editing) { providerSheet = nil }
+					}
+			} header: { Text(L("prov.header")) } footer: { SettingsNote(L("prov.footer")) }
 
 			Section {
 				if engine.models.isEmpty {

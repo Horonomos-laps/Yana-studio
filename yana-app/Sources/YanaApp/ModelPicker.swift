@@ -67,7 +67,7 @@ struct ModelPicker: View {
 	private func groupView(_ group: ProviderModels) -> some View {
 		let rows = filtered(group)
 		HStack {
-			Text(group.provider).font(.system(size: 12, weight: .semibold)).foregroundStyle(FB.textSecondary)
+			Text(CustomProviders.displayName(group.provider)).font(.system(size: 12, weight: .semibold)).foregroundStyle(FB.textSecondary)
 			Spacer()
 			switch group.state {
 			case .loading: ProgressView().controlSize(.small)

@@ -27,11 +27,16 @@ final class ModelCatalog: ObservableObject {
 	// A key saved or removed while a load is running: the finished load would miss it, so load once more.
 	private var loadAgain = false
 	private var keyWatch: AnyCancellable?
+	private var providerWatch: AnyCancellable?
 
 	// Saving or removing a key in Settings reloads the list at once. Without this the list was only built at
 	// launch (and again after five minutes), so a key added later showed no models until the refresh button.
 	init() {
 		keyWatch = AppSettings.shared.$keyVersion.dropFirst().sink { [weak self] _ in
+			Task { @MainActor in self?.refresh() }
+		}
+		// A provider added, changed or removed in Settings shows up in the list at once.
+		providerWatch = CustomProviderStore.shared.$items.dropFirst().sink { [weak self] _ in
 			Task { @MainActor in self?.refresh() }
 		}
 	}
@@ -86,6 +91,10 @@ final class ModelCatalog: ObservableObject {
 				: base.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/models"
 			plan.append(("custom", Endpoint(url: url, auth: .bearer), settings.apiKey("custom")))
 		}
+		// Providers the person added (CustomProviders.swift): each is asked for its own model list.
+		for item in CustomProviderStore.shared.items {
+			plan.append((item.id, Endpoint(url: CustomProviders.modelsURL(for: item.baseURL), auth: .bearer), settings.apiKey(item.id)))
+		}
 		groups = plan.map { ProviderModels(provider: $0.0, state: $0.1 == nil ? .manual : .loading) }
 		Task {
 			async let locals = Self.probeLocals()
@@ -98,7 +107,13 @@ final class ModelCatalog: ObservableObject {
 				for await result in group { all.append(result) }
 				return all
 			}
-			for (provider, state, models) in cloudResults {
+			for (provider, listed, models) in cloudResults {
+				var state = listed
+				// A provider with no model list (or none to show) still works: the name is typed in the picker.
+				if CustomProviders.isCustom(provider) {
+					if case .failed(let reason) = listed, CustomProviders.isListingUnsupported(reason) { state = .manual }
+					if listed == .ready, models.isEmpty { state = .manual }
+				}
 				if let index = groups.firstIndex(where: { $0.provider == provider }) {
 					groups[index].state = state
 					groups[index].models = models
@@ -109,6 +124,12 @@ final class ModelCatalog: ObservableObject {
 			loading = false
 			if loadAgain { loadAgain = false; refresh() }
 		}
+	}
+
+	// Asks an endpoint for its model list without adding anything (the Test connection button).
+	nonisolated static func probe(baseURL: String, key: String?) async -> (ProviderModels.State, [String]) {
+		let (_, state, models) = await fetch("probe", Endpoint(url: CustomProviders.modelsURL(for: baseURL), auth: .bearer), key)
+		return (state, models)
 	}
 
 	nonisolated private static func probeLocals() async -> [ProviderModels] {

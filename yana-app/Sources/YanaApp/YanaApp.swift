@@ -49,6 +49,8 @@ struct RootView: View {
 		case "Settings": SettingsPage(back: { selected = lastPage }) { selected = $0 }
 		// YANA_PAGE=Tour shows the guide in the page area, where a snapshot can capture it (a sheet is not captured).
 		case "Tour": OnboardingTourView { selected = "Chat" }
+		// YANA_PAGE=ProviderSheet shows the add-a-provider sheet in the page area, for a snapshot.
+		case "ProviderSheet": CustomProviderSheet(editing: nil) { selected = "Chat" }
 		case "Tool approvals": ApprovalsPage().padding(.top, 30)
 		case "Overview": HomePage().padding(.top, 30)
 		case "Tasks": TasksPage().padding(.top, 30)
