@@ -46,6 +46,12 @@ final class NotchModel: ObservableObject {
 enum NotchPrefs {
 	static let enabledKey = "yana.notch.enabled"
 	static let quietKey = "yana.notch.noHaptics"
+	static let hoverKey = "yana.notch.openOnHover"
+	static let solidKey = "yana.notch.solid"
 	static var enabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
 	static var quiet: Bool { UserDefaults.standard.bool(forKey: quietKey) }
+	// On unless switched off: resting the pointer on the notch opens it.
+	static var openOnHover: Bool { UserDefaults.standard.object(forKey: hoverKey) as? Bool ?? true }
+	// The open panel is see-through frosted glass unless the person wants it solid black.
+	static var solid: Bool { UserDefaults.standard.bool(forKey: solidKey) }
 }

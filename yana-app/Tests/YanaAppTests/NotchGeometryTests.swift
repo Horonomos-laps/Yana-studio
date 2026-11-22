@@ -78,7 +78,20 @@ final class NotchGeometryTests: XCTestCase {
 	}
 
 	func testTheNewStringsExistInAllLanguages() {
-		XCTAssertEqual(notchRows.count, 5)
+		XCTAssertEqual(notchRows.count, 7)
 		for row in notchRows { XCTAssertFalse(row.vi.isEmpty); XCTAssertFalse(row.en.isEmpty); XCTAssertFalse(row.ko.isEmpty) }
+	}
+
+	func testHoverOpensAndGlassAreTheDefaults() {
+		let d = UserDefaults.standard
+		let h = d.object(forKey: NotchPrefs.hoverKey), s = d.object(forKey: NotchPrefs.solidKey)
+		d.removeObject(forKey: NotchPrefs.hoverKey); d.removeObject(forKey: NotchPrefs.solidKey)
+		defer { d.set(h, forKey: NotchPrefs.hoverKey); d.set(s, forKey: NotchPrefs.solidKey) }
+		XCTAssertTrue(NotchPrefs.openOnHover, "resting on the notch opens it unless switched off")
+		XCTAssertFalse(NotchPrefs.solid, "see-through unless switched to solid")
+		d.set(false, forKey: NotchPrefs.hoverKey)
+		XCTAssertFalse(NotchPrefs.openOnHover)
+		XCTAssertLessThan(NotchController.openDelay, 0.5, "short enough to feel immediate")
+		XCTAssertGreaterThan(NotchController.openDelay, NotchController.closeDelay, "a pass-over does not open it")
 	}
 }

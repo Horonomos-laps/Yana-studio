@@ -29,12 +29,14 @@ final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
 @MainActor
 final class NotchController {
 	static let closeDelay = 0.15   // the pointer may slip off for a moment without closing it
+	static let openDelay = 0.22    // resting on the notch opens it; just passing over does not
 
 	let screen: NSScreen
 	let model: NotchModel
 	private let panel: NotchPanel
 	private var monitors: [Any] = []
 	private var closeWork: DispatchWorkItem?
+	private var openWork: DispatchWorkItem?
 
 	init(screen: NSScreen) {
 		self.screen = screen
@@ -63,6 +65,7 @@ final class NotchController {
 		monitors.forEach(NSEvent.removeMonitor)
 		monitors = []
 		closeWork?.cancel()
+		openWork?.cancel()
 		panel.close()
 	}
 
@@ -73,10 +76,19 @@ final class NotchController {
 		let inside = hitRect.contains(mouse)
 		// Only over the shape does the panel take the mouse; everywhere else clicks pass through.
 		panel.ignoresMouseEvents = !inside
+		if !inside { openWork?.cancel(); openWork = nil }
 		model.setHovering(inside)
 		if inside {
 			closeWork?.cancel()
 			closeWork = nil
+			if !model.isOpen, NotchPrefs.openOnHover, openWork == nil {
+				let work = DispatchWorkItem { [weak self] in
+					self?.openWork = nil
+					if self?.model.hovering == true { self?.model.open() }
+				}
+				openWork = work
+				DispatchQueue.main.asyncAfter(deadline: .now() + Self.openDelay, execute: work)
+			}
 		} else if model.isOpen, closeWork == nil {
 			let work = DispatchWorkItem { [weak self] in
 				self?.closeWork = nil

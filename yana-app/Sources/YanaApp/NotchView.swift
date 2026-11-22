@@ -6,6 +6,7 @@ import SwiftUI
 struct NotchView: View {
 	@ObservedObject var model: NotchModel
 	var onSettings: () -> Void = {}
+	@AppStorage(NotchPrefs.solidKey) private var solid = false
 
 	var body: some View {
 		let look = model.look
@@ -14,7 +15,12 @@ struct NotchView: View {
 		let shape = NotchShape(topRadius: radii.top, bottomRadius: radii.bottom)
 
 		ZStack(alignment: .top) {
-			Color.black
+			// Closed it is solid black so it merges with the camera housing; open it is frosted glass you can see through.
+			if model.isOpen && !solid {
+				NotchFrost().overlay(Color.black.opacity(0.28)).transition(.opacity)
+			} else {
+				Color.black
+			}
 			if model.isOpen {
 				OpenPanel(onSettings: onSettings, close: model.close)
 					.frame(width: size.width, height: size.height, alignment: .top)
@@ -51,4 +57,17 @@ private struct OpenPanel: View {
 		}
 		.padding(.horizontal, 24).padding(.top, 36).padding(.bottom, 14)
 	}
+}
+
+// Frosted material that shows the desktop behind the window, blurred.
+struct NotchFrost: NSViewRepresentable {
+	func makeNSView(context: Context) -> NSVisualEffectView {
+		let view = NSVisualEffectView()
+		view.material = .hudWindow
+		view.blendingMode = .behindWindow
+		view.state = .active
+		return view
+	}
+
+	func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }

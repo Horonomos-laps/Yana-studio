@@ -202,6 +202,8 @@ struct GeneralSettings: View {
 	@AppStorage(SleepGuard.key) private var keepAwake = false
 	@AppStorage(NotchPrefs.enabledKey) private var notchOn = false
 	@AppStorage(NotchPrefs.quietKey) private var notchQuiet = false
+	@AppStorage(NotchPrefs.hoverKey) private var notchHover = true
+	@AppStorage(NotchPrefs.solidKey) private var notchSolid = false
 
 	var body: some View {
 		Form {
@@ -239,7 +241,11 @@ struct GeneralSettings: View {
 
 			Section {
 				Toggle(L("set.notch"), isOn: $notchOn)
-				if notchOn { Toggle(L("set.notchQuiet"), isOn: $notchQuiet) }
+				if notchOn {
+					Toggle(L("set.notchHover"), isOn: $notchHover)
+					Toggle(L("set.notchSolid"), isOn: $notchSolid)
+					Toggle(L("set.notchQuiet"), isOn: $notchQuiet)
+				}
 			} footer: { SettingsNote(L("set.notchNote")) }
 		}
 		.onChange(of: notchOn) { _, _ in NotchCenter.shared.apply() }
