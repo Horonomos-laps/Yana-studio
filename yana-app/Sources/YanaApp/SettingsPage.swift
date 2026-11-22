@@ -232,6 +232,7 @@ struct GeneralSettings: View {
 
 			Section {
 				Toggle(L("set.keepAwake"), isOn: $keepAwake)
+				LaunchAtLoginRow()
 			} footer: { SettingsNote(L("set.keepAwakeNote")) }
 		}
 	}
