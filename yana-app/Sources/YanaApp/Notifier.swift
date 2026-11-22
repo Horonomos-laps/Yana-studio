@@ -41,6 +41,7 @@ enum Notifier {
 			let content = UNMutableNotificationContent()
 			content.title = title
 			content.body = body
+			if NotifyPrefs.current().sound { content.sound = .default }
 			center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
 		}
 	}

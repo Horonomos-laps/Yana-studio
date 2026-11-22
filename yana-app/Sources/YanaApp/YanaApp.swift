@@ -5,6 +5,8 @@ struct RootView: View {
 	@State private var selected: String
 	@ObservedObject private var loc = Loc.shared
 	@ObservedObject private var appSettings = AppSettings.shared
+	// Keep the Mac awake while Yana works, when the person asked (Settings > General; SleepGuard).
+	@AppStorage(SleepGuard.key) private var keepAwake = false
 	// One chat for the window, shared by the chat page and its sidebar. Lives here so a language switch
 	// (which rebuilds the subtree below) keeps the conversation.
 	@StateObject private var engine = ChatEngine()
@@ -135,6 +137,8 @@ struct RootView: View {
 		.onChange(of: terminals.wantsPanel) { _, wanted in
 			if wanted && selected != "Chat" && selected != "Start" { selected = "Chat" }
 		}
+		.onChange(of: engine.running) { _, running in SleepGuard.shared.update(enabled: keepAwake, running: running) }
+		.onChange(of: keepAwake) { _, on in SleepGuard.shared.update(enabled: on, running: engine.running) }
 		// The terminals are AppKit views: they are colored again when the look changes, from Settings or from macOS.
 		.onChange(of: appSettings.appearance) { _, _ in
 			Appearance.apply(appSettings.appearance)

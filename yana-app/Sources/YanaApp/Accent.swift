@@ -43,6 +43,8 @@ enum Accent: CaseIterable {
 	static func section(_ section: SettingsSection) -> Accent {
 		switch section {
 		case .general: return .ink
+		case .appearance: return .violet
+		case .notifications: return .orange
 		case .chat: return .blue
 		case .personal: return .pink
 		case .memory: return .amber

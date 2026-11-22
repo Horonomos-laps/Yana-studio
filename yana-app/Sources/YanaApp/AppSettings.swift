@@ -37,6 +37,9 @@ final class AppSettings: ObservableObject {
 	// What opens when Yana starts: "ask" (the start chooser), "Terminal" or "Chat".
 	@Published var startPage: String { didSet { store.set(startPage, forKey: "yana.startPage") } }
 	// The look: light (the default), dark, or follow macOS (Palette.swift).
+	// The font and size of code in replies (CodeFont): "" is the system monospaced font.
+	@Published var codeFontName: String { didSet { store.set(codeFontName, forKey: "yana.code.font") } }
+	@Published var codeFontSize: Double { didSet { store.set(CodeFont.clampedSize(codeFontSize), forKey: "yana.code.size") } }
 	@Published var appearance: Appearance { didSet { store.set(appearance.rawValue, forKey: "yana.appearance"); MainActor.assumeIsolated { Appearance.apply(appearance) } } }
 	// Default project folder for chat, terminal and Yana Studio. Empty: the git repo Yana was started in.
 	@Published var workspace: String { didSet { store.set(workspace, forKey: "yana.workspace") } }
@@ -71,6 +74,8 @@ final class AppSettings: ObservableObject {
 		ideCheckout = store.string(forKey: "yana.ideCheckout") ?? "\(NSHomeDirectory())/yana-ide-upstream/vscode"
 		// A new install opens straight on the chat screen; the start chooser is opt-in from Settings.
 		startPage = store.string(forKey: "yana.startPage") ?? "Chat"
+		codeFontName = store.string(forKey: "yana.code.font") ?? ""
+		codeFontSize = CodeFont.clampedSize(store.object(forKey: "yana.code.size") as? Double ?? CodeFont.defaultSize)
 		appearance = store.string(forKey: "yana.appearance").flatMap(Appearance.init(rawValue:)) ?? .light
 		workspace = store.string(forKey: "yana.workspace") ?? ""
 		terminalOptionAsMeta = store.bool(forKey: "yana.terminal.optionAsMeta")

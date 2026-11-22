@@ -72,7 +72,7 @@ struct CodeBlock: View {
 	}
 
 	private var codeText: some View {
-		Text(code.isEmpty ? " " : code).font(.system(size: 12.5, design: .monospaced)).foregroundStyle(FB.text)
+		Text(code.isEmpty ? " " : code).font(CodeFont.font(name: AppSettings.shared.codeFontName, size: AppSettings.shared.codeFontSize)).foregroundStyle(FB.text)
 			.fixedSize(horizontal: true, vertical: true)
 	}
 

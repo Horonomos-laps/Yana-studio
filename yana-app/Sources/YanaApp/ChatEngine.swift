@@ -514,8 +514,8 @@ final class ChatEngine: ObservableObject {
 	private func notifyIfNeeded() {
 		guard let line = lines.last, line.role == .assistant else { return }
 		let waiting = line.approval != nil && line.approval?.decided == nil
-		guard Notifier.shouldNotify(enabled: Notifier.enabled, appActive: NSApplication.shared.isActive,
-		                            elapsed: Date().timeIntervalSince(turnStartedAt), needsPerson: waiting) else { return }
+		guard NotifyPrefs.current().shouldNotify(appActive: NSApplication.shared.isActive,
+		                                         elapsed: Date().timeIntervalSince(turnStartedAt), needsPerson: waiting) else { return }
 		let chat = title.map { String($0.split(separator: "\n").first ?? "").prefix(40) } ?? ""
 		if let ask = line.approval, waiting {
 			Notifier.post(title: L("notify.approval"), body: "\(ask.capability): \(Notifier.summary(ask.reason, limit: 100))", id: "approval-\(sessionId)")

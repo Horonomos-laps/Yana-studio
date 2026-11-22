@@ -7,11 +7,13 @@ import SwiftUI
 // SettingsInfo.swift. API keys go to the macOS Keychain only and are never shown again after saving.
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-	case general, chat, personal, memory, models, terminal, studio, git, worktree, hooks, security, data, updates, system, shortcuts, about
+	case general, appearance, notifications, chat, personal, memory, models, terminal, studio, git, worktree, hooks, security, data, updates, system, shortcuts, about
 	var id: String { rawValue }
 	var icon: String {
 		switch self {
 		case .general: return "settings"
+		case .appearance: return "palette"
+		case .notifications: return "bell"
 		case .chat: return "message"
 		case .personal: return "user"
 		case .memory: return "bookmark"
@@ -112,6 +114,8 @@ struct SettingsPage: View {
 	private var pane: some View {
 		switch section {
 		case .general: GeneralSettings()
+		case .appearance: AppearanceSettings()
+		case .notifications: NotificationSettings()
 		case .chat: ChatSettings()
 		case .personal: PersonalSettings()
 		case .memory: MemorySettings()
@@ -187,18 +191,13 @@ struct GeneralSettings: View {
 	@ObservedObject private var loc = Loc.shared
 	@ObservedObject private var settings = AppSettings.shared
 	@AppStorage("yana.ui.chatSidebar") private var chatSidebar = true
-	@AppStorage(LiquidGlass.enabledKey) private var liquidGlass = true
+	@AppStorage(SleepGuard.key) private var keepAwake = false
 
 	var body: some View {
 		Form {
 			Section {
 				Picker(L("set.language"), selection: $loc.lang) {
 					ForEach(Lang.allCases) { Text($0.nativeName).tag($0) }
-				}
-				Picker(L("set.appearance"), selection: $settings.appearance) {
-					Text(L("set.appearanceLight")).tag(Appearance.light)
-					Text(L("set.appearanceDark")).tag(Appearance.dark)
-					Text(L("set.appearanceSystem")).tag(Appearance.system)
 				}
 				Picker(L("set.startPage"), selection: $settings.startPage) {
 					Text(L("set.startAsk")).tag("ask")
@@ -220,12 +219,12 @@ struct GeneralSettings: View {
 
 			Section {
 				Toggle(L("set.showChatList"), isOn: $chatSidebar)
-				Toggle(L("set.glass"), isOn: $liquidGlass)
-				if liquidGlass && !LiquidGlass.active {
-					Text(L("set.glassOff")).font(.fbCaption).foregroundStyle(FB.textSecondary)
-				}
 				Toggle(L("set.updatesOnLaunch"), isOn: $settings.checkUpdatesOnLaunch)
 			} header: { Text(L("set.window")) }
+
+			Section {
+				Toggle(L("set.keepAwake"), isOn: $keepAwake)
+			} footer: { SettingsNote(L("set.keepAwakeNote")) }
 		}
 	}
 
@@ -242,8 +241,6 @@ struct GeneralSettings: View {
 
 struct ChatSettings: View {
 	@ObservedObject private var settings = AppSettings.shared
-	// Notifications when a long turn ends or waits for a decision (Notifier.swift); on until switched off.
-	@AppStorage(Notifier.defaultsKey) private var notify = true
 	// Speech to text may use Apple's servers only for a language with no on-device model (Dictation.swift).
 	@AppStorage("yana.dictation.allowServer") private var dictationServer = false
 	// Installed system voices, by display name.
@@ -260,7 +257,6 @@ struct ChatSettings: View {
 					Text(L("chat.modePlan")).tag(true)
 				}
 				Toggle(L("set.showTokens"), isOn: $settings.showTokens)
-				Toggle(L("set.notify"), isOn: $notify)
 			} footer: { SettingsNote(L("set.defaultModeNote")) }
 
 			Section {
