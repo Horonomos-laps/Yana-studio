@@ -20,5 +20,13 @@ let notchRows: [StringRow] = [
 	StringRow("notch.clipboard", "Lịch sử clipboard", "Clipboard history", "클립보드 기록"),
 	StringRow("notch.clipboardEmpty", "Chưa có gì. Chép một đoạn chữ là nó hiện ở đây.", "Nothing yet. Copy some text and it shows here.", "아직 없습니다. 텍스트를 복사하면 여기에 표시됩니다."),
 	StringRow("notch.clear", "Xóa hết", "Clear", "모두 지우기"),
+	StringRow("notch.home", "Tiện ích", "Widgets", "위젯"),
+	StringRow("notch.tokens", "Token", "Tokens", "토큰"),
+	StringRow("notch.asks", "lần hỏi duyệt", "approvals", "승인 요청"),
+	StringRow("notch.allow", "Cho phép", "Allow", "허용"),
+	StringRow("notch.deny", "Từ chối", "Deny", "거부"),
+	StringRow("notch.stateIdle", "Đang rảnh", "Idle", "대기 중"),
+	StringRow("notch.stateWorking", "Đang làm việc", "Working", "작업 중"),
+	StringRow("notch.stateWaiting", "Chờ anh duyệt", "Waiting for you", "승인 대기"),
 	StringRow("notch.idle", "Yana đang rảnh. Việc đang chạy và lệnh chờ duyệt sẽ hiện ở đây.", "Yana is idle. Running work and approvals will show here.", "Yana는 대기 중입니다. 실행 중인 작업과 승인 요청이 여기에 표시됩니다."),
 ]

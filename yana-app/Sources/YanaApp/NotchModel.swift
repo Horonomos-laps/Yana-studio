@@ -1,21 +1,23 @@
 import AppKit
+import Combine
 import SwiftUI
 
 // What one screen's notch is doing. The controller changes it from mouse events; the view only draws it.
 
-enum NotchTab: Equatable { case home, clipboard }
+enum NotchTab: Int, Equatable, CaseIterable { case yana, home, clipboard }
 
 @MainActor
 final class NotchModel: ObservableObject {
 	@Published var isOpen = false
 	@Published var hovering = false
-	@Published var tab: NotchTab = .home
+	@Published var tab: NotchTab = .yana
 	@Published var typing = false   // a text field has the keyboard: do not close under the person's hands
-	// Phase 2 fills these from yana-rt; in phase 1 they only come from the preview switch.
+	// Set from YanaActivity: something is happening (a reply is being written or a command waits for a decision).
 	@Published var hasActivity = false
 	@Published var glancing = false
 
 	let geometry: NotchGeometry
+	private var cancellable: AnyCancellable?
 	let displayID: CGDirectDisplayID
 
 	init(screen: NSScreen) {
@@ -24,6 +26,13 @@ final class NotchModel: ObservableObject {
 		                               rightAreaWidth: screen.auxiliaryTopRightArea?.width)
 		geometry = NotchGeometry(notch: size)
 		displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) ?? 0
+		// Yana's own work drives the closed look: wings while busy, and a line under them while it waits for a decision.
+		cancellable = YanaActivity.shared.$run.receive(on: RunLoop.main).sink { [weak self] run in
+			withAnimation(.notchOpen) {
+				self?.hasActivity = run.isActive
+				self?.glancing = run.state == .waiting
+			}
+		}
 	}
 
 	var look: NotchLook {

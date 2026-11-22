@@ -7,6 +7,7 @@ struct NotchView: View {
 	@ObservedObject var model: NotchModel
 	var onSettings: () -> Void = {}
 	@AppStorage(NotchPrefs.solidKey) private var solid = false
+	@ObservedObject private var activity = YanaActivity.shared
 
 	var body: some View {
 		let look = model.look
@@ -20,6 +21,11 @@ struct NotchView: View {
 				NotchFrost().overlay(Color.black.opacity(0.28)).transition(.opacity)
 			} else {
 				Color.black
+			}
+			if !model.isOpen, activity.run.isActive {
+				ActivityWings(model: model, run: activity.run, glance: look == .glance)
+					.frame(width: size.width, height: size.height, alignment: .top)
+					.transition(.opacity)
 			}
 			if model.isOpen {
 				OpenPanel(model: model, onSettings: onSettings)
@@ -47,9 +53,7 @@ private struct OpenPanel: View {
 		VStack(spacing: 8) {
 			// The top row sits beside the camera housing: tabs on the left, buttons on the right.
 			HStack(spacing: 0) {
-				HStack(spacing: 14) {
-					tab("house", .home); tab("doc.on.clipboard", .clipboard)
-				}
+				HStack(spacing: 7) { ForEach(NotchTab.allCases, id: \.self) { dot($0) } }
 				Spacer(minLength: model.geometry.hasNotch ? notch.width + 20 : 40)
 				HStack(spacing: 14) {
 					Button(action: onSettings) { Image(systemName: "gearshape") }.buttonStyle(.plain)
@@ -62,6 +66,8 @@ private struct OpenPanel: View {
 
 			Group {
 				switch model.tab {
+				case .yana:
+					YanaCard()
 				case .home:
 					HStack(spacing: 8) {
 						MusicCard(); TimerCard()
@@ -76,9 +82,61 @@ private struct OpenPanel: View {
 		.padding(.horizontal, 22).padding(.bottom, 14)
 	}
 
-	private func tab(_ icon: String, _ value: NotchTab) -> some View {
-		Button { withAnimation(.notchHover) { model.tab = value } } label: { Image(systemName: icon) }
-			.buttonStyle(.plain).foregroundStyle(model.tab == value ? .white : .white.opacity(0.45))
+	// Three dots like a page control: the filled one is where you are; each one is a button.
+	private func dot(_ value: NotchTab) -> some View {
+		Button { withAnimation(.notchHover) { model.tab = value } } label: {
+			Circle().fill(model.tab == value ? Color.white : Color.white.opacity(0.35)).frame(width: 8, height: 8)
+		}
+		.buttonStyle(.plain)
+		.help(title(value))
+	}
+
+	private func title(_ tab: NotchTab) -> String {
+		switch tab {
+		case .yana: "Yana"
+		case .home: L("notch.home")
+		case .clipboard: L("notch.clipboard")
+		}
+	}
+}
+
+// The closed pill while Yana is busy: a status dot on the left wing, moving bars on the right wing, and under them a
+// short line (the answer so far, or what is waiting for a yes or no) while it glances.
+private struct ActivityWings: View {
+	@ObservedObject var model: NotchModel
+	let run: YanaRun
+	let glance: Bool
+
+	var body: some View {
+		let notch = model.geometry.closedSize
+		VStack(spacing: 0) {
+			HStack(spacing: 0) {
+				Circle().fill(run.state == .waiting ? Color.orange : Color.green).frame(width: 9, height: 9)
+					.frame(width: NotchGeometry.wing)
+				Spacer(minLength: notch.width)
+				EqualizerBars(active: run.state == .working).frame(width: NotchGeometry.wing)
+			}
+			.frame(height: model.geometry.rowHeight)
+			if glance {
+				Text(run.state == .waiting ? (run.waitingFor ?? "") : run.reply)
+					.font(.system(size: 10)).foregroundStyle(.white.opacity(0.8)).lineLimit(1).padding(.horizontal, 12)
+			}
+		}
+	}
+}
+
+private struct EqualizerBars: View {
+	let active: Bool
+	var body: some View {
+		TimelineView(.animation(minimumInterval: 0.12, paused: !active)) { context in
+			let t = context.date.timeIntervalSinceReferenceDate
+			HStack(spacing: 2) {
+				ForEach(0 ..< 4, id: \.self) { i in
+					Capsule().fill(Color.white.opacity(0.85))
+						.frame(width: 2.5, height: active ? 5 + 9 * abs(sin(t * 6 + Double(i) * 1.3)) : 4)
+				}
+			}
+		}
 	}
 }
 

@@ -16,4 +16,14 @@ No notchd code is included. Yana's version is written from scratch; what is borr
 | A widget set in the open notch: music with controls, timers and a Pomodoro, to-do list, notes, clipboard history | README, Sources/Notchd/Widgets.swift, Timer.swift, Pomodoro.swift, Notes.swift, Clipboard.swift |
 | Not closing while a text field has the keyboard | Sources/Notchd/NotchController.swift |
 
+## Ideas from OneNotch (closed-source app, seen in screen recordings only)
+
+No code or files of OneNotch were used or examined; only what its screens show.
+
+| Idea | Seen as |
+|---|---|
+| Pages in the open notch, switched with a row of three dots | The dots at the top left of the notch |
+| One row per coding session: state, model, elapsed time, project, branch, last message, counts | Its coding-agents page |
+| A closed pill with a mark on the left wing and moving bars on the right wing while something runs | Its live activity |
+
 If code from notchd is ever copied, it will keep its license header and be marked here as copied.

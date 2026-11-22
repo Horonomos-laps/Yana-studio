@@ -196,3 +196,84 @@ struct ClipboardTab: View {
 		}
 	}
 }
+
+// MARK: Yana
+
+// One row for Yana's current work, in the manner of OneNotch's coding-agents page: state, model, time, project and
+// branch, the last question and answer, tokens, and Allow / Deny when a command waits for a person.
+struct YanaCard: View {
+	@ObservedObject private var activity = YanaActivity.shared
+
+	var body: some View {
+		let run = activity.run
+		HStack(alignment: .top, spacing: 14) {
+			VStack(spacing: 6) {
+				Circle().fill(color(run.state)).frame(width: 14, height: 14)
+				Text("Yana").font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.white)
+				Text(stateText(run.state)).font(.system(size: 10)).foregroundStyle(dim)
+			}
+			.frame(width: 96)
+			VStack(alignment: .leading, spacing: 5) {
+				meta
+				if run.question.isEmpty {
+					Text(L("notch.idle")).font(.system(size: 12)).foregroundStyle(dim)
+				} else {
+					Text(run.question).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white).lineLimit(2)
+					if !run.reply.isEmpty { Text(run.reply).font(.system(size: 11)).foregroundStyle(dim).lineLimit(3) }
+				}
+				Spacer(minLength: 0)
+				if run.state == .waiting { approvalRow(run) } else { chips(run) }
+			}
+			.frame(maxWidth: .infinity, alignment: .leading)
+		}
+		.padding(10)
+		.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+		.background(cardFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+	}
+
+	private var meta: some View {
+		HStack(spacing: 10) {
+			if !activity.model.isEmpty { Label(activity.model, systemImage: "sparkle") }
+			if let start = activity.startedAt {
+				TimelineView(.periodic(from: .now, by: 1)) { context in
+					Label(clockText(context.date.timeIntervalSince(start)), systemImage: "clock")
+				}
+			}
+			if !activity.project.isEmpty { Label(activity.project, systemImage: "folder") }
+			if !activity.branch.isEmpty { Label(activity.branch, systemImage: "arrow.triangle.branch") }
+		}
+		.font(.system(size: 10)).foregroundStyle(dim).lineLimit(1)
+	}
+
+	private func chips(_ run: YanaRun) -> some View {
+		HStack(spacing: 6) {
+			chip("\(L("notch.tokens")) \(YanaRun.short(run.inputTokens)) → \(YanaRun.short(run.outputTokens))", .blue)
+			if run.askCount > 0 { chip("\(run.askCount) \(L("notch.asks"))", .orange) }
+		}
+	}
+
+	private func approvalRow(_ run: YanaRun) -> some View {
+		HStack(spacing: 8) {
+			Text(run.waitingFor ?? "").font(.system(size: 11, weight: .medium)).foregroundStyle(.orange).lineLimit(1)
+			Spacer()
+			Button(L("notch.deny")) { activity.decide?(false) }.buttonStyle(.plain)
+				.padding(.horizontal, 10).padding(.vertical, 4).background(Color.white.opacity(0.14), in: Capsule())
+			Button(L("notch.allow")) { activity.decide?(true) }.buttonStyle(.plain)
+				.padding(.horizontal, 10).padding(.vertical, 4).background(Color.green.opacity(0.85), in: Capsule())
+		}
+		.font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+	}
+
+	private func chip(_ text: String, _ tint: Color) -> some View {
+		Text(text).font(.system(size: 10, weight: .medium)).foregroundStyle(tint)
+			.padding(.horizontal, 7).padding(.vertical, 2).background(tint.opacity(0.18), in: Capsule())
+	}
+
+	private func color(_ state: YanaRun.State) -> Color {
+		switch state { case .idle: .gray; case .working: .green; case .waiting: .orange }
+	}
+
+	private func stateText(_ state: YanaRun.State) -> String {
+		switch state { case .idle: L("notch.stateIdle"); case .working: L("notch.stateWorking"); case .waiting: L("notch.stateWaiting") }
+	}
+}

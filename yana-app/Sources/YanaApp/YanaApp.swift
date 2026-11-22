@@ -140,6 +140,14 @@ struct RootView: View {
 			if wanted && selected != "Chat" && selected != "Start" { selected = "Chat" }
 		}
 		.onChange(of: engine.running) { _, running in SleepGuard.shared.update(enabled: keepAwake, running: running) }
+		// The notch shows Yana's own work, pushed on every change of the chat. Its Allow / Deny buttons answer the
+		// same open approval card as the chat's own buttons.
+		.onChange(of: engine.lines.count) { _, _ in pushToNotch() }
+		.onChange(of: engine.running) { _, _ in pushToNotch() }
+		.onAppear {
+			YanaActivity.shared.decide = { approved in engine.decide(approved, .once) }
+			pushToNotch()
+		}
 		.onChange(of: keepAwake) { _, on in SleepGuard.shared.update(enabled: on, running: engine.running) }
 		// The terminals are AppKit views: they are colored again when the look changes, from Settings or from macOS.
 		.onChange(of: appSettings.appearance) { _, _ in
@@ -156,6 +164,11 @@ struct RootView: View {
 	}
 
 	// Menu bar actions (AppCommands.swift).
+	private func pushToNotch() {
+		YanaActivity.shared.update(lines: engine.lines, running: engine.running, model: engine.model,
+		                           provider: engine.provider, workspace: engine.workspace)
+	}
+
 	private func perform(_ action: MenuAction) {
 		switch action {
 		case .settings: selected = "Settings"
