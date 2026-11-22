@@ -35,7 +35,8 @@ let railEntries: [RailEntry] = [
 // dark mode it took the dark desktop color and turned the sidebar and the glass composer a muddy grey.
 // The icon rail is pure white in the light look (a neutral gray read as yellowish next to the page), dark gray in the dark.
 private let railColor = FBPair.rail.color
-private let sidebarColor = FB.chrome
+// The chat list is a flat column like the icon rail beside it (white in the light look), not a floating rounded panel.
+private let sidebarColor = FBPair.rail.color
 private let dividerColor = FB.divider
 
 struct SidebarBackground: View {
@@ -140,7 +141,8 @@ struct ChatSidebar: View {
 		.padding(EdgeInsets(top: 38, leading: 12, bottom: 14, trailing: 12))
 		.frame(width: 252)
 		.frame(maxHeight: .infinity)
-		.sidePanelBackground(color: sidebarColor, leadingInset: 2)
+		.background(sidebarColor)
+		.overlay(alignment: .trailing) { FB.divider.frame(width: 1) }
 		.sheet(item: $renaming) { chat in
 			RenameSheet(text: $renameText, cancel: { renaming = nil }) {
 				history.rename(chat.id, to: renameText)

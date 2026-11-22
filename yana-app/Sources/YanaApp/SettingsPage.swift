@@ -104,7 +104,9 @@ struct SettingsPage: View {
 				}
 			}
 			.frame(width: 240)
-			.sidePanelBackground(color: FB.chrome, leadingInset: LiquidGlass.panelInset)
+			.frame(maxHeight: .infinity)
+			.background(FBPair.rail.color)
+			.overlay(alignment: .trailing) { FB.divider.frame(width: 1) }
 
 			VStack(alignment: .leading, spacing: 0) {
 				PaneHeader(section: section)
