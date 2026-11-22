@@ -30,6 +30,7 @@ struct ChatHome: View {
 	@EnvironmentObject private var engine: ChatEngine
 	@State private var text = ""
 	@State private var atBottom = true
+	@AppStorage("yana.ui.suggestions") private var showSuggestions = true
 	// Room above the first message for the chat's title and its menu.
 	private static let conversationTopInset: CGFloat = 84
 	private static let suggestionsMaxWidth: CGFloat = 760
@@ -279,7 +280,7 @@ struct ChatHome: View {
 					.padding(.bottom, 22)
 				inputArea
 				// Cards to start from; a click fills the box (it does not send) and hands the focus to typing.
-				if ChatSuggestion.visible(chatIsEmpty: engine.lines.isEmpty, draft: text) {
+				if showSuggestions, ChatSuggestion.visible(chatIsEmpty: engine.lines.isEmpty, draft: text) {
 					SuggestionCards { text = $0 }
 						.padding(.horizontal, 8).padding(.top, 18).frame(maxWidth: Self.suggestionsMaxWidth)
 				}
