@@ -3,10 +3,14 @@ import SwiftUI
 
 // What one screen's notch is doing. The controller changes it from mouse events; the view only draws it.
 
+enum NotchTab: Equatable { case home, clipboard }
+
 @MainActor
 final class NotchModel: ObservableObject {
 	@Published var isOpen = false
 	@Published var hovering = false
+	@Published var tab: NotchTab = .home
+	@Published var typing = false   // a text field has the keyboard: do not close under the person's hands
 	// Phase 2 fills these from yana-rt; in phase 1 they only come from the preview switch.
 	@Published var hasActivity = false
 	@Published var glancing = false

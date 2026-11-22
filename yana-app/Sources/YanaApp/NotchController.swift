@@ -77,6 +77,8 @@ final class NotchController {
 		// Only over the shape does the panel take the mouse; everywhere else clicks pass through.
 		panel.ignoresMouseEvents = !inside
 		if !inside { openWork?.cancel(); openWork = nil }
+		// Typing ended when the panel lost the keyboard (a click elsewhere).
+		if model.typing, !panel.isKeyWindow { model.typing = false }
 		model.setHovering(inside)
 		if inside {
 			closeWork?.cancel()
@@ -89,7 +91,7 @@ final class NotchController {
 				openWork = work
 				DispatchQueue.main.asyncAfter(deadline: .now() + Self.openDelay, execute: work)
 			}
-		} else if model.isOpen, closeWork == nil {
+		} else if model.isOpen, !model.typing, closeWork == nil {
 			let work = DispatchWorkItem { [weak self] in
 				self?.closeWork = nil
 				self?.model.close()
@@ -112,6 +114,7 @@ final class NotchCenter {
 	}
 
 	private func start() {
+		MusicStore.shared.start(); TimerStore.shared.start(); ClipboardStore.shared.start()
 		rebuild()
 		guard observer == nil else { return }
 		observer = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
@@ -121,6 +124,7 @@ final class NotchCenter {
 	}
 
 	private func stop() {
+		MusicStore.shared.stop(); TimerStore.shared.stop(); ClipboardStore.shared.stop()
 		if let observer { NotificationCenter.default.removeObserver(observer) }
 		observer = nil
 		controllers.forEach { $0.close() }

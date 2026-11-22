@@ -22,7 +22,7 @@ struct NotchView: View {
 				Color.black
 			}
 			if model.isOpen {
-				OpenPanel(onSettings: onSettings, close: model.close)
+				OpenPanel(model: model, onSettings: onSettings)
 					.frame(width: size.width, height: size.height, alignment: .top)
 					.transition(.opacity.combined(with: .scale(scale: 0.86, anchor: .top)))
 			}
@@ -39,23 +39,46 @@ struct NotchView: View {
 }
 
 private struct OpenPanel: View {
+	@ObservedObject var model: NotchModel
 	let onSettings: () -> Void
-	let close: () -> Void
 
 	var body: some View {
-		VStack(alignment: .leading, spacing: 8) {
-			HStack {
-				Text("Yana").font(.system(size: 15, weight: .heavy, design: .rounded)).foregroundStyle(.white)
-				Spacer()
-				Button(action: onSettings) { Image(systemName: "gearshape") }.buttonStyle(.plain)
-				Button(action: close) { Image(systemName: "chevron.up") }.buttonStyle(.plain)
+		let notch = model.geometry.closedSize
+		VStack(spacing: 8) {
+			// The top row sits beside the camera housing: tabs on the left, buttons on the right.
+			HStack(spacing: 0) {
+				HStack(spacing: 14) {
+					tab("house", .home); tab("doc.on.clipboard", .clipboard)
+				}
+				Spacer(minLength: model.geometry.hasNotch ? notch.width + 20 : 40)
+				HStack(spacing: 14) {
+					Button(action: onSettings) { Image(systemName: "gearshape") }.buttonStyle(.plain)
+					Button(action: model.close) { Image(systemName: "chevron.up") }.buttonStyle(.plain)
+				}
 			}
-			.foregroundStyle(.white.opacity(0.7))
-			Spacer(minLength: 0)
-			Text(L("notch.idle")).font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
-			Spacer(minLength: 0)
+			.font(.system(size: 13, weight: .semibold))
+			.foregroundStyle(.white.opacity(0.75))
+			.frame(height: max(notch.height, 28))
+
+			Group {
+				switch model.tab {
+				case .home:
+					HStack(spacing: 8) {
+						MusicCard(); TimerCard()
+						TodoCard(typing: { model.typing = $0 }); NotesCard(typing: { model.typing = $0 })
+					}
+				case .clipboard:
+					ClipboardTab()
+				}
+			}
+			.frame(maxHeight: .infinity)
 		}
-		.padding(.horizontal, 24).padding(.top, 36).padding(.bottom, 14)
+		.padding(.horizontal, 22).padding(.bottom, 14)
+	}
+
+	private func tab(_ icon: String, _ value: NotchTab) -> some View {
+		Button { withAnimation(.notchHover) { model.tab = value } } label: { Image(systemName: icon) }
+			.buttonStyle(.plain).foregroundStyle(model.tab == value ? .white : .white.opacity(0.45))
 	}
 }
 

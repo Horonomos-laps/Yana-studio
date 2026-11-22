@@ -24,7 +24,7 @@ struct NotchGeometry: Equatable {
 	static let glanceExtraWidth: CGFloat = 70
 	static let glanceExtraHeight: CGFloat = 26
 	static let minRowHeight: CGFloat = 30
-	static let openSize = CGSize(width: 440, height: 150)    // phase 1 panel; later it follows its content
+	static let openSize = CGSize(width: 720, height: 210)    // header row beside the housing, then the widget cards
 	static let windowHeight: CGFloat = 280                   // room for the open shape, its shadow and the spring overshoot
 
 	var closedSize: CGSize { notch ?? Self.handleSize }
