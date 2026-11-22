@@ -342,6 +342,7 @@ struct AboutSettings: View {
 
 			Section(L("about.legal")) {
 				LabeledContent(L("about.license")) { Link("Apache License 2.0", destination: Self.license) }
+				LabeledContent(L("about.credits")) { Link("notchd (Apache 2.0)", destination: URL(string: "https://github.com/notchd-app/notchd")!) }
 				LabeledContent(L("about.author"), value: "Vũ Văn Tâm")
 				LabeledContent(L("about.privacy"), value: L("about.privacyValue"))
 			}

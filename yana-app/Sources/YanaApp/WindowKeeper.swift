@@ -64,6 +64,10 @@ private final class CloseHidesWindow: NSObject, NSWindowDelegate {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+	func applicationDidFinishLaunching(_ notification: Notification) {
+		NotchCenter.shared.apply()
+	}
+
 	func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
 		if !flag, WindowKeeper.show() { return false }
 		return true

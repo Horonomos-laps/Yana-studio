@@ -200,6 +200,8 @@ struct GeneralSettings: View {
 	@ObservedObject private var settings = AppSettings.shared
 	@AppStorage("yana.ui.chatSidebar") private var chatSidebar = true
 	@AppStorage(SleepGuard.key) private var keepAwake = false
+	@AppStorage(NotchPrefs.enabledKey) private var notchOn = false
+	@AppStorage(NotchPrefs.quietKey) private var notchQuiet = false
 
 	var body: some View {
 		Form {
@@ -234,7 +236,13 @@ struct GeneralSettings: View {
 				Toggle(L("set.keepAwake"), isOn: $keepAwake)
 				LaunchAtLoginRow()
 			} footer: { SettingsNote(L("set.keepAwakeNote")) }
+
+			Section {
+				Toggle(L("set.notch"), isOn: $notchOn)
+				if notchOn { Toggle(L("set.notchQuiet"), isOn: $notchQuiet) }
+			} footer: { SettingsNote(L("set.notchNote")) }
 		}
+		.onChange(of: notchOn) { _, _ in NotchCenter.shared.apply() }
 	}
 
 	private func chooseFolder() {

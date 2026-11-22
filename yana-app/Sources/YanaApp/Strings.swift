@@ -744,4 +744,4 @@ private let settingsSectionRows: [StringRow] = [
 	StringRow("set.aboutNote", "Thư viện bên ngoài trong app và giấy phép của chúng.", "Third-party libraries in the app and their licenses.", "앱에 포함된 외부 라이브러리와 라이선스."),
 ]
 
-let allStringRows: [StringRow] = navRows + commonRows + homeRows + approvalRows + settingsRows + chatRows + pageRows + toolRows + panelRows + settingsSectionRows + devSettingsRows + sidebarRows + dictationRows + appshotRows + sandboxRows + featureRows + glassRows + suggestionRows + appearanceRows + taskCreateRows + chatExtraRows + extraSettingsRows + providerRows + personalStyleRows + launchAtLoginRows
+let allStringRows: [StringRow] = navRows + commonRows + homeRows + approvalRows + settingsRows + chatRows + pageRows + toolRows + panelRows + settingsSectionRows + devSettingsRows + sidebarRows + dictationRows + appshotRows + sandboxRows + featureRows + glassRows + suggestionRows + appearanceRows + taskCreateRows + chatExtraRows + extraSettingsRows + providerRows + personalStyleRows + launchAtLoginRows + notchRows
