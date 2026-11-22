@@ -145,19 +145,17 @@ private struct EqualizerBars: View {
 // Older systems get the frosted material alone.
 struct NotchGlass: View {
 	let shape: NotchShape
-	static let backingOpacity = 0.6   // enough that text on it is readable on any desktop, little enough to see through
+	static let backingOpacity = 0.7   // enough that text on it is readable on any desktop, little enough to see through
 
 	var body: some View {
-		// The behind-window blur drew solid black in the notch's borderless panel (seen in a screenshot), so the panel
-		// no longer depends on it: a light-or-dark backing that follows the appearance, with Liquid Glass over it.
-		let backing = shape.fill(FBPair.glassBacking.color.opacity(NotchGlass.backingOpacity))
-		if #available(macOS 26.0, *) {
-			ZStack {
-				backing
-				Color.clear.glassEffect(Glass.regular, in: shape)
-			}
-		} else {
-			backing
+		// Neither the behind-window blur nor the system glass effect draws anything but solid black inside the notch's
+		// borderless panel (seen twice in screenshots), so the glass look is drawn here: a light-or-dark tint that follows
+		// the appearance and lets the desktop show through, a soft sheen from the top, and a bright rim.
+		ZStack {
+			shape.fill(FBPair.glassBacking.color.opacity(NotchGlass.backingOpacity))
+			shape.fill(LinearGradient(colors: [Color.white.opacity(0.30), Color.white.opacity(0)], startPoint: .top, endPoint: .center))
+			shape.stroke(LinearGradient(colors: [Color.white.opacity(0.65), Color.white.opacity(0.1)], startPoint: .top, endPoint: .bottom),
+			             lineWidth: 1.5)
 		}
 	}
 }
