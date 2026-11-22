@@ -90,7 +90,7 @@ struct ChatSidebar: View {
 	var body: some View {
 		VStack(alignment: .leading, spacing: 4) {
 			HStack(spacing: 4) {
-				Text("Yana").font(.system(size: 22, weight: .semibold)).foregroundStyle(FB.text)
+				RainbowText(text: "Yana", size: 32).offset(y: -6)
 				Spacer()
 				FBIconButton(icon: "search", variant: showSearch ? .secondary : .ghost, size: .small, tooltip: L("history.search")) {
 					showSearch.toggle()
@@ -98,7 +98,7 @@ struct ChatSidebar: View {
 				}
 				FBIconButton(icon: "sidebar", variant: .ghost, size: .small, tooltip: L("sidebar.hide"), action: collapse)
 			}
-			.padding(EdgeInsets(top: 4, leading: 8, bottom: 10, trailing: 2))
+			.padding(EdgeInsets(top: 0, leading: 8, bottom: 10, trailing: 2))
 
 			// Clears the conversation and starts a new yana-rt session id.
 			SidebarRow(icon: "edit", title: L("chat.new"), strong: false)
