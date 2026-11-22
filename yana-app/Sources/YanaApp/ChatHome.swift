@@ -29,6 +29,9 @@ struct Chip: View {
 struct ChatHome: View {
 	@EnvironmentObject private var engine: ChatEngine
 	@State private var text = ""
+	@State private var atBottom = true
+	// Room above the first message for the chat's title and its menu.
+	private static let conversationTopInset: CGFloat = 84
 	private static let suggestionsMaxWidth: CGFloat = 760
 	// Speaking into the box (Dictation.swift). Audio stays on this Mac unless allowed in Settings > Chat.
 	@StateObject private var dictation = DictationEngine()
@@ -187,6 +190,9 @@ struct ChatHome: View {
 							.padding(.top, titleBarClearance).padding(.leading, 14)
 					}
 				}
+				.overlay(alignment: .top) {
+					if !engine.lines.isEmpty { ChatHeader().padding(.top, titleBarClearance) }
+				}
 				.overlay(alignment: .topTrailing) {
 					FBIconButton(icon: "sidebar", variant: right == .hidden ? .ghost : .secondary, size: .medium,
 					             tooltip: right == .hidden ? L("panel.show") : L("panel.hide")) { right = right == .hidden ? .tools : .hidden }
@@ -310,6 +316,8 @@ struct ChatHome: View {
 		.frame(maxWidth: 760)
 	}
 
+	private static let bottomID = "chat-bottom"
+
 	private var conversation: some View {
 		ScrollViewReader { proxy in
 			ScrollView {
@@ -319,13 +327,28 @@ struct ChatHome: View {
 						            canRegenerate: engine.canReplay && line.id == engine.lines.last?.id,
 						            canEdit: engine.canReplay && line.id == engine.lastUserLineID).id(line.id)
 					}
+					// Seen only when the newest message is in view, which is how the jump button knows to show.
+					Color.clear.frame(height: 1).id(Self.bottomID)
+						.onAppear { atBottom = true }
+						.onDisappear { atBottom = false }
 				}
 				.frame(maxWidth: 760)
 				.frame(maxWidth: .infinity)
-				.padding(.vertical, 40)
+				.padding(.top, Self.conversationTopInset).padding(.bottom, 40)
 			}
 			.onChange(of: engine.lines.last?.text) { _, _ in
-				if let last = engine.lines.last { proxy.scrollTo(last.id, anchor: .bottom) }
+				let lastIsUser = engine.lines.last?.role == .user
+				if ScrollFollow.shouldFollow(atBottom: atBottom, lastIsUser: lastIsUser), let last = engine.lines.last {
+					proxy.scrollTo(last.id, anchor: .bottom)
+				}
+			}
+			.overlay(alignment: .bottom) {
+				if !atBottom {
+					FBIconButton(icon: "arrow-down", variant: .secondary, size: .medium, tooltip: L("chathdr.scrollDown")) {
+						withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+					}
+					.padding(.bottom, 12)
+				}
 			}
 			// The edit button on the last question hands its text back to the chat box.
 			.onChange(of: engine.draft) { _, new in
@@ -628,8 +651,13 @@ struct MessageView: View {
 						.padding(.horizontal, 14).padding(.vertical, 10)
 						.background(RoundedRectangle(cornerRadius: 18).fill(FB.primarySubtle))
 				}
-				if canEdit {
-					FBIconButton(icon: "edit", variant: .ghost, size: .small, tooltip: L("msg.edit")) { engine.editLast() }
+				if !line.text.isEmpty || canEdit {
+					HStack(spacing: 2) {
+						if !line.text.isEmpty { CopyIconButton(text: line.text) }
+						if canEdit {
+							FBIconButton(icon: "edit", variant: .ghost, size: .small, tooltip: L("msg.edit")) { engine.editLast() }
+						}
+					}
 				}
 			}
 			.padding(.leading, 120)

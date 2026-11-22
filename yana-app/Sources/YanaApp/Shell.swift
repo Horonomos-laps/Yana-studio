@@ -197,20 +197,7 @@ struct ChatSidebar: View {
 	}
 
 	// Saves one chat as a Markdown file wherever the person picks.
-	private func export(_ chat: SavedChat) {
-		let panel = NSSavePanel()
-		panel.nameFieldStringValue = ChatLibrary.fileName(for: chat.displayTitle)
-		panel.canCreateDirectories = true
-		guard panel.runModal() == .OK, let url = panel.url else { return }
-		do {
-			try Data(history.markdown(chat).utf8).write(to: url, options: .atomic)
-		} catch {
-			let alert = NSAlert()
-			alert.messageText = L("history.exportFailed")
-			alert.informativeText = error.localizedDescription
-			alert.runModal()
-		}
-	}
+	private func export(_ chat: SavedChat) { ChatExport.save(chat, history: history) }
 }
 
 struct RenameSheet: View {
