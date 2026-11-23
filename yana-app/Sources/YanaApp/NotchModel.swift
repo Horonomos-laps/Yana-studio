@@ -41,7 +41,7 @@ final class NotchModel: ObservableObject {
 			}
 		}
 		// Claude Code and Codex running anywhere, above all in Yana Studio's terminal, also show on the closed pill.
-		agentCancellable = AgentMonitor.shared.$sessions.receive(on: RunLoop.main).sink { [weak self] sessions in
+		agentCancellable = AgentMonitor.shared.$all.receive(on: RunLoop.main).sink { [weak self] sessions in
 			withAnimation(.notchOpen) { self?.agentState = AgentEvents.overall(sessions); self?.refreshActivity() }
 		}
 		// Music playing grows the closed pill: the cover on the left wing, moving bars in the cover's color on the right.

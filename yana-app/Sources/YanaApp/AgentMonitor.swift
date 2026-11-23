@@ -104,12 +104,16 @@ enum AgentEvents {
 @MainActor
 final class AgentMonitor: ObservableObject {
 	static let shared = AgentMonitor()
-	@Published private(set) var sessions: [AgentSession] = []
+	@Published private(set) var sessions: [AgentSession] = []         // told by the hooks
+	@Published private(set) var logSessions: [AgentSession] = []       // read from Claude Code's own logs, no setup
+	@Published private(set) var all: [AgentSession] = []               // both together, one per session
 	private var timer: Timer?
+	private var ticks = 0
+	private let scanQueue = DispatchQueue(label: "yana.agents.scan", qos: .utility)
 
 	// Sessions to show: the ones at work or waiting first (waiting on top), then the recently finished.
 	var shown: [AgentSession] {
-		sessions.sorted { a, b in
+		all.sorted { a, b in
 			func rank(_ s: AgentSession) -> Int { s.state == .waiting ? 0 : s.state == .working ? 1 : 2 }
 			return (rank(a), b.updated) < (rank(b), a.updated)
 		}
@@ -131,12 +135,31 @@ final class AgentMonitor: ObservableObject {
 		}
 	}
 
-	func stop() { timer?.invalidate(); timer = nil; sessions = [] }
+	func stop() { timer?.invalidate(); timer = nil; sessions = []; logSessions = []; all = [] }
 
 	private func tick() {
 		drain(maxAge: AgentEvents.workingTimeout)
 		let kept = AgentEvents.expire(sessions)
 		if kept != sessions { sessions = kept }
+		ticks += 1
+		if ticks % 2 == 1 { scanLogs() } else { refreshAll() }
+	}
+
+	// Claude Code's own logs, looked at every two seconds off the main thread.
+	private func scanLogs() {
+		scanQueue.async { [weak self] in
+			let found = TranscriptSessions.scan()
+			Task { @MainActor in
+				guard let self else { return }
+				if found != self.logSessions { self.logSessions = found }
+				self.refreshAll()
+			}
+		}
+	}
+
+	private func refreshAll() {
+		let merged = TranscriptSessions.merge(hooks: sessions, logs: logSessions)
+		if Set(merged.map(\.id)) != Set(all.map(\.id)) || merged.sorted(by: { $0.id < $1.id }) != all.sorted(by: { $0.id < $1.id }) { all = merged }
 	}
 
 	// Reads and deletes every finished event file. Hooks write a hidden temporary file and rename it, so a file without a
@@ -152,7 +175,7 @@ final class AgentMonitor: ObservableObject {
 			      let data = try? Data(contentsOf: file),
 			      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
 			let next = AgentEvents.apply(sessions, json: json, frontmost: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
-			if next != sessions { sessions = next }
+			if next != sessions { sessions = next; refreshAll() }
 		}
 	}
 
