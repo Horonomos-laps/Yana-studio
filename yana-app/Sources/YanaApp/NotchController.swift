@@ -74,7 +74,7 @@ final class NotchController {
 			self?.debugHold = true   // keeps it open while the pointer is elsewhere
 			self?.model.open()
 		}
-		DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+		DispatchQueue.main.asyncAfter(deadline: .now() + (Double(ProcessInfo.processInfo.environment["YANA_NOTCH_WAIT"] ?? "") ?? 2.5)) { [weak self] in
 			guard let self, let view = panel.contentView,
 			      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
 			view.cacheDisplay(in: view.bounds, to: rep)
