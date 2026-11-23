@@ -71,6 +71,10 @@ struct ChatSidebar: View {
 	@State private var query = ""
 	@State private var renaming: SavedChat?
 	@State private var renameText = ""
+	@ObservedObject private var projects = ProjectStore.shared
+	@State private var projectEdit: ProjectEdit?
+	@State private var deleting: Project?
+	@AppStorage("yana.ui.sidebar.collapsedProjects") private var collapsedProjects = ""
 
 	// "Pinned" then "Recent", filtered by the search box (title and every message). See ChatSections.swift.
 	@AppStorage("yana.ui.sidebar.pinnedCollapsed") private var pinnedCollapsed = false
@@ -83,7 +87,9 @@ struct ChatSidebar: View {
 	@AppStorage("yana.ui.sidebar.projectsCollapsed") private var projectsCollapsed = false
 	private var searching: Bool { !ChatLibrary.normalize(query).isEmpty }
 	private var sections: [ChatSection] {
-		ChatSections.build(chats: history.chats, query: query, showAllRecent: showAllRecent, showArchived: showArchived)
+		// The ordinary chats; a search looks in every chat, projects included.
+		ChatSections.build(chats: searching ? history.chats : ProjectLogic.scope(history.chats, projectID: nil), query: query,
+		                   showAllRecent: showAllRecent, showArchived: showArchived)
 	}
 	private var archivedCount: Int { ChatSections.archivedCount(history.chats) }
 
@@ -102,16 +108,9 @@ struct ChatSidebar: View {
 
 			// Clears the conversation and starts a new yana-rt session id.
 			SidebarRow(icon: "edit", title: L("chat.new"), strong: false)
-				.onTapGesture { engine.reset() }
+				.onTapGesture { engine.startChat(in: nil) }
 				.opacity(engine.running ? 0.4 : 1)
 
-			SidebarSectionHeader(title: L("chat.projects"), count: 1, collapsed: projectsCollapsed, foldable: true, plain: true) {
-				projectsCollapsed.toggle()
-			}
-			if !projectsCollapsed {
-				SidebarRow(icon: "folder", title: URL(fileURLWithPath: engine.workspace).lastPathComponent, strong: false, accent: Accent.amber.color)
-					.help(engine.workspace)
-			}
 
 			// Saved chats (ChatHistory.swift), newest first; the open one is highlighted. Right-click deletes.
 			if showSearch || searching { searchField }
@@ -119,6 +118,11 @@ struct ChatSidebar: View {
 				LazyVStack(alignment: .leading, spacing: 2) {
 					if query.isEmpty, engine.title != nil && history.chat(engine.currentChatID) == nil {
 						RecentRow(title: engine.title ?? "", date: nil, current: true)
+					}
+					// Projects first, grouped like folders; then the ordinary chats (Pinned, Recent) below.
+					if !searching { projectsSection }
+					if !searching, !projects.items.isEmpty || !sections.isEmpty {
+						SidebarSectionHeader(title: L("project.ordinary"), count: 0, collapsed: false, foldable: false, plain: true) {}
 					}
 					ForEach(sections) { section in sectionView(section) }
 					if archivedCount > 0 && !searching {
@@ -143,11 +147,83 @@ struct ChatSidebar: View {
 		.frame(maxHeight: .infinity)
 		.background(sidebarColor)
 		.overlay(alignment: .trailing) { FB.divider.frame(width: 1) }
+		.sheet(item: $projectEdit) { edit in
+			ProjectSheet(editing: edit.project, cancel: { projectEdit = nil }) { name, folder, instructions in
+				if let project = edit.project {
+					projects.update(project.id, name: name, folder: folder, instructions: instructions)
+					if engine.projectID == project.id { engine.refreshProject() }
+				} else if let made = projects.add(name: name, folder: folder, instructions: instructions) {
+					engine.startChat(in: made.id)
+				}
+				projectEdit = nil
+			}
+		}
+		.confirmationDialog(L("project.delete"), isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+		                    presenting: deleting) { project in
+			Button(L("project.delete"), role: .destructive) {
+				if engine.projectID == project.id { engine.startChat(in: nil) }
+				projects.remove(project.id)
+			}
+		} message: { _ in Text(L("project.deleteNote")) }
 		.sheet(item: $renaming) { chat in
 			RenameSheet(text: $renameText, cancel: { renaming = nil }) {
 				history.rename(chat.id, to: renameText)
 				renaming = nil
 			}
+		}
+	}
+
+	private func isCollapsed(_ project: Project) -> Bool { collapsedProjects.split(separator: ",").contains { $0 == project.id } }
+
+	private func toggleCollapsed(_ project: Project) {
+		var ids = collapsedProjects.split(separator: ",").map(String.init)
+		if let i = ids.firstIndex(of: project.id) { ids.remove(at: i) } else { ids.append(project.id) }
+		collapsedProjects = ids.joined(separator: ",")
+	}
+
+	// The projects, each a group like a folder: its name and chat count, a button for a new chat inside it, and its chats.
+	@ViewBuilder
+	private var projectsSection: some View {
+		HStack {
+			Text(L("chat.projects")).font(.system(size: 13)).foregroundStyle(FB.textTertiary)
+			Spacer()
+			Button { projectEdit = ProjectEdit(project: nil) } label: { FBIcon(name: "plus", size: 12, color: FB.textTertiary) }
+				.buttonStyle(.plain).help(L("project.new"))
+		}
+		.padding(EdgeInsets(top: 14, leading: 10, bottom: 4, trailing: 10))
+		ForEach(projects.items) { project in projectGroup(project) }
+	}
+
+	@ViewBuilder
+	private func projectGroup(_ project: Project) -> some View {
+		let chats = ProjectLogic.scope(history.chats, projectID: project.id).filter { !$0.isArchived }
+			.sorted { ($0.isPinned ? 1 : 0, $0.updated) > ($1.isPinned ? 1 : 0, $1.updated) }
+		let collapsed = isCollapsed(project)
+		HStack(spacing: 6) {
+			FBIcon(name: collapsed ? "chevron-right" : "chevron-down", size: 10, color: FB.textTertiary)
+			FBIcon(name: "folder", size: 14, color: Accent.amber.color)
+			Text(project.name).font(.system(size: 13, weight: engine.projectID == project.id ? .semibold : .regular))
+				.foregroundStyle(FB.text).lineLimit(1)
+			Text("\(chats.count)").font(.system(size: 11)).foregroundStyle(FB.textTertiary)
+			Spacer(minLength: 0)
+			Button { engine.startChat(in: project.id) } label: { FBIcon(name: "plus", size: 12, color: FB.textSecondary) }
+				.buttonStyle(.plain).help(L("project.newChatIn"))
+		}
+		.padding(.horizontal, 10).frame(height: 30)
+		.contentShape(Rectangle())
+		.onTapGesture { toggleCollapsed(project) }
+		.help(project.folder.isEmpty ? project.name : project.folder)
+		.contextMenu {
+			Button(L("project.newChatIn")) { engine.startChat(in: project.id) }
+			Button(L("project.edit.menu")) { projectEdit = ProjectEdit(project: project) }
+			Divider()
+			Button(L("project.delete"), role: .destructive) { deleting = project }
+		}
+		if !collapsed {
+			if chats.isEmpty {
+				Text(L("project.empty")).font(.fbCaption).foregroundStyle(FB.textTertiary).padding(.horizontal, 26).padding(.vertical, 4)
+			}
+			ForEach(chats.prefix(8)) { chat in chatRow(chat).padding(.leading, 12) }
 		}
 	}
 
@@ -181,6 +257,13 @@ struct ChatSidebar: View {
 					Button(chat.isPinned ? L("history.unpin") : L("history.pin")) { history.setPinned(chat.id, !chat.isPinned) }
 				}
 				Button(L("history.rename")) { renameText = chat.displayTitle; renaming = chat }
+				Menu(L("project.moveTo")) {
+					ForEach(projects.items) { project in
+						Button(project.name) { engine.move(chat.id, to: project.id) }.disabled(chat.projectID == project.id)
+					}
+					if chat.projectID != nil { Divider(); Button(L("project.ordinary")) { engine.move(chat.id, to: nil) } }
+				}
+				.disabled(projects.items.isEmpty && chat.projectID == nil)
 				Button(L("history.export")) { export(chat) }
 				Button(L("history.fork")) { if let copy = history.fork(chat.id) { engine.open(copy) } }
 				Button(chat.isArchived ? L("history.unarchive") : L("history.archive")) {
@@ -356,4 +439,10 @@ struct SidebarRow: View {
 		.contentShape(Rectangle())
 		.onHover { hover = $0 }
 	}
+}
+
+// What the project window is doing: making a new project (project nil) or changing one.
+struct ProjectEdit: Identifiable {
+	let project: Project?
+	var id: String { project?.id ?? "new" }
 }

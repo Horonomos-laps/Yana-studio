@@ -27,6 +27,8 @@ struct SavedChat: Codable, Identifiable, Equatable {
 	var customTitle: String? = nil
 	var pinned: Bool? = nil
 	var archived: Bool? = nil
+	// The project this chat belongs to (Projects.swift); nil for an ordinary chat. Optional so older chats still load.
+	var projectID: String? = nil
 
 	var displayTitle: String { customTitle.flatMap { $0.isEmpty ? nil : $0 } ?? title }
 	var isPinned: Bool { pinned == true }
@@ -147,6 +149,18 @@ final class ChatHistoryStore: ObservableObject {
 	}
 
 	// Writes a changed chat back without moving it to the top: only a new message does that.
+	// Puts a chat into a project, or back among the ordinary chats with nil.
+	func setProject(_ id: String, _ projectID: String?) {
+		guard var chat = chat(id) else { return }
+		chat.projectID = projectID
+		persist(chat)
+	}
+
+	// A deleted project's chats stay and become ordinary chats.
+	func releaseProject(_ projectID: String) {
+		for chat in chats where chat.projectID == projectID { setProject(chat.id, nil) }
+	}
+
 	private func persist(_ chat: SavedChat) {
 		guard Self.validID(chat.id), let index = chats.firstIndex(where: { $0.id == chat.id }) else { return }
 		do {

@@ -277,6 +277,9 @@ struct ChatHome: View {
 		VStack(spacing: 0) {
 			if engine.lines.isEmpty {
 				Spacer(minLength: 0)
+				if let project = ProjectStore.shared.project(engine.projectID) {
+					Label(project.name, systemImage: "folder").font(.system(size: 13, weight: .medium)).foregroundStyle(FB.textSecondary)
+				}
 				Text(L("chat.heading")).font(.system(size: 30, weight: .semibold)).foregroundStyle(FB.text)
 					.padding(.bottom, 22)
 				inputArea

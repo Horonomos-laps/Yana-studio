@@ -54,6 +54,8 @@ final class ChatEngine: ObservableObject {
 	@Published var planMode = AppSettings.shared.defaultPlanMode
 	// The folder yana-rt runs in. Approval pauses also need its `.claude/state/locking-protocol-version`.
 	@Published var workspace = RtClient.workspace()
+	// The project this chat is in (Projects.swift); nil for an ordinary chat.
+	@Published private(set) var projectID: String?
 	@Published private(set) var models: [String] = []
 	// Images waiting to go out with the next message (Attachments.swift).
 	@Published var attachments: [ChatImage] = []
@@ -190,12 +192,39 @@ final class ChatEngine: ObservableObject {
 	var chatInputTokens: Int { lines.reduce(0) { $0 + $1.inputTokens } }
 	var chatOutputTokens: Int { lines.reduce(0) { $0 + $1.outputTokens } }
 
-	// Starts a new chat: the current one is saved first, then an empty conversation with a new session id.
-	func reset() {
+	// Starts a new chat: the current one is saved first, then an empty conversation with a new session id. It stays in the
+	// project the current chat is in.
+	func reset() { startChat(in: projectID) }
+
+	// A new chat in a project, or an ordinary one with nil. While a project is open Yana works in its folder, if it has one.
+	func startChat(in project: String?) {
 		guard !running else { return }
 		saveToHistory()
 		lines = []
 		sessionId = UUID().uuidString.lowercased()
+		enter(project: project)
+	}
+
+	// Puts a saved chat into a project, or back among the ordinary chats. When it is the open one, the project's folder
+	// is taken up at once, so the next message already runs there.
+	func move(_ chatID: String, to project: String?) {
+		ChatHistoryStore.shared.setProject(chatID, project)
+		if chatID == sessionId, !running { enter(project: project) }
+	}
+
+	// Takes up the open project's folder again after the project was edited.
+	func refreshProject() { if !running { enter(project: projectID) } }
+
+	// Switches the project and the working folder that goes with it.
+	private func enter(project id: String?) {
+		projectID = id
+		let folder = ProjectStore.shared.project(id)?.folder ?? ""
+		var isDir: ObjCBool = false
+		if !folder.isEmpty, FileManager.default.fileExists(atPath: folder, isDirectory: &isDir), isDir.boolValue {
+			workspace = folder
+		} else {
+			workspace = RtClient.workspace()
+		}
 	}
 
 	var currentChatID: String { sessionId }
@@ -205,6 +234,7 @@ final class ChatEngine: ObservableObject {
 		guard !running, chat.id != sessionId else { return }
 		saveToHistory()
 		sessionId = chat.id
+		enter(project: chat.projectID)
 		lines = chat.lines.map { line in
 			var restored = ChatLine(role: line.user ? .user : .assistant, text: line.text)
 			// A saved question with no attachment or quote marker is plain typed text, so it can be asked again.
@@ -235,6 +265,7 @@ final class ChatEngine: ObservableObject {
 			chat.pinned = existing.pinned
 			chat.archived = existing.archived
 		}
+		chat.projectID = projectID
 		ChatHistoryStore.shared.save(chat)
 	}
 
@@ -303,6 +334,7 @@ final class ChatEngine: ObservableObject {
 			}
 			system.append(Self.rememberInstruction)
 		}
+		if let project = ProjectStore.shared.project(projectID) { system.append(ProjectLogic.instruction(for: project)) }
 		if let personal = Personalization.instruction() { system.append(personal) }
 		if let git = GitPrefs.instruction() { system.append(git) }
 		if !system.isEmpty { payload["system"] = system.joined(separator: "\n\n") }
