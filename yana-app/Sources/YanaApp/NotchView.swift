@@ -111,8 +111,7 @@ private struct ActivityWings: View {
 		let notch = model.geometry.closedSize
 		VStack(spacing: 0) {
 			HStack(spacing: 0) {
-				Circle().fill(run.state == .waiting ? Color.orange : Color.green).frame(width: 9, height: 9)
-					.frame(width: NotchGeometry.wing)
+				YanaMascot(state: run.state, width: 26).frame(width: NotchGeometry.wing)
 				Spacer(minLength: notch.width)
 				EqualizerBars(active: run.state == .working).frame(width: NotchGeometry.wing)
 			}

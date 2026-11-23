@@ -209,7 +209,7 @@ struct YanaCard: View {
 		let run = activity.run
 		HStack(alignment: .top, spacing: 14) {
 			VStack(spacing: 6) {
-				Circle().fill(color(run.state)).frame(width: 14, height: 14)
+				YanaMascot(state: run.state, width: 48)
 				Text("Yana").font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(.primary)
 				Text(stateText(run.state)).font(.system(size: 10)).foregroundStyle(dim)
 			}
