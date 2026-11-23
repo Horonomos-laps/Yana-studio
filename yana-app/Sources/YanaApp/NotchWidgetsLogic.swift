@@ -10,7 +10,8 @@ struct NowPlaying: Equatable {
 	enum Source: String {
 		case spotify = "Spotify", music = "Music"
 		case chrome = "Google Chrome", brave = "Brave Browser", edge = "Microsoft Edge", arc = "Arc", safari = "Safari"
-		var isBrowser: Bool { self != .spotify && self != .music }
+		case system = "System"   // read from the system's now-playing through the bundled adapter: any app
+		var isBrowser: Bool { [.chrome, .brave, .edge, .arc, .safari].contains(self) }
 		// Apps are named by bundle identifier in scripts and looked up among the running apps: naming an app that is not
 		// installed makes macOS show a "Choose Application" box asking where it is.
 		var bundleID: String {
@@ -22,8 +23,10 @@ struct NowPlaying: Equatable {
 			case .edge: "com.microsoft.edgemac"
 			case .arc: "company.thebrowser.Browser"
 			case .safari: "com.apple.Safari"
+			case .system: ""
 			}
 		}
+		// The players asked one by one through AppleScript (the fallback when the adapter does not work).
 		static let all: [Source] = [.spotify, .music, .chrome, .brave, .edge, .arc, .safari]
 	}
 	let source: Source
@@ -33,6 +36,8 @@ struct NowPlaying: Equatable {
 	let duration: Double   // seconds, 0 when unknown
 	let position: Double   // seconds
 	let artworkURL: URL?
+	var artworkData: Data? = nil
+	var appBundleID: String? = nil
 
 	static let separator = "\u{1F}"   // a character no title contains, so a "|" in a song name cannot split it
 

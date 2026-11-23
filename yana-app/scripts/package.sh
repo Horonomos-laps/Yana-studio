@@ -42,6 +42,8 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 
 cp "$bin_dir/YanaApp" "$app/Contents/MacOS/YanaApp"
 for bundle in "$bin_dir"/*.bundle; do cp -R "$bundle" "$app/Contents/Resources/"; done
+# The third-party MediaRemote adapter (BSD-3, see Resources/MediaRemote/README.md): lets the notch read what any app plays.
+cp -R "$(dirname "$0")/../Resources/MediaRemote" "$app/Contents/Resources/MediaRemote"
 # Icons come from the in-app RabbitLogo (AppIconArt): light for Yana, dark with a code badge for Studio.
 icon_dir="$(mktemp -d)"
 "$bin_dir/YanaApp" --icon "$icon_dir/app.png" app >/dev/null

@@ -23,15 +23,97 @@ final class MusicStore: ObservableObject {
 	private var timer: Timer?
 	private let queue = DispatchQueue(label: "yana.notch.music", qos: .utility)
 
+	// "system" when the bundled adapter works (any app is read), "scripts" when it does not (Spotify, Music and browsers
+	// are asked one by one), nil before the check has finished.
+	@Published private(set) var mode: String?
+	private var adapterPaths: MediaRemoteAdapter.Paths?
+	private var adapterProcess: Process?
+	private var adapterState = MediaRemoteState()
+	private var adapterRetries = 0
+
 	func start() {
 		guard timer == nil else { return }
-		refresh()
 		timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-			Task { @MainActor in self?.refresh() }
+			Task { @MainActor in self?.tick() }
+		}
+		queue.async { [weak self] in
+			// Is the adapter there and does it work on this macOS? Its own "test" command says so (exit code 0).
+			let paths = MediaRemoteAdapter.locate()
+			let works = paths.map { Self.adapterWorks($0) } ?? false
+			Task { @MainActor in
+				guard let self, self.timer != nil else { return }
+				if works, let paths {
+					self.adapterPaths = paths; self.mode = "system"; self.startAdapter()
+				} else {
+					self.mode = "scripts"; self.refresh()
+				}
+			}
 		}
 	}
 
-	func stop() { timer?.invalidate(); timer = nil; nowPlaying = nil }
+	private func tick() {
+		switch mode {
+		case "system": // the position keeps moving between the adapter's updates
+			if adapterState.nowPlaying() != nil { nowPlaying = adapterState.nowPlaying() }
+		case "scripts": refresh()
+		default: break
+		}
+	}
+
+	nonisolated private static func adapterWorks(_ paths: MediaRemoteAdapter.Paths) -> Bool {
+		let process = Process()
+		process.executableURL = MediaRemoteAdapter.perl
+		process.arguments = MediaRemoteAdapter.arguments(paths, [paths.testClient.path, "test"])
+		process.standardOutput = Pipe(); process.standardError = Pipe()
+		guard (try? process.run()) != nil else { return false }
+		process.waitUntilExit()
+		return process.terminationStatus == 0
+	}
+
+	private func startAdapter() {
+		guard let paths = adapterPaths, adapterProcess == nil else { return }
+		let process = Process()
+		process.executableURL = MediaRemoteAdapter.perl
+		process.arguments = MediaRemoteAdapter.arguments(paths, ["stream"] + MediaRemoteAdapter.streamOptions)
+		let pipe = Pipe()
+		process.standardOutput = pipe; process.standardError = Pipe()
+		var pending = Data()
+		pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+			pending.append(handle.availableData)
+			while let end = pending.firstIndex(of: 0x0A) {
+				let line = String(decoding: pending[pending.startIndex ..< end], as: UTF8.self)
+				pending.removeSubrange(pending.startIndex ... end)
+				Task { @MainActor in self?.take(line: line) }
+			}
+		}
+		process.terminationHandler = { [weak self] _ in
+			Task { @MainActor in self?.adapterEnded() }
+		}
+		guard (try? process.run()) != nil else { mode = "scripts"; refresh(); return }
+		adapterProcess = process
+	}
+
+	private func take(line: String) {
+		guard adapterState.apply(line: line) else { return }
+		adapterRetries = 0
+		nowPlaying = adapterState.nowPlaying()
+	}
+
+	// If the adapter stops by itself it is started again a few times, then the scripts take over.
+	private func adapterEnded() {
+		adapterProcess = nil
+		guard mode == "system", timer != nil else { return }
+		adapterRetries += 1
+		if adapterRetries > 3 { mode = "scripts"; refresh(); return }
+		DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.startAdapter() }
+	}
+
+	func stop() {
+		timer?.invalidate(); timer = nil; nowPlaying = nil; mode = nil
+		adapterProcess?.terminationHandler = nil
+		adapterProcess?.terminate(); adapterProcess = nil
+		adapterState = MediaRemoteState()
+	}
 
 	// One script per player. It says nothing when the app is not running, so asking never launches it.
 	private static func script(for source: NowPlaying.Source) -> String {
@@ -77,7 +159,15 @@ final class MusicStore: ObservableObject {
 	}
 
 	func send(_ command: BrowserMusic.Command) {
-		guard let source = nowPlaying?.source else { return }
+		if mode == "system", let paths = adapterPaths {
+			let process = Process()
+			process.executableURL = MediaRemoteAdapter.perl
+			process.arguments = MediaRemoteAdapter.arguments(paths, ["send", "\(MediaRemoteAdapter.commandID(command))"])
+			process.standardOutput = Pipe(); process.standardError = Pipe()
+			try? process.run()
+			return
+		}
+		guard let source = nowPlaying?.source, source != .system else { return }
 		queue.async { [weak self] in
 			var error: NSDictionary?
 			if source.isBrowser {

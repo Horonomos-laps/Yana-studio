@@ -73,7 +73,9 @@ struct MusicCard: View {
 	@ViewBuilder private func artwork(_ now: NowPlaying) -> some View {
 		let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
 		Group {
-			if let url = now.artworkURL {
+			if let data = now.artworkData, let image = NSImage(data: data) {
+				Image(nsImage: image).resizable().scaledToFill()
+			} else if let url = now.artworkURL {
 				AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { Color.primary.opacity(0.1) }
 			} else {
 				ZStack { Color.primary.opacity(0.1); Image(systemName: "music.note").foregroundStyle(dim) }
