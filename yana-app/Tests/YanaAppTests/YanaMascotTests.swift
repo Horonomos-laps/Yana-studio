@@ -10,29 +10,50 @@ final class YanaMascotTests: XCTestCase {
 		}
 	}
 
-	func testEarsLeanLeftAndRightAndStayInsideTheCanvas() {
-		let shifts = Set((0 ..< 40).map { Mascot.earShift(tick: $0) })
-		XCTAssertEqual(shifts, [-1, 0, 1])
-		for tick in 0 ..< 40 {
-			for cell in Mascot.cells(tick: tick, working: true, accent: 0x22C55E) {
-				XCTAssertTrue((0 ..< Mascot.columns).contains(cell.x)); XCTAssertTrue((0 ..< Mascot.rows).contains(cell.y))
+	func testMotionIsSmoothNoPoseJumpsBetweenFramesThirtyToTheSecond() {
+		var previous = Mascot.pose(time: 0, working: true)
+		var t = 1.0 / 30
+		while t < 12 {
+			let next = Mascot.pose(time: t, working: true)
+			XCTAssertLessThan(abs(next.ear - previous.ear), 0.3, "ears move by a fraction of a pixel per frame")
+			XCTAssertLessThan(abs(next.bob - previous.bob), 0.3)
+			XCTAssertLessThan(abs(next.light - previous.light), 1.0, "the typing light moves less than a pixel per frame")
+			XCTAssertLessThan(abs(next.eyeOpen - previous.eyeOpen), 0.45, "the eyes close over several frames")
+			previous = next; t += 1.0 / 30
+		}
+	}
+
+	func testPoseStaysInRangeAndTheEyesBlink() {
+		var sawShut = false
+		for i in 0 ..< 3000 {
+			let p = Mascot.pose(time: Double(i) / 100, working: i % 2 == 0)
+			XCTAssertTrue((-0.81 ... 0.81).contains(p.ear)); XCTAssertTrue((0 ... 0.61).contains(p.bob))
+			XCTAssertTrue((0 ... 1).contains(p.eyeOpen))
+			XCTAssertTrue((0 ... Double(Mascot.screenColumns - 1)).contains(p.light))
+			if p.eyeOpen < 0.1 { sawShut = true }
+		}
+		XCTAssertTrue(sawShut)
+		XCTAssertEqual(Mascot.pose(time: 1.0, working: false).eyeOpen, 1, "open between blinks")
+	}
+
+	func testAllPixelsStayInsideTheCanvasAndTheSpriteIsTheSameSizeEveryFrame() {
+		let count = Mascot.cells(time: 0, working: true, accent: 0x22C55E).count
+		for i in 0 ..< 200 {
+			let cells = Mascot.cells(time: Double(i) * 0.07, working: i % 2 == 0, accent: 0x22C55E)
+			XCTAssertEqual(cells.count, count)
+			for c in cells {
+				XCTAssertTrue(c.x > -1 && c.x < Double(Mascot.columns)); XCTAssertTrue(c.y > -1 && c.y < Double(Mascot.rows))
 			}
 		}
 	}
 
-	func testTheEyesBlinkOnlyOnSomeTicks() {
-		let blinks = (0 ..< 60).filter { Mascot.blinking(tick: $0) }
-		XCTAssertEqual(blinks.count, 4)
-		let open = Mascot.cells(tick: 1, working: false, accent: 0).filter { $0.y == 6 && $0.color == 0x1B2340 }.count
-		let closed = Mascot.cells(tick: 0, working: false, accent: 0).filter { $0.y == 6 && $0.color == 0x1B2340 }.count
-		XCTAssertEqual(open, 4); XCTAssertEqual(closed, 0)
-	}
-
-	func testTheTypingPixelSweepsTheScreenOnlyWhileWorking() {
-		let columns = Set((0 ..< 44).map { Mascot.typingColumn(tick: $0) })
-		XCTAssertEqual(columns, Set(0 ..< 12))
-		let lit = { (tick: Int, working: Bool) in Mascot.cells(tick: tick, working: working, accent: 0xABCDEF).filter { $0.color == 0xABCDEF }.count }
-		XCTAssertEqual(lit(3, true), 3, "one column of the three screen rows")
-		XCTAssertEqual(lit(3, false), 0, "idle does not type")
+	func testTheTypingLightOnlyShowsWhileWorkingAndFadesAcrossNeighbours() {
+		let accent: UInt32 = 0x22C55E
+		let lid: UInt32 = 0x9AA3B2
+		func tinted(_ working: Bool) -> Int {
+			Mascot.cells(time: 0.3, working: working, accent: accent).filter { $0.color != lid && ($0.y >= 9.5 && $0.y <= 13) && $0.color != 0x4A5470 && $0.color != 0xEEF2FF && $0.color != 0xFF8FB1 }.count
+		}
+		XCTAssertGreaterThan(tinted(true), 0); XCTAssertEqual(tinted(false), 0)
+		XCTAssertEqual(Mascot.mix(0x000000, 0xFFFFFF, 0.5), 0x808080); XCTAssertEqual(Mascot.mix(1, 2, 0), 1)
 	}
 }
