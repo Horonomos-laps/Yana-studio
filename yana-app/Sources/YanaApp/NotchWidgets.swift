@@ -3,7 +3,8 @@ import SwiftUI
 
 // The widgets inside the open notch. Cards sit side by side on the Home tab; the clipboard has its own tab.
 
-private let cardFill = Color.primary.opacity(0.08)
+// A faint lighter tile on the dark glass.
+private let cardFill = Color.white.opacity(0.09)
 private let dim = Color.secondary
 
 struct WidgetCard<Content: View>: View {

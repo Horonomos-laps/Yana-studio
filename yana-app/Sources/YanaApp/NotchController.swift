@@ -12,6 +12,8 @@ final class NotchPanel: NSPanel {
 		backgroundColor = .clear
 		hasShadow = false
 		isMovable = false
+		// The panel is always dark, like the camera housing it grows from: white text and dark glass, in any app look.
+		appearance = NSAppearance(named: .darkAqua)
 		isReleasedWhenClosed = false
 		level = NSWindow.Level(NSWindow.Level.mainMenu.rawValue + 3)
 		collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
@@ -37,6 +39,7 @@ final class NotchController {
 	private var monitors: [Any] = []
 	private var closeWork: DispatchWorkItem?
 	private var openWork: DispatchWorkItem?
+	private var debugHold = false   // only with YANA_NOTCH_SHOT
 
 	init(screen: NSScreen) {
 		self.screen = screen
@@ -50,6 +53,7 @@ final class NotchController {
 		panel.contentView = host
 		panel.ignoresMouseEvents = true
 		panel.orderFrontRegardless()
+		if let path = ProcessInfo.processInfo.environment["YANA_NOTCH_SHOT"] { scheduleShot(to: path) }
 
 		let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .leftMouseDragged]
 		monitors.append(NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
@@ -59,6 +63,24 @@ final class NotchController {
 			Task { @MainActor in self?.update() }
 			return event
 		} as Any)
+	}
+
+	// Debug only: open the notch and save what the panel's content draws, so the panel can be checked without screen
+	// capture. YANA_NOTCH_SHOT=/path/file.png, optional YANA_NOTCH_TAB=0,1,2.
+	private func scheduleShot(to path: String) {
+		let tab = Int(ProcessInfo.processInfo.environment["YANA_NOTCH_TAB"] ?? "") ?? 0
+		DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+			self?.model.tab = NotchTab(rawValue: tab) ?? .yana
+			self?.debugHold = true   // keeps it open while the pointer is elsewhere
+			self?.model.open()
+		}
+		DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+			guard let self, let view = panel.contentView,
+			      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+			view.cacheDisplay(in: view.bounds, to: rep)
+			try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+			NSLog("[NotchShot] wrote %@ open=%d tab=%d solid=%d look=%@ appearance=%@ bounds=%@", path, model.isOpen ? 1 : 0, model.tab.rawValue, NotchPrefs.solid ? 1 : 0, String(describing: model.look), panel.effectiveAppearance.name.rawValue, NSStringFromRect(view.bounds))
+		}
 	}
 
 	func close() {
@@ -91,7 +113,7 @@ final class NotchController {
 				openWork = work
 				DispatchQueue.main.asyncAfter(deadline: .now() + Self.openDelay, execute: work)
 			}
-		} else if model.isOpen, !model.typing, closeWork == nil {
+		} else if model.isOpen, !model.typing, !debugHold, closeWork == nil {
 			let work = DispatchWorkItem { [weak self] in
 				self?.closeWork = nil
 				self?.model.close()
@@ -110,7 +132,7 @@ final class NotchCenter {
 	private var observer: NSObjectProtocol?
 
 	func apply() {
-		if NotchPrefs.enabled { start() } else { stop() }
+		if NotchPrefs.enabled || ProcessInfo.processInfo.environment["YANA_NOTCH_SHOT"] != nil { start() } else { stop() }
 	}
 
 	private func start() {
