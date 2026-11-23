@@ -245,6 +245,7 @@ struct GeneralSettings: View {
 					Toggle(L("set.notchHover"), isOn: $notchHover)
 					Toggle(L("set.notchSolid"), isOn: $notchSolid)
 					Toggle(L("set.notchQuiet"), isOn: $notchQuiet)
+					AgentConnectRow()
 				}
 			} footer: { SettingsNote(L("set.notchNote")) }
 		}

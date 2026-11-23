@@ -269,6 +269,7 @@ struct YanaCard: View {
 				}
 				Spacer(minLength: 0)
 				if run.state == .waiting { approvalRow(run) } else { chips(run) }
+				AgentRows()
 			}
 			.frame(maxWidth: .infinity, alignment: .leading)
 		}
@@ -321,5 +322,57 @@ struct YanaCard: View {
 
 	private func stateText(_ state: YanaRun.State) -> String {
 		switch state { case .idle: L("notch.stateIdle"); case .working: L("notch.stateWorking"); case .waiting: L("notch.stateWaiting") }
+	}
+}
+
+// The agents running in Yana Studio's terminal or elsewhere: one line each, with a dot for the state. Pressing a line
+// brings the app it was started from to the front.
+struct AgentRows: View {
+	@ObservedObject private var monitor = AgentMonitor.shared
+
+	var body: some View {
+		ForEach(monitor.shown.prefix(3)) { session in
+			Button { monitor.focus(session) } label: {
+				HStack(spacing: 6) {
+					Circle().fill(color(session.state)).frame(width: 7, height: 7)
+					Text("\(session.tool.rawValue) · \(session.project)").font(.system(size: 11, weight: .medium)).foregroundStyle(.primary)
+					Text(session.message ?? stateText(session.state)).font(.system(size: 11)).foregroundStyle(dim).lineLimit(1)
+					Spacer(minLength: 0)
+				}
+			}.buttonStyle(.plain)
+		}
+	}
+
+	private func color(_ state: AgentSession.State) -> Color {
+		switch state { case .working: .green; case .waiting: .orange; case .done: .gray }
+	}
+
+	private func stateText(_ state: AgentSession.State) -> String {
+		switch state { case .working: L("notch.stateWorking"); case .waiting: L("notch.stateWaiting"); case .done: L("notch.agentDone") }
+	}
+}
+
+// The Connect / Disconnect row for Claude Code in Settings.
+struct AgentConnectRow: View {
+	@State private var connected = AgentHooks.isConnected()
+	@State private var problem: String?
+
+	var body: some View {
+		VStack(alignment: .leading, spacing: 4) {
+			LabeledContent(L("notch.agentsTitle")) {
+				Button(connected ? L("notch.agentsDisconnect") : L("notch.agentsConnect")) { toggle() }
+			}
+			SettingsNote(problem ?? L(connected ? "notch.agentsOn" : "notch.agentsOff"))
+		}
+	}
+
+	private func toggle() {
+		do {
+			if connected { try AgentHooks.disconnect() } else { try AgentHooks.connect() }
+			problem = nil
+		} catch {
+			problem = L("notch.agentsFailed")
+		}
+		connected = AgentHooks.isConnected()
 	}
 }

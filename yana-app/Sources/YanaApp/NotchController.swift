@@ -159,7 +159,7 @@ final class NotchCenter {
 	}
 
 	private func start() {
-		MusicStore.shared.start(); TimerStore.shared.start(); ClipboardStore.shared.start()
+		MusicStore.shared.start(); TimerStore.shared.start(); ClipboardStore.shared.start(); AgentMonitor.shared.start()
 		rebuild()
 		guard observer == nil else { return }
 		observer = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
@@ -169,7 +169,7 @@ final class NotchCenter {
 	}
 
 	private func stop() {
-		MusicStore.shared.stop(); TimerStore.shared.stop(); ClipboardStore.shared.stop()
+		MusicStore.shared.stop(); TimerStore.shared.stop(); ClipboardStore.shared.stop(); AgentMonitor.shared.stop()
 		if let observer { NotificationCenter.default.removeObserver(observer) }
 		observer = nil
 		controllers.forEach { $0.close() }

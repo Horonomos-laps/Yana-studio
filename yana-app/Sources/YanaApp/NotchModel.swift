@@ -18,6 +18,8 @@ final class NotchModel: ObservableObject {
 	@Published var music: NowPlaying?            // the track playing now, nil when nothing plays
 	@Published var musicTint: UInt32 = ArtworkTint.fallback
 	private var yanaActive = false
+	@Published var agentState: YanaRun.State?     // Claude Code or Codex at work or waiting (AgentMonitor.swift)
+	private var agentCancellable: AnyCancellable?
 	private var musicCancellable: AnyCancellable?
 
 	let geometry: NotchGeometry
@@ -38,6 +40,10 @@ final class NotchModel: ObservableObject {
 				self?.refreshActivity()
 			}
 		}
+		// Claude Code and Codex running anywhere, above all in Yana Studio's terminal, also show on the closed pill.
+		agentCancellable = AgentMonitor.shared.$sessions.receive(on: RunLoop.main).sink { [weak self] sessions in
+			withAnimation(.notchOpen) { self?.agentState = AgentEvents.overall(sessions); self?.refreshActivity() }
+		}
 		// Music playing grows the closed pill: the cover on the left wing, moving bars in the cover's color on the right.
 		musicCancellable = MusicStore.shared.$nowPlaying.receive(on: RunLoop.main).sink { [weak self] track in
 			guard let self else { return }
@@ -50,12 +56,12 @@ final class NotchModel: ObservableObject {
 	}
 
 	// Yana's own work wins; otherwise a playing track is the activity.
-	private func refreshActivity() { hasActivity = yanaActive || music != nil }
+	private func refreshActivity() { hasActivity = yanaActive || agentState != nil || music != nil }
 
 	var look: NotchLook {
 		// Hovering a playing track (with Yana idle) slides its title out under the pill.
 		NotchGeometry.look(open: isOpen, hovering: hovering, hasActivity: hasActivity,
-		                   glancing: glancing || (hovering && !yanaActive && music != nil))
+		                   glancing: glancing || agentState == .waiting || (hovering && !yanaActive && agentState == nil && music != nil))
 	}
 
 	func open() {

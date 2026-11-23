@@ -116,19 +116,23 @@ private struct ActivityWings: View {
 	@ObservedObject var model: NotchModel
 	let run: YanaRun
 	let glance: Bool
+	@ObservedObject private var agents = AgentMonitor.shared
+
+	// Yana's own work, then an agent in the terminal, then music: the first that is going on gives the wings.
+	private var state: YanaRun.State? { run.isActive ? run.state : model.agentState }
 
 	var body: some View {
 		let notch = model.geometry.closedSize
 		VStack(spacing: 0) {
 			HStack(spacing: 0) {
-				if run.isActive {
-					YanaMascot(state: run.state, width: 26).frame(width: NotchGeometry.wing)
+				if let state {
+					YanaMascot(state: state, width: 26).frame(width: NotchGeometry.wing)
 				} else {
 					CoverThumb(track: model.music).frame(width: NotchGeometry.wing)
 				}
 				Spacer(minLength: notch.width)
-				EqualizerBars(active: run.isActive ? run.state == .working : true,
-				              color: run.isActive ? .white : Color(hex: model.musicTint))
+				EqualizerBars(active: state.map { $0 == .working } ?? true,
+				              color: state != nil ? .white : Color(hex: model.musicTint))
 					.frame(width: NotchGeometry.wing)
 			}
 			.frame(height: model.geometry.rowHeight)
@@ -139,10 +143,14 @@ private struct ActivityWings: View {
 		}
 	}
 
-	// Under the pill: what waits for a decision, the answer so far, or the song and artist.
+	// Under the pill: what waits for a decision, the answer so far, the agent's message, or the song and artist.
 	private var line: String {
 		if run.state == .waiting { return run.waitingFor ?? "" }
 		if run.isActive { return run.reply }
+		if let agent = agents.shown.first(where: { $0.state != .done }) {
+			let text = [agent.tool.rawValue, agent.project].joined(separator: " · ")
+			return agent.message.map { "\(text): \($0)" } ?? text
+		}
 		guard let track = model.music else { return "" }
 		return track.artist.isEmpty ? track.title : "\(track.title) · \(track.artist)"
 	}
