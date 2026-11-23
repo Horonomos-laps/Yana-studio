@@ -177,16 +177,25 @@ private struct CoverThumb: View {
 private struct EqualizerBars: View {
 	let active: Bool
 	var color: Color = .white
+	static let barCount = 5
+
+	// Each bar mixes two slow waves of different speeds, so the motion never repeats in step. Written in small typed steps:
+	// the Swift 6.1 compiler of the CI runner gives up on this as one expression.
+	static func height(bar: Int, time t: Double, active: Bool) -> CGFloat {
+		guard active else { return 4 }
+		let i = Double(bar)
+		let fast: Double = sin(t * (5.3 + i * 0.9) + i * 1.7)
+		let slow: Double = sin(t * (3.1 + i * 0.5) + i)
+		let mix: Double = abs(0.6 * fast + 0.4 * slow)
+		return CGFloat(4 + 11 * mix)
+	}
 
 	var body: some View {
 		TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !active)) { context in
 			let t = context.date.timeIntervalSinceReferenceDate
 			HStack(spacing: 2.2) {
-				ForEach(0 ..< 5, id: \.self) { i in
-					// Each bar mixes two slow waves of different speeds, so the motion never repeats in step.
-					let a = sin(t * (5.3 + Double(i) * 0.9) + Double(i) * 1.7), b = sin(t * (3.1 + Double(i) * 0.5) + Double(i))
-					Capsule().fill(color.opacity(0.95))
-						.frame(width: 2.6, height: active ? 4 + 11 * abs(0.6 * a + 0.4 * b) : 4)
+				ForEach(0 ..< Self.barCount, id: \.self) { bar in
+					Capsule().fill(color.opacity(0.95)).frame(width: 2.6, height: Self.height(bar: bar, time: t, active: active))
 				}
 			}
 		}

@@ -327,8 +327,14 @@ enum PluginInstaller {
 		"system override", "\\[inst\\]", "<\\|im_start\\|>", "<!--\\s*system",
 	].compactMap { try? NSRegularExpression(pattern: $0, options: [.caseInsensitive]) }
 
-	private static let hiddenCharacters: Set<UInt32> = Set((0x200B ... 0x200F).map(UInt32.init) + (0x202A ... 0x202E).map(UInt32.init)
-		+ (0x2060 ... 0x2064).map(UInt32.init) + [0xFEFF])
+	// Zero-width and direction-changing characters. Built from typed pieces: as one expression the Swift 6.1 compiler of the
+	// CI runner gives up on it.
+	private static let hiddenCharacters: Set<UInt32> = {
+		var set = Set<UInt32>()
+		let ranges: [ClosedRange<UInt32>] = [0x200B ... 0x200F, 0x202A ... 0x202E, 0x2060 ... 0x2064, 0xFEFF ... 0xFEFF]
+		for range in ranges { for value in range { set.insert(value) } }
+		return set
+	}()
 
 	static func scan(_ text: String) -> String? {
 		if text.unicodeScalars.contains(where: { hiddenCharacters.contains($0.value) }) { return "it contains invisible characters" }
