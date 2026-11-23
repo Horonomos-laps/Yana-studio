@@ -19,6 +19,7 @@ final class MusicStore: ObservableObject {
 	static let shared = MusicStore()
 	@Published private(set) var nowPlaying: NowPlaying?
 	@Published private(set) var denied = false   // macOS refused the first request to control the player
+	@Published private(set) var problem: BrowserMusic.Problem?   // a browser is open but cannot be read yet
 	private var timer: Timer?
 	private let queue = DispatchQueue(label: "yana.notch.music", qos: .utility)
 
@@ -34,6 +35,7 @@ final class MusicStore: ObservableObject {
 
 	// One script per player. It says nothing when the app is not running, so asking never launches it.
 	private static func script(for source: NowPlaying.Source) -> String {
+		if source.isBrowser { return BrowserMusic.script(app: source.rawValue, js: BrowserMusic.readJS) }
 		let sep = "(character id 31)"
 		let tail = source == .spotify ? "& \(sep) & (artwork url of current track)" : ""
 		return """
@@ -51,29 +53,44 @@ final class MusicStore: ObservableObject {
 		queue.async { [weak self] in
 			var found: [NowPlaying] = []
 			var refused = false
-			for source in [NowPlaying.Source.spotify, .music] {
+			var problem: BrowserMusic.Problem?
+			for source in NowPlaying.Source.all {
 				var error: NSDictionary?
 				let result = NSAppleScript(source: Self.script(for: source))?.executeAndReturnError(&error)
-				if let code = error?[NSAppleScript.errorNumber] as? Int, code == -1743 { refused = true }
+				if let code = error?[NSAppleScript.errorNumber] as? Int {
+					let message = error?[NSAppleScript.errorMessage] as? String ?? ""
+					if code == -1743 { refused = true }
+					if source.isBrowser, problem == nil { problem = BrowserMusic.problem(code: code, message: message, app: source.rawValue) }
+				}
 				if let text = result?.stringValue, let info = NowPlaying.parse(text, source: source) { found.append(info) }
 			}
-			let chosen = NowPlaying.choose(found), denied = refused
-			Task { @MainActor in self?.nowPlaying = chosen; self?.denied = denied && chosen == nil }
+			let chosen = NowPlaying.choose(found), denied = refused, issue = problem
+			Task { @MainActor in
+				self?.nowPlaying = chosen
+				self?.denied = denied && chosen == nil
+				self?.problem = chosen == nil ? issue : nil
+			}
 		}
 	}
 
-	func send(_ command: String) {
-		guard let source = nowPlaying?.source.rawValue else { return }
+	func send(_ command: BrowserMusic.Command) {
+		guard let source = nowPlaying?.source else { return }
 		queue.async { [weak self] in
 			var error: NSDictionary?
-			NSAppleScript(source: "tell application \"\(source)\" to \(command)")?.executeAndReturnError(&error)
+			if source.isBrowser {
+				NSAppleScript(source: BrowserMusic.script(app: source.rawValue, js: BrowserMusic.js(for: command)))?.executeAndReturnError(&error)
+			} else {
+				let word: String
+				switch command { case .playPause: word = "playpause"; case .next: word = "next track"; case .previous: word = "previous track" }
+				NSAppleScript(source: "tell application \"\(source.rawValue)\" to \(word)")?.executeAndReturnError(&error)
+			}
 			Task { @MainActor in self?.refresh() }
 		}
 	}
 
-	func playPause() { send("playpause") }
-	func next() { send("next track") }
-	func previous() { send("previous track") }
+	func playPause() { send(.playPause) }
+	func next() { send(.next) }
+	func previous() { send(.previous) }
 }
 
 // MARK: Timers and Pomodoro

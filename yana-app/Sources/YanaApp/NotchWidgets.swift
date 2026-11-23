@@ -36,6 +36,16 @@ private struct IconButton: View {
 
 struct MusicCard: View {
 	@ObservedObject private var store = MusicStore.shared
+
+	// What to say when nothing plays: how to let Yana read a browser, or that macOS must allow it, or just that it is quiet.
+	private var message: String {
+		switch store.problem {
+		case let .javascriptOff(app)?: return L("notch.musicJs").replacingOccurrences(of: "%@", with: BrowserMusic.switchHint(app: app))
+		case .automationRefused?: return L("notch.musicDenied")
+		case nil: return store.denied ? L("notch.musicDenied") : L("notch.musicNone")
+		}
+	}
+
 	var body: some View {
 		WidgetCard(title: L("notch.music")) {
 			if let now = store.nowPlaying {
@@ -55,7 +65,7 @@ struct MusicCard: View {
 					Spacer()
 				}
 			} else {
-				Text(store.denied ? L("notch.musicDenied") : L("notch.musicNone")).font(.system(size: 11)).foregroundStyle(dim)
+				Text(message).font(.system(size: 11)).foregroundStyle(dim)
 			}
 		}
 	}

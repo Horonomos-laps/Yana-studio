@@ -78,7 +78,7 @@ final class NotchGeometryTests: XCTestCase {
 	}
 
 	func testTheNewStringsExistInAllLanguages() {
-		XCTAssertEqual(notchRows.count, 28)
+		XCTAssertEqual(notchRows.count, 29)
 		for row in notchRows { XCTAssertFalse(row.vi.isEmpty); XCTAssertFalse(row.en.isEmpty); XCTAssertFalse(row.ko.isEmpty) }
 	}
 

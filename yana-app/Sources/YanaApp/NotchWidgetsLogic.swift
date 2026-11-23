@@ -7,7 +7,12 @@ import Foundation
 // MARK: Music
 
 struct NowPlaying: Equatable {
-	enum Source: String { case spotify = "Spotify", music = "Music" }
+	enum Source: String {
+		case spotify = "Spotify", music = "Music"
+		case chrome = "Google Chrome", brave = "Brave Browser", edge = "Microsoft Edge", arc = "Arc", safari = "Safari"
+		var isBrowser: Bool { self != .spotify && self != .music }
+		static let all: [Source] = [.spotify, .music, .chrome, .brave, .edge, .arc, .safari]
+	}
 	let source: Source
 	let title: String
 	let artist: String
