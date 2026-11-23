@@ -53,7 +53,12 @@ private struct OpenPanel: View {
 		VStack(spacing: 8) {
 			// The top row sits beside the camera housing: tabs on the left, buttons on the right.
 			HStack(spacing: 0) {
-				HStack(spacing: 7) { ForEach(NotchTab.allCases, id: \.self) { dot($0) } }
+				// A tiny rainbow "Yana" in the top-left corner (its letters appear one by one when the panel opens),
+				// then the page dots.
+				HStack(spacing: 10) {
+					RainbowText(text: "Yana", size: 12)
+					HStack(spacing: 7) { ForEach(NotchTab.allCases, id: \.self) { dot($0) } }
+				}
 				Spacer(minLength: model.geometry.hasNotch ? notch.width + 20 : 40)
 				HStack(spacing: 14) {
 					Button(action: onSettings) { Image(systemName: "gearshape") }.buttonStyle(.plain)
