@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 // The rules behind the notch's widgets, as plain functions and values so they can be tested without a screen or a
@@ -188,4 +189,32 @@ struct Pomodoro: Codable, Equatable {
 	}
 
 	mutating func reset() { self = Pomodoro() }
+}
+
+// The average color of a cover, lifted so it stays bright against the black pill: the equalizer bars take this color.
+enum ArtworkTint {
+	static let fallback: UInt32 = 0x34C759
+
+	// Average of the picture's pixels as 0xRRGGBB, with brightness raised to at least about 0.65 so it is visible.
+	static func average(_ data: Data?) -> UInt32 {
+		guard let data, let image = NSImage(data: data),
+		      let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1, pixelsHigh: 1, bitsPerSample: 8, samplesPerPixel: 4,
+		                                 hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 4, bitsPerPixel: 32),
+		      let context = NSGraphicsContext(bitmapImageRep: rep) else { return fallback }
+		NSGraphicsContext.saveGraphicsState()
+		NSGraphicsContext.current = context
+		context.imageInterpolation = .high
+		image.draw(in: NSRect(x: 0, y: 0, width: 1, height: 1), from: .zero, operation: .copy, fraction: 1)
+		NSGraphicsContext.restoreGraphicsState()
+		guard let color = rep.colorAt(x: 0, y: 0)?.usingColorSpace(.deviceRGB) else { return fallback }
+		return lift(r: Double(color.redComponent), g: Double(color.greenComponent), b: Double(color.blueComponent))
+	}
+
+	static func lift(r: Double, g: Double, b: Double, minimum: Double = 0.65) -> UInt32 {
+		let top = max(r, g, b)
+		guard top > 0.02 else { return fallback }
+		let k = top < minimum ? minimum / top : 1
+		func byte(_ v: Double) -> UInt32 { UInt32((min(1, v * k) * 255).rounded()) }
+		return byte(r) << 16 | byte(g) << 8 | byte(b)
+	}
 }

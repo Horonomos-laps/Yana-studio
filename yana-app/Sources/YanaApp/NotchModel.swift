@@ -15,6 +15,10 @@ final class NotchModel: ObservableObject {
 	// Set from YanaActivity: something is happening (a reply is being written or a command waits for a decision).
 	@Published var hasActivity = false
 	@Published var glancing = false
+	@Published var music: NowPlaying?            // the track playing now, nil when nothing plays
+	@Published var musicTint: UInt32 = ArtworkTint.fallback
+	private var yanaActive = false
+	private var musicCancellable: AnyCancellable?
 
 	let geometry: NotchGeometry
 	private var cancellable: AnyCancellable?
@@ -29,14 +33,29 @@ final class NotchModel: ObservableObject {
 		// Yana's own work drives the closed look: wings while busy, and a line under them while it waits for a decision.
 		cancellable = YanaActivity.shared.$run.receive(on: RunLoop.main).sink { [weak self] run in
 			withAnimation(.notchOpen) {
-				self?.hasActivity = run.isActive
+				self?.yanaActive = run.isActive
 				self?.glancing = run.state == .waiting
+				self?.refreshActivity()
 			}
+		}
+		// Music playing grows the closed pill: the cover on the left wing, moving bars in the cover's color on the right.
+		musicCancellable = MusicStore.shared.$nowPlaying.receive(on: RunLoop.main).sink { [weak self] track in
+			guard let self else { return }
+			let playing = track?.playing == true ? track : nil
+			if playing?.title != self.music?.title || playing?.artworkData != self.music?.artworkData {
+				self.musicTint = ArtworkTint.average(playing?.artworkData)
+			}
+			withAnimation(.notchOpen) { self.music = playing; self.refreshActivity() }
 		}
 	}
 
+	// Yana's own work wins; otherwise a playing track is the activity.
+	private func refreshActivity() { hasActivity = yanaActive || music != nil }
+
 	var look: NotchLook {
-		NotchGeometry.look(open: isOpen, hovering: hovering, hasActivity: hasActivity, glancing: glancing)
+		// Hovering a playing track (with Yana idle) slides its title out under the pill.
+		NotchGeometry.look(open: isOpen, hovering: hovering, hasActivity: hasActivity,
+		                   glancing: glancing || (hovering && !yanaActive && music != nil))
 	}
 
 	func open() {

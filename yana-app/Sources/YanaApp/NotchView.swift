@@ -22,7 +22,7 @@ struct NotchView: View {
 			} else {
 				Color.black
 			}
-			if !model.isOpen, activity.run.isActive {
+			if !model.isOpen, model.hasActivity {
 				ActivityWings(model: model, run: activity.run, glance: look == .glance)
 					.frame(width: size.width, height: size.height, alignment: .top)
 					.transition(.opacity)
@@ -116,28 +116,64 @@ private struct ActivityWings: View {
 		let notch = model.geometry.closedSize
 		VStack(spacing: 0) {
 			HStack(spacing: 0) {
-				YanaMascot(state: run.state, width: 26).frame(width: NotchGeometry.wing)
+				if run.isActive {
+					YanaMascot(state: run.state, width: 26).frame(width: NotchGeometry.wing)
+				} else {
+					CoverThumb(track: model.music).frame(width: NotchGeometry.wing)
+				}
 				Spacer(minLength: notch.width)
-				EqualizerBars(active: run.state == .working).frame(width: NotchGeometry.wing)
+				EqualizerBars(active: run.isActive ? run.state == .working : true,
+				              color: run.isActive ? .white : Color(hex: model.musicTint))
+					.frame(width: NotchGeometry.wing)
 			}
 			.frame(height: model.geometry.rowHeight)
 			if glance {
-				Text(run.state == .waiting ? (run.waitingFor ?? "") : run.reply)
+				Text(line)
 					.font(.system(size: 10)).foregroundStyle(.white.opacity(0.8)).lineLimit(1).padding(.horizontal, 12)
 			}
 		}
+	}
+
+	// Under the pill: what waits for a decision, the answer so far, or the song and artist.
+	private var line: String {
+		if run.state == .waiting { return run.waitingFor ?? "" }
+		if run.isActive { return run.reply }
+		guard let track = model.music else { return "" }
+		return track.artist.isEmpty ? track.title : "\(track.title) · \(track.artist)"
+	}
+}
+
+// The cover on the left wing, small and rounded; a music note when there is no picture.
+private struct CoverThumb: View {
+	let track: NowPlaying?
+	var body: some View {
+		let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+		Group {
+			if let data = track?.artworkData, let image = NSImage(data: data) {
+				Image(nsImage: image).resizable().scaledToFill()
+			} else if let url = track?.artworkURL {
+				AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.15) }
+			} else {
+				ZStack { Color.white.opacity(0.15); Image(systemName: "music.note").font(.system(size: 10)).foregroundStyle(.white.opacity(0.8)) }
+			}
+		}
+		.frame(width: 24, height: 24).clipShape(shape)
 	}
 }
 
 private struct EqualizerBars: View {
 	let active: Bool
+	var color: Color = .white
+
 	var body: some View {
-		TimelineView(.animation(minimumInterval: 0.12, paused: !active)) { context in
+		TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !active)) { context in
 			let t = context.date.timeIntervalSinceReferenceDate
-			HStack(spacing: 2) {
-				ForEach(0 ..< 4, id: \.self) { i in
-					Capsule().fill(Color.white.opacity(0.85))
-						.frame(width: 2.5, height: active ? 5 + 9 * abs(sin(t * 6 + Double(i) * 1.3)) : 4)
+			HStack(spacing: 2.2) {
+				ForEach(0 ..< 5, id: \.self) { i in
+					// Each bar mixes two slow waves of different speeds, so the motion never repeats in step.
+					let a = sin(t * (5.3 + Double(i) * 0.9) + Double(i) * 1.7), b = sin(t * (3.1 + Double(i) * 0.5) + Double(i))
+					Capsule().fill(color.opacity(0.95))
+						.frame(width: 2.6, height: active ? 4 + 11 * abs(0.6 * a + 0.4 * b) : 4)
 				}
 			}
 		}

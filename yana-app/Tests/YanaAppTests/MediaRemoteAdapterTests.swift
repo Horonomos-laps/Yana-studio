@@ -72,4 +72,21 @@ final class MediaRemoteAdapterTests: XCTestCase {
 		XCTAssertEqual(MediaRemoteAdapter.arguments(paths, ["send", "2"]), ["/a/s.pl", "/a/F.framework", "send", "2"])
 		XCTAssertEqual(MediaRemoteAdapter.perl.path, "/usr/bin/perl")
 	}
+
+	func testTheCoverTintIsLiftedToStayVisibleOnBlack() {
+		XCTAssertEqual(ArtworkTint.lift(r: 1, g: 0, b: 0), 0xFF0000)
+		let dark = ArtworkTint.lift(r: 0.2, g: 0.1, b: 0.1)
+		XCTAssertEqual(dark >> 16 & 0xFF, UInt32((0.65 * 255).rounded()), "the brightest channel is raised to the minimum")
+		XCTAssertEqual(ArtworkTint.lift(r: 0, g: 0, b: 0), ArtworkTint.fallback, "black has no hue to keep")
+		XCTAssertEqual(ArtworkTint.average(nil), ArtworkTint.fallback); XCTAssertEqual(ArtworkTint.average(Data([1, 2, 3])), ArtworkTint.fallback)
+	}
+
+	func testTheAverageOfARedPictureIsRed() throws {
+		let size = NSSize(width: 8, height: 8)
+		let image = NSImage(size: size)
+		image.lockFocus(); NSColor.red.setFill(); NSRect(origin: .zero, size: size).fill(); image.unlockFocus()
+		let png = try XCTUnwrap(NSBitmapImageRep(data: try XCTUnwrap(image.tiffRepresentation))?.representation(using: .png, properties: [:]))
+		let tint = ArtworkTint.average(png)
+		XCTAssertGreaterThan(tint >> 16 & 0xFF, 200); XCTAssertLessThan(tint >> 8 & 0xFF, 60); XCTAssertLessThan(tint & 0xFF, 60)
+	}
 }

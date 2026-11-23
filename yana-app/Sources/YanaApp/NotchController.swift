@@ -70,6 +70,7 @@ final class NotchController {
 	private func scheduleShot(to path: String) {
 		let tab = Int(ProcessInfo.processInfo.environment["YANA_NOTCH_TAB"] ?? "") ?? 0
 		DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+			guard tab >= 0 else { return }   // YANA_NOTCH_TAB=-1 captures the closed pill
 			self?.model.tab = NotchTab(rawValue: tab) ?? .yana
 			self?.debugHold = true   // keeps it open while the pointer is elsewhere
 			self?.model.open()
