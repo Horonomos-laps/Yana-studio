@@ -22,8 +22,13 @@ struct NotchView: View {
 			} else {
 				Color.black
 			}
-			if !model.isOpen, model.hasActivity {
+			// The wings (cover and bars, or the rabbit) stay where they are while the panel grows around them, so opening
+			// never switches the music effect off and back on. Open, they sit in the header beside the camera.
+			if model.hasActivity {
+				let wingWidth = model.geometry.closedSize.width + 2 * NotchGeometry.wing
 				ActivityWings(model: model, run: activity.run, glance: look == .glance)
+					.frame(width: model.isOpen ? wingWidth : size.width, height: model.isOpen ? model.geometry.rowHeight : size.height,
+					       alignment: .top)
 					.frame(width: size.width, height: size.height, alignment: .top)
 					.transition(.opacity)
 			}
