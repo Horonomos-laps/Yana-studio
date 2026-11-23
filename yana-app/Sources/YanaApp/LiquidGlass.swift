@@ -42,7 +42,7 @@ struct YanaGlass<S: Shape>: ViewModifier {
 	func body(content: Content) -> some View {
 		if LiquidGlass.active, #available(macOS 26.0, *) {
 			content
-				.glassEffect(style, in: shape)
+				.systemGlass(in: shape, tint: tint, interactive: interactive)
 				.background { shape.fill(FBPair.glassBacking.color.opacity(LiquidGlass.whiteBacking)) }
 		} else {
 			content
@@ -52,12 +52,6 @@ struct YanaGlass<S: Shape>: ViewModifier {
 		}
 	}
 
-	@available(macOS 26.0, *)
-	private var style: Glass {
-		var glass = Glass.regular
-		if let tint { glass = glass.tint(tint) }
-		return interactive ? glass.interactive() : glass
-	}
 }
 
 // A column on the right (terminal, browser, tools): the same floating glass panel as the rail and the chat list,
@@ -73,7 +67,7 @@ struct FloatingPanel: ViewModifier {
 				.background {
 					ZStack {
 						shape.fill(FBPair.glassBacking.color.opacity(LiquidGlass.whiteBacking))
-						Color.clear.glassEffect(.regular, in: shape)
+						Color.clear.systemGlass(in: shape)
 					}
 				}
 				.padding(EdgeInsets(top: LiquidGlass.panelInset, leading: 2, bottom: LiquidGlass.panelInset, trailing: LiquidGlass.panelInset))
@@ -84,6 +78,31 @@ struct FloatingPanel: ViewModifier {
 }
 
 extension View {
+	// The system's Liquid Glass (macOS 26 and later). The glass API only exists in the macOS 26 SDK, which needs Swift 6.2
+	// or newer: with an older toolchain (the macos-15 CI runner has Swift 6.1) the call is not compiled and the view is left
+	// as it is, with the backing under it, so the app still builds and looks flat-white there.
+	@ViewBuilder
+	func systemGlass<S: Shape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
+		#if compiler(>=6.2)
+		if #available(macOS 26.0, *) {
+			self.glassEffect(Self.glassStyle(tint: tint, interactive: interactive), in: shape)
+		} else {
+			self
+		}
+		#else
+		self
+		#endif
+	}
+
+	#if compiler(>=6.2)
+	@available(macOS 26.0, *)
+	private static func glassStyle(tint: Color?, interactive: Bool) -> Glass {
+		var glass = Glass.regular
+		if let tint { glass = glass.tint(tint) }
+		return interactive ? glass.interactive() : glass
+	}
+	#endif
+
 	func floatingPanel() -> some View { modifier(FloatingPanel()) }
 
 	func yanaGlass<S: Shape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
@@ -110,7 +129,7 @@ struct SidePanelBackground: ViewModifier {
 							.fill(FBPair.glassBacking.color.opacity(LiquidGlass.whiteBacking))
 						RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous)
 							.fill(Color.clear)
-							.glassEffect(.regular, in: RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous))
+							.systemGlass(in: RoundedRectangle(cornerRadius: LiquidGlass.panelRadius, style: .continuous))
 					}
 						.padding(EdgeInsets(top: LiquidGlass.panelInset, leading: leadingInset, bottom: LiquidGlass.panelInset, trailing: 2))
 				}
