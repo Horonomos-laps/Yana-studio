@@ -8,9 +8,9 @@ import SwiftUI
 
 enum TrafficLights {
 	// Where the first button's top-left corner is, from the window's top-left corner, and the gap between buttons.
-	static let leading: CGFloat = 8
+	static let leading: CGFloat = 10
 	static let top: CGFloat = 21
-	static let step: CGFloat = 13
+	static let step: CGFloat = 11
 	static let size: CGFloat = 14
 	// The dots are drawn smaller than macOS draws them (12 pt across), so they sit lightly in the rail.
 	static let scale: CGFloat = 0.7
