@@ -148,13 +148,25 @@ final class AgentMonitor: ObservableObject {
 	// Claude Code's own logs, looked at every two seconds off the main thread.
 	private func scanLogs() {
 		scanQueue.async { [weak self] in
-			let found = TranscriptSessions.scan()
+			var found = TranscriptSessions.scan()
+			// Which app each session runs in, looked up every few scans (listing processes is cheap but not free).
+			if !found.isEmpty {
+				let apps = Self.appCache()
+				for i in found.indices { found[i].appBundleID = apps[found[i].cwd] }
+			}
 			Task { @MainActor in
 				guard let self else { return }
 				if found != self.logSessions { self.logSessions = found }
 				self.refreshAll()
 			}
 		}
+	}
+
+	// folder -> app, refreshed at most every 6 seconds.
+	nonisolated(unsafe) private static var cached: (at: Date, apps: [String: String]) = (.distantPast, [:])
+	nonisolated private static func appCache() -> [String: String] {
+		if Date().timeIntervalSince(cached.at) > 6 { cached = (Date(), ProcessTable.appsByFolder()) }
+		return cached.apps
 	}
 
 	private func refreshAll() {

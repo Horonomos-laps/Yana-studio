@@ -62,4 +62,51 @@ final class TranscriptSessionsTests: XCTestCase {
 		XCTAssertEqual(found.map(\.id), ["abc"]); XCTAssertEqual(found.first?.state, .working); XCTAssertEqual(found.first?.project, "Yana-AI")
 		XCTAssertTrue(TranscriptSessions.scan(root: dir.appendingPathComponent("missing")).isEmpty)
 	}
+
+	func testWhatThePersonTypedIsReadButToolResultsAndSystemNotesAreNot() {
+		func user(_ content: String, meta: Bool = false) -> String {
+			#"{"type":"user","cwd":"/a","isMeta":\#(meta),"message":{"role":"user","content":\#(content)}}"#
+		}
+		let tail = [
+			user(#""Sửa lỗi\nnút bấm""#),
+			line("assistant", tool: true),
+			user(#"[{"type":"tool_result","content":"ok"}]"#),
+			user(#""<system-reminder>x</system-reminder>""#),
+			user(#""caveat""#, meta: true),
+		].joined(separator: "\n")
+		let info = TranscriptSessions.parse(tail: tail, id: "s", modified: now)
+		XCTAssertEqual(info.lastPrompt, "Sửa lỗi nút bấm", "the last thing typed, on one line")
+		XCTAssertEqual(TranscriptSessions.typedText([["type": "text", "text": "hello"], ["type": "text", "text": "world"]]), "hello world")
+		XCTAssertNil(TranscriptSessions.typedText("[Request interrupted by user]")); XCTAssertNil(TranscriptSessions.typedText(nil))
+		XCTAssertEqual(TranscriptSessions.typedText(String(repeating: "x", count: 500))?.count, TranscriptSessions.maxPrompt)
+		let session = TranscriptSessions.session(from: TranscriptInfo(id: "s", cwd: "/a", lastRole: "assistant", lastHadToolUse: false,
+		                                                              lastPrompt: "Hỏi gì đó", modified: now.addingTimeInterval(-2)), now: now)
+		XCTAssertEqual(session?.message, "Hỏi gì đó")
+	}
+
+	func testProcessLinesAreReadAndOnlyClaudeIsRecognized() {
+		let output = """
+		  101     1 /Applications/Yana.app/Contents/Applications/Yana Studio.app/Contents/MacOS/Yana Studio
+		  202   101 /Applications/Yana.app/Contents/Applications/Yana Studio.app/Contents/Frameworks/Helper --type=utility
+		  303   202 /bin/zsh -il
+		  404   303 claude --resume abc
+		  505   303 node /Users/x/.npm/_npx/@anthropic-ai/claude-code/cli.js
+		  606   303 /opt/homebrew/bin/claude
+		  707   303 claude-code-guide thing
+		bad line
+		"""
+		let entries = ProcessTable.parse(output)
+		XCTAssertEqual(entries.count, 7); XCTAssertEqual(entries.first?.pid, 101); XCTAssertEqual(entries[3].parent, 303)
+		XCTAssertEqual(entries.filter { ProcessTable.isClaude($0.command) }.map(\.pid), [404, 505, 606])
+	}
+
+	func testTheAppIsFoundByWalkingUpTheParents() {
+		let entries = [ProcessTable.Entry(pid: 101, parent: 1, command: "app"), ProcessTable.Entry(pid: 202, parent: 101, command: "helper"),
+		               ProcessTable.Entry(pid: 303, parent: 202, command: "zsh"), ProcessTable.Entry(pid: 404, parent: 303, command: "claude")]
+		let app = ProcessTable.ancestorApp(of: 404, entries: entries) { $0 == 101 ? "link.vutam.yana.studio" : nil }
+		XCTAssertEqual(app, "link.vutam.yana.studio")
+		XCTAssertNil(ProcessTable.ancestorApp(of: 404, entries: entries) { _ in nil }, "no app above it")
+		XCTAssertNil(ProcessTable.ancestorApp(of: 999, entries: entries) { _ in "x" }, "an unknown process")
+		XCTAssertNotNil(ProcessTable.folder(of: ProcessInfo.processInfo.processIdentifier), "the system gives a process's folder")
+	}
 }
