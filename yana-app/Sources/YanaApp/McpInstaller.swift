@@ -56,8 +56,31 @@ enum McpInstaller {
 		let entry = package.registryType == "npm"
 			? Entry(name: serverName(item), command: "npx", args: ["-y", "\(package.identifier)@\(package.version)"], env: env)
 			: Entry(name: serverName(item), command: "uvx", args: ["\(package.identifier)==\(package.version)"], env: env)
+		return try validated(entry)
+	}
+
+	// The limits yana-rt enforces on an entry, checked here so a bad one is refused before it is written.
+	static func validated(_ entry: Entry) throws -> Entry {
 		guard entry.commandLine.count <= maxCommandLine else { throw InstallError.invalid(L("mcp.tooLong")) }
 		guard entry.env.joined(separator: ", ").count <= maxEnvList, entry.env.count <= 32 else { throw InstallError.invalid(L("mcp.tooManyVars")) }
+		return entry
+	}
+
+	// An entry from a plugin's .mcp.json (PluginInstaller.McpServer): the same checks, the same file, the same
+	// confirmation step afterwards. Loader variables are dropped from its env list, as for a registry server.
+	static func entry(from server: PluginInstaller.McpServer) throws -> Entry {
+		guard case .local(let command, let args, true) = server.kind else { throw InstallError.noPackage }
+		let env = server.env.filter { !loaderVariables.contains($0) && !$0.hasPrefix("LD_") && !$0.hasPrefix("DYLD_") }
+		return try validated(Entry(name: String(server.name.prefix(maxNameChars)), command: command, args: args, env: env))
+	}
+
+	// Adds or replaces the entry with the same name.
+	@discardableResult
+	static func add(_ entry: Entry, workspace: String) throws -> Entry {
+		var list = try servers(in: workspace).filter { ($0["name"] as? String) != entry.name }
+		guard list.count < maxServers else { throw InstallError.full }
+		list.append(entry.json)
+		try write(list, workspace: workspace)
 		return entry
 	}
 

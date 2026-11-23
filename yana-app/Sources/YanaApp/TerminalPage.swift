@@ -13,6 +13,8 @@ final class TerminalTab: NSObject, ObservableObject, Identifiable, LocalProcessT
 	let view: LocalProcessTerminalView
 	@Published var title: String
 	@Published var exited = false
+	// True when this tab's shell runs under the sandbox (TerminalSandbox.swift).
+	@Published private(set) var sandboxed = false
 
 	// A fixed program this tab runs instead of a shell (the runtime installer), with its title.
 	struct Job {
@@ -39,9 +41,18 @@ final class TerminalTab: NSObject, ObservableObject, Identifiable, LocalProcessT
 		let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
 		var environment = Terminal.getEnvironmentVariables(termName: "xterm-256color", trueColor: true)
 		environment += ["SHELL=\(shell)", "TERM_PROGRAM=Yana"]
+		exited = false
+		// With the sandbox on, the shell is started by sandbox-exec (as a login shell with -l).
+		let policy = TerminalSandbox.current()
+		if policy.enabled && TerminalSandbox.isAvailable {
+			let run = TerminalSandbox.launch(shell: shell, folder: folder, home: NSHomeDirectory(), blockNetwork: policy.blockNetwork)
+			sandboxed = true
+			view.startProcess(executable: run.executable, args: run.args, environment: environment, execName: nil, currentDirectory: folder)
+			return
+		}
+		sandboxed = false
 		// "-zsh" as argv[0] makes it a login shell, the way macOS Terminal starts one (PATH from path_helper).
 		let execName = "-" + URL(fileURLWithPath: shell).lastPathComponent
-		exited = false
 		view.startProcess(executable: shell, args: [], environment: environment, execName: execName, currentDirectory: folder)
 	}
 
@@ -122,14 +133,24 @@ enum TerminalStyle {
 		(0x00, 0x00, 0xFF), (0xE5, 0x00, 0xE5), (0x00, 0xE5, 0xE5), (0xE5, 0xE5, 0xE5),
 	]
 
+	// The 16 colors for a dark background (the One Dark set): the Basic ones above would be too dim on it.
+	private static let darkBasic: [(UInt16, UInt16, UInt16)] = [
+		(0x45, 0x47, 0x4D), (0xE0, 0x6C, 0x75), (0x98, 0xC3, 0x79), (0xE5, 0xC0, 0x7B),
+		(0x61, 0xAF, 0xEF), (0xC6, 0x78, 0xDD), (0x56, 0xB6, 0xC2), (0xAB, 0xB2, 0xBF),
+		(0x5C, 0x63, 0x70), (0xFF, 0x7B, 0x86), (0xA9, 0xD6, 0x8A), (0xF0, 0xD0, 0x8C),
+		(0x73, 0xBD, 0xFF), (0xD6, 0x89, 0xEE), (0x67, 0xC8, 0xD4), (0xE6, 0xE6, 0xE6),
+	]
+
 	@MainActor
 	static func apply(to view: LocalProcessTerminalView, fontSize: CGFloat) {
 		view.font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular) // SF Mono
-		view.nativeBackgroundColor = NSColor(FB.canvas)
-		view.nativeForegroundColor = NSColor(FB.text)
+		// AppKit does not follow SwiftUI's scheme by itself, so the colors are picked for the look in use right now.
+		let dark = Appearance.isDarkNow
+		view.nativeBackgroundColor = NSColor.srgb(FBPair.surface.hex(dark: dark))
+		view.nativeForegroundColor = NSColor.srgb(FBPair.text.hex(dark: dark))
 		view.caretColor = NSColor(FB.primary)
-		view.selectedTextBackgroundColor = NSColor(FB.primarySubtleHover)
-		view.installColors(basic.map { SwiftTerm.Color(red8: $0.0, green8: $0.1, blue8: $0.2) })
+		view.selectedTextBackgroundColor = NSColor.srgb(FBPair.primarySubtleHover.hex(dark: dark))
+		view.installColors((dark ? darkBasic : basic).map { SwiftTerm.Color(red8: $0.0, green8: $0.1, blue8: $0.2) })
 		// Off by default: ⌥ types accented letters, like macOS Terminal. Settings can switch it to Meta.
 		view.optionAsMetaKey = AppSettings.shared.terminalOptionAsMeta
 	}
@@ -195,7 +216,7 @@ struct TerminalPage: View {
 			FBIconButton(icon: "close", variant: .ghost, size: .small, tooltip: L("term.hidePanel"), action: close)
 		}
 		.padding(EdgeInsets(top: titleBarClearance, leading: 14, bottom: 8, trailing: 14))
-		.background(FB.chrome)
+		.background(LiquidGlass.active ? Color.clear : FB.chrome)
 	}
 
 	private func exitedBar(_ tab: TerminalTab) -> some View {
@@ -230,7 +251,8 @@ private struct TerminalTabChip: View {
 
 	var body: some View {
 		HStack(spacing: 6) {
-			FBIcon(name: "terminal", size: 13, color: selected ? FB.primaryText : FB.textSecondary)
+			FBIcon(name: tab.sandboxed ? "lock" : "terminal", size: 13, color: selected ? FB.primaryText : FB.textSecondary)
+				.help(tab.sandboxed ? L("sbx.tabHelp") : "")
 			Text(tab.title).font(.system(size: 12, weight: selected ? .semibold : .regular))
 				.foregroundStyle(tab.exited ? FB.textSecondary : FB.text).lineLimit(1)
 			FBIcon(name: "close", size: 11, color: FB.textSecondary)

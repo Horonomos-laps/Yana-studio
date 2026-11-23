@@ -132,13 +132,20 @@ extension RtClient {
 	static func loadSkills() -> [SkillInfo] {
 		let root = URL(fileURLWithPath: workspace()).appendingPathComponent("core/skills")
 		let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
-		return names.sorted().compactMap { name in
-			let file = root.appendingPathComponent(name).appendingPathComponent("SKILL.md")
-			guard let handle = try? FileHandle(forReadingFrom: file) else { return nil }
-			defer { try? handle.close() }
-			let head = String(decoding: handle.readData(ofLength: 2048), as: UTF8.self)
-			return SkillInfo(id: name, description: frontMatterValue("description", in: head))
+		let project: [SkillInfo] = names.sorted().compactMap { name in
+			describe(id: name, file: root.appendingPathComponent(name).appendingPathComponent("SKILL.md"))
 		}
+		// Skills and commands of plugins the person installed from the store (PluginInstaller), usable in every
+		// project: named "plugin:name".
+		let plugins: [SkillInfo] = PluginInstaller.components().compactMap { describe(id: $0.id, file: $0.file) }
+		return project + plugins
+	}
+
+	private static func describe(id: String, file: URL) -> SkillInfo? {
+		guard let handle = try? FileHandle(forReadingFrom: file) else { return nil }
+		defer { try? handle.close() }
+		let head = String(decoding: handle.readData(ofLength: 2048), as: UTF8.self)
+		return SkillInfo(id: id, description: frontMatterValue("description", in: head))
 	}
 
 	private static func frontMatterValue(_ key: String, in text: String) -> String {

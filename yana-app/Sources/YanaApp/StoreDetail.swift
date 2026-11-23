@@ -13,6 +13,15 @@ struct StoreDetailSheet: View {
 	@State private var preview: McpInstaller.Entry?
 	@State private var problem: String?
 	@State private var installed = false
+	// Marketplace plugins (PluginInstaller): the plan shown before anything is written, and the work in progress.
+	@State private var pluginPlan: PluginInstaller.Plan?
+	@State private var pluginInstalled = false
+	@State private var working = false
+	@State private var pluginDone: String?
+	// The MCP servers the plugin declares (PluginInstaller.McpServer), kept after install so a local one can be added.
+	@State private var pluginMcp: [PluginInstaller.McpServer] = []
+
+	private var pluginName: String { item.id.split(separator: "#").last.map(String.init) ?? item.name }
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 0) {
@@ -46,10 +55,13 @@ struct StoreDetailSheet: View {
 				VStack(alignment: .leading, spacing: 18) {
 					if let problem { FBAlert(kind: .error, text: problem, closable: false) }
 					if let preview { previewPanel(preview) }
+					if let pluginPlan { pluginPanel(pluginPlan) }
+					if let pluginDone { FBAlert(kind: .success, text: pluginDone, closable: false) }
+					if pluginPlan == nil { pluginMcpSection }
 					Text(item.summary.isEmpty ? L("store.noDescription") : item.summary).font(.system(size: 14)).foregroundStyle(FB.text)
 						.textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
 					if !item.parts.isEmpty {
-						section(L(item.kind == .mcpRegistry ? "store.connectHow" : "store.adds")) {
+						section(L(item.kind == .mcpRegistry ? "store.connectHow" : item.kind == .cliHub ? "store.cliInstall" : "store.adds")) {
 							ForEach(item.parts, id: \.self) { part in
 								Text(part).font(.system(size: 12, design: .monospaced)).foregroundStyle(FB.text).textSelection(.enabled)
 							}
@@ -62,7 +74,7 @@ struct StoreDetailSheet: View {
 						if let pin = item.pin, pin != "latest" { row(L("store.pin"), String(pin.prefix(12))) }
 						if let author = item.author { row(L("store.developer"), author) }
 					}
-					Text(L(item.kind == .awesomeList ? "store.chatgptNote" : "store.safetyNote")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+					Text(L(item.kind == .awesomeList ? "store.chatgptNote" : item.kind == .cliHub ? "store.cliHubNote" : "store.safetyNote")).font(.fbCaption).foregroundStyle(FB.textSecondary)
 						.fixedSize(horizontal: false, vertical: true)
 				}
 				.padding(24)
@@ -71,7 +83,11 @@ struct StoreDetailSheet: View {
 		}
 		.frame(width: 640, height: 560)
 		.background(FB.canvas)
-		.onAppear { installed = McpInstaller.installedNames(in: engine.workspace).contains(McpInstaller.serverName(item)) }
+		.onAppear {
+			installed = McpInstaller.installedNames(in: engine.workspace).contains(McpInstaller.serverName(item))
+			pluginInstalled = PluginInstaller.isInstalled(pluginName)
+			pluginMcp = pluginInstalled ? PluginInstaller.installedMcp(pluginName) : []
+		}
 	}
 
 	@ViewBuilder
@@ -92,9 +108,164 @@ struct StoreDetailSheet: View {
 					.padding(.horizontal, 20).padding(.vertical, 6).background(Capsule().fill(FB.primary))
 			}
 			.buttonStyle(.plain)
-		case .marketplace:
-			label(L("store.getSoon")).help(L("store.getSoonHelp"))
+		case .marketplace where item.repo == nil, .cliHub where item.repo == nil:
+			label(L("plugin.noSource")).help(L("plugin.noSourceHelp"))
+		case .marketplace where pluginInstalled, .cliHub where pluginInstalled:
+			HStack(spacing: 8) {
+				label(L("plugin.installed"))
+				FBButton(title: L("store.remove"), variant: .secondary, size: .small) { removePlugin() }
+			}
+		case .marketplace, .cliHub:
+			Button(action: startPlugin) {
+				Text(working ? L("plugin.working") : L("store.get")).font(.system(size: 13, weight: .bold)).foregroundStyle(FB.onPrimary)
+					.padding(.horizontal, 20).padding(.vertical, 6).background(Capsule().fill(FB.primary))
+			}
+			.buttonStyle(.plain)
+			.disabled(working)
 		}
+	}
+
+	// Step 1 of Get for a plugin: read what the plugin would add from its pinned commit and show it; nothing is written.
+	private func startPlugin() {
+		problem = nil
+		pluginDone = nil
+		working = true
+		let name = pluginName
+		let version = item.version
+		let repo = item.repo ?? ""
+		let path = item.repoPath
+		let pin = item.pin
+		Task {
+			do {
+				// A plugin inside the marketplace's own repository has no pin of its own: use the commit it is at now.
+				var sha = pin
+				if sha == nil, let own = URL(string: repo)?.pathComponents.filter({ $0 != "/" }), own.count >= 2 {
+					sha = try await PluginInstaller.currentSha(owner: own[0], repo: own[1])
+				}
+				let source = try PluginInstaller.source(url: repo, path: path, sha: sha)
+				let fetched = try await PluginInstaller.fetchPlan(plugin: name, version: version, source: source)
+				pluginMcp = fetched.mcp
+				pluginPlan = fetched
+			} catch {
+				problem = error.localizedDescription
+			}
+			working = false
+		}
+	}
+
+	// Step 2: download, scan, and write to ~/.yana-ai/plugins; then the skills and commands appear after "/".
+	private func installPlugin(_ plan: PluginInstaller.Plan) {
+		working = true
+		Task {
+			do {
+				let manifest = try await PluginInstaller.install(plan)
+				pluginInstalled = true
+				pluginPlan = nil
+				engine.reloadSkills()
+				pluginDone = String(format: L("plugin.done"), manifest.components.count, manifest.plugin)
+			} catch {
+				problem = error.localizedDescription
+			}
+			working = false
+		}
+	}
+
+	private func removePlugin() {
+		do {
+			try PluginInstaller.remove(pluginName)
+			pluginInstalled = false
+			pluginDone = nil
+			pluginMcp = []
+			engine.reloadSkills()
+		} catch {
+			problem = error.localizedDescription
+		}
+	}
+
+	private func pluginPanel(_ plan: PluginInstaller.Plan) -> some View {
+		let skills = plan.components.filter { $0.kind == .skill }.map(\.name)
+		let commands = plan.components.filter { $0.kind == .command }.map(\.name)
+		return VStack(alignment: .leading, spacing: 10) {
+			Text(L("plugin.previewTitle")).font(.system(size: 15, weight: .bold)).foregroundStyle(FB.text)
+			Text(L("plugin.previewWhere")).font(.fbCaption).foregroundStyle(FB.textSecondary).fixedSize(horizontal: false, vertical: true)
+			VStack(alignment: .leading, spacing: 4) {
+				Text("\(L("store.source")): \(plan.source.owner)/\(plan.source.repo)@\(plan.source.sha.prefix(12))")
+				if !skills.isEmpty { Text("\(L("plugin.skills")) (\(skills.count)): \(skills.prefix(12).joined(separator: ", "))\(skills.count > 12 ? "…" : "")") }
+				if !commands.isEmpty { Text("\(L("plugin.commands")) (\(commands.count)): \(commands.prefix(12).map { "/\(plan.plugin):\($0)" }.joined(separator: ", "))\(commands.count > 12 ? "…" : "")") }
+				Text("\(L("plugin.size")): \(max(plan.totalBytes / 1000, 1)) KB")
+			}
+			.font(.system(size: 12, design: .monospaced)).foregroundStyle(FB.text).textSelection(.enabled)
+			.padding(10).frame(maxWidth: .infinity, alignment: .leading)
+			.background(RoundedRectangle(cornerRadius: 8).fill(FB.surfaceTertiary))
+			if !plan.mcp.isEmpty {
+				VStack(alignment: .leading, spacing: 3) {
+					Text(L("plugin.mcpTitle")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+					ForEach(plan.mcp, id: \.name) { server in
+						Text("\(server.name): \(mcpStatus(server))").font(.system(size: 12, design: .monospaced)).foregroundStyle(FB.text)
+							.fixedSize(horizontal: false, vertical: true)
+					}
+				}
+			}
+			if !plan.left.isEmpty {
+				Text(String(format: L("plugin.left"), plan.left.map { L("plugin.left.\($0.rawValue)") }.joined(separator: ", ")))
+					.font(.fbCaption).foregroundStyle(FB.warningText).fixedSize(horizontal: false, vertical: true)
+			}
+			Text(L("plugin.safety")).font(.fbCaption).foregroundStyle(FB.textSecondary).fixedSize(horizontal: false, vertical: true)
+			HStack {
+				Spacer()
+				FBButton(title: L("store.cancel"), variant: .secondary, size: .small) { pluginPlan = nil }
+				FBButton(title: working ? L("plugin.working") : L("plugin.install"), variant: .primary, size: .small) { installPlugin(plan) }
+					.disabled(working)
+			}
+		}
+		.padding(14)
+		.background(RoundedRectangle(cornerRadius: 12).stroke(FB.primaryBorder))
+	}
+
+	// What the person needs to know about one MCP server of the plugin: whether yana-rt can run it, and why not.
+	private func mcpStatus(_ server: PluginInstaller.McpServer) -> String {
+		switch server.kind {
+		case .remote(let url): return String(format: L("plugin.mcp.remote"), url)
+		case .local(let command, let args, let pinned):
+			let line = ([command] + args).joined(separator: " ")
+			return pinned ? String(format: L("plugin.mcp.pinned"), line) : String(format: L("plugin.mcp.unpinned"), line)
+		case .other: return L("plugin.mcp.other")
+		}
+	}
+
+	@ViewBuilder
+	private var pluginMcpSection: some View {
+		if pluginInstalled, !pluginMcp.isEmpty {
+			section(L("plugin.mcpTitle")) {
+				ForEach(pluginMcp, id: \.name) { server in
+					HStack(alignment: .top, spacing: 10) {
+						VStack(alignment: .leading, spacing: 2) {
+							Text(server.name).font(.fbBodyMedium).foregroundStyle(FB.text)
+							Text(mcpStatus(server)).font(.fbCaption).foregroundStyle(FB.textSecondary).fixedSize(horizontal: false, vertical: true)
+						}
+						Spacer(minLength: 8)
+						if server.installable {
+							FBButton(title: L("plugin.mcp.add"), variant: .secondary, size: .small) { addMcp(server) }
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Writes the server into this project's .yana-ai/mcp-servers.json, then opens the terminal step where the person
+	// types yes to trust it: the same path as a server from the MCP registry.
+	private func addMcp(_ server: PluginInstaller.McpServer) {
+		do {
+			let entry = try McpInstaller.entry(from: server)
+			try McpInstaller.add(entry, workspace: engine.workspace)
+		} catch {
+			problem = error.localizedDescription
+			return
+		}
+		guard let job = McpInstaller.confirmJob() else { problem = RtError.notInstalled.message; return }
+		terminals.run(job, folder: engine.workspace)
+		close()
 	}
 
 	private func label(_ text: String) -> some View {
@@ -222,6 +393,7 @@ struct StoreSourcesView: View {
 					Text(L("store.kind.marketplace")).tag(StoreFeed.Kind.marketplace)
 					Text(L("store.kind.mcpRegistry")).tag(StoreFeed.Kind.mcpRegistry)
 					Text(L("store.kind.awesomeList")).tag(StoreFeed.Kind.awesomeList)
+				Text(L("store.kind.cliHub")).tag(StoreFeed.Kind.cliHub)
 				}
 				TextField("https://…", text: $url).textFieldStyle(.roundedBorder)
 				TextField(L("store.sourceName"), text: $label).textFieldStyle(.roundedBorder)

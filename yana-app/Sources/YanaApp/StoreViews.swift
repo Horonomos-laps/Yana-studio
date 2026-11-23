@@ -27,6 +27,7 @@ enum StoreStyle {
 		case .marketplace: return Color(hex: 0xB4532F)  // Claude orange, darkened for text contrast
 		case .mcpRegistry: return FB.primaryText
 		case .awesomeList: return Color(hex: 0x0B7A5E) // ChatGPT green, darkened for text contrast
+		case .cliHub: return Color(hex: 0x6B4FBB)       // purple, darkened for text contrast
 		}
 	}
 }

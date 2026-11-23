@@ -28,11 +28,16 @@ struct ChatLine: Identifiable {
 	// Tokens reported by yana-rt's `metrics` events for this reply (0 until one arrives).
 	var inputTokens = 0
 	var outputTokens = 0
+	var tokensAt: Date? = nil
 	// Thumbnails of the images sent with a user message.
 	var images: [NSImage] = []
 	// Long-term memory: what the reply drew on, and a fact Yana proposes to remember (user decides).
 	var memoryUsed: String? = nil
 	var memoryProposal: String? = nil
+	// A user message: what was typed, and whether nothing but that text went out with it (no image, document,
+	// video note or quote). Only such a message can be asked again or edited, because the rest cannot be rebuilt.
+	var raw: String? = nil
+	var replayable = false
 }
 
 @MainActor
@@ -49,6 +54,8 @@ final class ChatEngine: ObservableObject {
 	@Published var planMode = AppSettings.shared.defaultPlanMode
 	// The folder yana-rt runs in. Approval pauses also need its `.claude/state/locking-protocol-version`.
 	@Published var workspace = RtClient.workspace()
+	// The project this chat is in (Projects.swift); nil for an ordinary chat.
+	@Published private(set) var projectID: String?
 	@Published private(set) var models: [String] = []
 	// Images waiting to go out with the next message (Attachments.swift).
 	@Published var attachments: [ChatImage] = []
@@ -137,6 +144,13 @@ final class ChatEngine: ObservableObject {
 	// A skill's instructions are sent as the turn's system prompt; cap keeps one skill from flooding context.
 	private static let maxSkillChars = 24_000
 
+	// After a plugin is installed or removed: read the skill folders again so the "/" list is current.
+	func reloadSkills() {
+		skills = []
+		skillsLoading = false
+		loadSkillsIfNeeded()
+	}
+
 	func loadSkillsIfNeeded() {
 		guard skills.isEmpty, !skillsLoading else { return }
 		skillsLoading = true
@@ -151,6 +165,13 @@ final class ChatEngine: ObservableObject {
 		guard message.hasPrefix("/") else { return nil }
 		let name = String(message.dropFirst().prefix { !$0.isWhitespace })
 		guard skills.contains(where: { $0.id == name }) else { return nil }
+		// A plugin's skill or command ("plugin:name"): a command's $ARGUMENTS is what follows the name.
+		if let installed = PluginInstaller.components().first(where: { $0.id == name }) {
+			guard let text = try? String(contentsOf: installed.file, encoding: .utf8) else { return nil }
+			let rest = String(message.dropFirst(name.count + 1))
+			let body = installed.kind == .command ? PluginInstaller.expandCommand(text, arguments: rest) : text
+			return (name, String(body.prefix(Self.maxSkillChars)))
+		}
 		let file = URL(fileURLWithPath: RtClient.workspace()).appendingPathComponent("core/skills/\(name)/SKILL.md")
 		guard let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
 		return (name, String(text.prefix(Self.maxSkillChars)))
@@ -159,6 +180,7 @@ final class ChatEngine: ObservableObject {
 	private static let maxHistoryTurns = 40 // yana-rt's own MAX_HISTORY_TURNS
 	private static let errorTailChars = 400
 	private static let ollamaPath = "/opt/homebrew/bin/ollama"
+	private var turnStartedAt = Date()
 	private var sessionId = UUID().uuidString.lowercased()
 	private var turnProvider = AppSettings.shared.provider
 	private var process: Process?
@@ -170,12 +192,39 @@ final class ChatEngine: ObservableObject {
 	var chatInputTokens: Int { lines.reduce(0) { $0 + $1.inputTokens } }
 	var chatOutputTokens: Int { lines.reduce(0) { $0 + $1.outputTokens } }
 
-	// Starts a new chat: the current one is saved first, then an empty conversation with a new session id.
-	func reset() {
+	// Starts a new chat: the current one is saved first, then an empty conversation with a new session id. It stays in the
+	// project the current chat is in.
+	func reset() { startChat(in: projectID) }
+
+	// A new chat in a project, or an ordinary one with nil. While a project is open Yana works in its folder, if it has one.
+	func startChat(in project: String?) {
 		guard !running else { return }
 		saveToHistory()
 		lines = []
 		sessionId = UUID().uuidString.lowercased()
+		enter(project: project)
+	}
+
+	// Puts a saved chat into a project, or back among the ordinary chats. When it is the open one, the project's folder
+	// is taken up at once, so the next message already runs there.
+	func move(_ chatID: String, to project: String?) {
+		ChatHistoryStore.shared.setProject(chatID, project)
+		if chatID == sessionId, !running { enter(project: project) }
+	}
+
+	// Takes up the open project's folder again after the project was edited.
+	func refreshProject() { if !running { enter(project: projectID) } }
+
+	// Switches the project and the working folder that goes with it.
+	private func enter(project id: String?) {
+		projectID = id
+		let folder = ProjectStore.shared.project(id)?.folder ?? ""
+		var isDir: ObjCBool = false
+		if !folder.isEmpty, FileManager.default.fileExists(atPath: folder, isDirectory: &isDir), isDir.boolValue {
+			workspace = folder
+		} else {
+			workspace = RtClient.workspace()
+		}
 	}
 
 	var currentChatID: String { sessionId }
@@ -185,11 +234,18 @@ final class ChatEngine: ObservableObject {
 		guard !running, chat.id != sessionId else { return }
 		saveToHistory()
 		sessionId = chat.id
+		enter(project: chat.projectID)
 		lines = chat.lines.map { line in
 			var restored = ChatLine(role: line.user ? .user : .assistant, text: line.text)
+			// A saved question with no attachment or quote marker is plain typed text, so it can be asked again.
+			if line.user, !line.text.contains("📎 "), !line.text.hasPrefix("↩︎") {
+				restored.raw = line.text
+				restored.replayable = true
+			}
 			restored.error = line.error
 			restored.inputTokens = line.inputTokens
 			restored.outputTokens = line.outputTokens
+			restored.tokensAt = line.at
 			return restored
 		}
 	}
@@ -198,11 +254,19 @@ final class ChatEngine: ObservableObject {
 	func saveToHistory() {
 		guard let title else { return }
 		let saved = lines.filter { !$0.text.isEmpty || $0.error != nil }.map {
-			SavedLine(user: $0.role == .user, text: $0.text, error: $0.error, inputTokens: $0.inputTokens, outputTokens: $0.outputTokens)
+			SavedLine(user: $0.role == .user, text: $0.text, error: $0.error, inputTokens: $0.inputTokens, outputTokens: $0.outputTokens, at: $0.tokensAt)
 		}
 		let firstLine = title.split(separator: "\n").first.map(String.init) ?? title
-		ChatHistoryStore.shared.save(SavedChat(id: sessionId, title: String(firstLine.prefix(ChatHistoryStore.titleChars)),
-		                                       updated: Date(), provider: turnProvider, model: model, lines: saved))
+		var chat = SavedChat(id: sessionId, title: String(firstLine.prefix(ChatHistoryStore.titleChars)),
+		                     updated: Date(), provider: turnProvider, model: model, lines: saved)
+		// A name or a pin the person set must survive the next save.
+		if let existing = ChatHistoryStore.shared.chat(sessionId) {
+			chat.customTitle = existing.customTitle
+			chat.pinned = existing.pinned
+			chat.archived = existing.archived
+		}
+		chat.projectID = projectID
+		ChatHistoryStore.shared.save(chat)
 	}
 
 	// Reads the pulled models from `ollama list` (first column, header skipped). Empty when Ollama is missing.
@@ -247,7 +311,10 @@ final class ChatEngine: ObservableObject {
 		attachError = nil
 		let quoteLine = quoted.map { "↩︎ " + Self.quotePreview($0) }
 		let shown = ([quoteLine ?? "", text] + docs.map { "📎 \($0.name)" }).filter { !$0.isEmpty }.joined(separator: "\n")
-		lines.append(ChatLine(role: .user, text: shown, images: sending.map(\.preview)))
+		var userLine = ChatLine(role: .user, text: shown, images: sending.map(\.preview))
+		userLine.raw = text
+		userLine.replayable = sending.isEmpty && docs.isEmpty && notes.isEmpty && quoted == nil
+		lines.append(userLine)
 		lines.append(ChatLine(role: .assistant, text: ""))
 		let task = ([Self.withQuote(withDocuments(text, docs), quoted)] + notes).filter { !$0.isEmpty }.joined(separator: "\n\n")
 		var payload: [String: Any] = ["task": task, "session_id": sessionId, "history": Array(history), "mode": planMode ? "plan" : "act"]
@@ -267,19 +334,29 @@ final class ChatEngine: ObservableObject {
 			}
 			system.append(Self.rememberInstruction)
 		}
+		if let project = ProjectStore.shared.project(projectID) { system.append(ProjectLogic.instruction(for: project)) }
+		if let personal = Personalization.instruction() { system.append(personal) }
+		if let git = GitPrefs.instruction() { system.append(git) }
 		if !system.isEmpty { payload["system"] = system.joined(separator: "\n\n") }
 		let settings = AppSettings.shared
+		// A provider the person added becomes "custom" with its own address; yana-rt needs no change (CustomProviders.swift).
+		guard let wire = CustomProviders.wire(for: provider, builtinBase: settings.baseURL, list: CustomProviderStore.shared.items) else {
+			failLast(L("prov.removed"))
+			return
+		}
 		if let key = settings.apiKey(provider) { payload["api_key"] = key }
-		if provider == "custom" {
-			payload["base_url"] = settings.baseURL
-			payload["custom_keyless"] = !settings.hasKey("custom")
+		if wire.isCustom {
+			payload["base_url"] = wire.baseURL ?? ""
+			payload["custom_keyless"] = !settings.hasKey(provider)
 		}
 		if let value = settings.maxTokensValue { payload["max_tokens"] = value }
 		if let value = settings.temperatureValue { payload["temperature"] = value }
+		// Only a level the current model is known to take; yana-rt refuses anything else.
+		if let level = ReasoningStore.shared.activeLevel { payload["reasoning_effort"] = level.rawValue }
 		// Auto mode: name the lease subject so yana-rt can find the leases the user granted (AutoRun.swift).
 		if AutoRunStore.shared.isOn { payload["agent_id"] = AutoRunStore.subject }
 		turnProvider = provider
-		var args = ["chat", "--headless", "--provider", provider]
+		var args = ["chat", "--headless", "--provider", wire.provider]
 		if let model { args += ["--model", model] }
 		start(args, input: payload)
 	}
@@ -299,10 +376,41 @@ final class ChatEngine: ObservableObject {
 			payload["scope"] = scope.rawValue
 		}
 		if let key = AppSettings.shared.apiKey(turnProvider) { payload["api_key"] = key }
-		start(["chat", "--resume-approval", "--provider", turnProvider], input: payload)
+		let resumeProvider = CustomProviders.wire(for: turnProvider, builtinBase: AppSettings.shared.baseURL,
+		                                          list: CustomProviderStore.shared.items)?.provider ?? turnProvider
+		start(["chat", "--resume-approval", "--provider", resumeProvider], input: payload)
 	}
 
 	func stop() { process?.terminate() }
+
+	// Text to put back in the chat box (the edit button); the chat page takes it and clears it.
+	@Published var draft: String? = nil
+
+	private var lastUserIndex: Int? { lines.lastIndex { $0.role == .user } }
+
+	// The last question can be asked again or edited when the turn is over, no approval is waiting, and only its
+	// own text went out with it.
+	var canReplay: Bool {
+		guard !running, lines.last?.role == .assistant, let index = lastUserIndex, lines[index].replayable, lines[index].raw != nil else { return false }
+		return !lines.contains { $0.approval != nil && $0.approval?.decided == nil }
+	}
+
+	var lastUserLineID: UUID? { lastUserIndex.map { lines[$0].id } }
+
+	// Asks the last question again: its reply is dropped and the same text is sent, so the model answers from
+	// the same history as the first time.
+	func regenerate() {
+		guard canReplay, let index = lastUserIndex, let text = lines[index].raw else { return }
+		lines.removeSubrange(index...)
+		send(text)
+	}
+
+	// Takes the last question back into the chat box to change it: it and its reply leave the chat.
+	func editLast() {
+		guard canReplay, let index = lastUserIndex, let text = lines[index].raw else { return }
+		lines.removeSubrange(index...)
+		draft = text
+	}
 
 	private func start(_ args: [String], input: [String: Any]) {
 		guard let binary = RtClient.binaryPath() else { failLast(RtError.notInstalled.message); return }
@@ -319,6 +427,7 @@ final class ChatEngine: ObservableObject {
 		do { try process.run() } catch { failLast("yana-rt could not start: \(error.localizedDescription)"); return }
 		self.process = process
 		running = true
+		turnStartedAt = Date()
 		stdin.fileHandleForWriting.write(body)
 		try? stdin.fileHandleForWriting.close()
 
@@ -383,6 +492,7 @@ final class ChatEngine: ObservableObject {
 			// One event per model call; a turn with tool rounds has several, so they add up.
 			lines[last].inputTokens += (event["input_tokens"] as? NSNumber)?.intValue ?? 0
 			lines[last].outputTokens += (event["output_tokens"] as? NSNumber)?.intValue ?? 0
+			if lines[last].tokensAt == nil { lines[last].tokensAt = Date() }
 		default:
 			break // runtime_event, cancelled: not shown yet
 		}
@@ -420,7 +530,7 @@ final class ChatEngine: ObservableObject {
 	private func finish(status: Int32, stderr: String) {
 		running = false
 		process = nil
-		defer { saveToHistory() } // every finished turn lands in "Recent", errors included
+		defer { saveToHistory(); notifyIfNeeded() } // every finished turn lands in "Recent", errors included
 		guard let last = lines.indices.last else { return }
 		if lines[last].role == .assistant, MemoryStore.shared.enabled {
 			let split = Self.extractProposal(lines[last].text)
@@ -436,6 +546,22 @@ final class ChatEngine: ObservableObject {
 				return
 			}
 			lines[last].error = detail.isEmpty ? "yana-rt exited with code \(status)" : String(detail.suffix(Self.errorTailChars))
+		}
+	}
+
+	// A notification when the turn is over, or waiting for the person, while the app is not in front (Notifier).
+	private func notifyIfNeeded() {
+		guard let line = lines.last, line.role == .assistant else { return }
+		let waiting = line.approval != nil && line.approval?.decided == nil
+		guard NotifyPrefs.current().shouldNotify(appActive: NSApplication.shared.isActive,
+		                                         elapsed: Date().timeIntervalSince(turnStartedAt), needsPerson: waiting) else { return }
+		let chat = title.map { String($0.split(separator: "\n").first ?? "").prefix(40) } ?? ""
+		if let ask = line.approval, waiting {
+			Notifier.post(title: L("notify.approval"), body: "\(ask.capability): \(Notifier.summary(ask.reason, limit: 100))", id: "approval-\(sessionId)")
+		} else if let error = line.error {
+			Notifier.post(title: L("notify.error"), body: Notifier.summary(error, limit: 120), id: "done-\(sessionId)")
+		} else if !line.text.isEmpty {
+			Notifier.post(title: chat.isEmpty ? L("notify.done") : "\(L("notify.done")) · \(chat)", body: Notifier.summary(line.text), id: "done-\(sessionId)")
 		}
 	}
 

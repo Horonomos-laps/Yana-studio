@@ -11,7 +11,8 @@ import Foundation
 // works offline; refreshed when older than six hours or on Refresh.
 
 struct StoreFeed: Codable, Identifiable, Hashable {
-	enum Kind: String, Codable, CaseIterable { case marketplace, mcpRegistry, awesomeList }
+	// cliHub: CLI-Hub's registry.json (CliHubFeed.swift), a catalog of agent CLIs whose SKILL.md can be installed.
+	enum Kind: String, Codable, CaseIterable { case marketplace, mcpRegistry, awesomeList, cliHub }
 	var id: String { url.absoluteString }
 	let kind: Kind
 	let url: URL
@@ -22,6 +23,7 @@ struct StoreFeed: Codable, Identifiable, Hashable {
 		StoreFeed(kind: .marketplace, url: URL(string: "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/.claude-plugin/marketplace.json")!, label: "Claude", builtIn: true),
 		StoreFeed(kind: .mcpRegistry, url: URL(string: "https://registry.modelcontextprotocol.io/v0.1/servers")!, label: "MCP Registry", builtIn: true),
 		StoreFeed(kind: .awesomeList, url: URL(string: "https://raw.githubusercontent.com/rdmgator12/awesome-chatgpt-apps/main/README.md")!, label: "ChatGPT", builtIn: true),
+		StoreFeed(kind: .cliHub, url: URL(string: "https://raw.githubusercontent.com/HKUDS/CLI-Anything/main/registry.json")!, label: "CLI-Hub", builtIn: true),
 	]
 }
 
@@ -39,6 +41,10 @@ struct StoreItem: Codable, Identifiable, Hashable {
 	let pin: String?        // marketplace: git sha of the plugin source
 	let parts: [String]     // marketplace: what it adds; MCP: how to connect (remote URL / package)
 	var package: McpPackage? = nil // MCP: a local (stdio) npm or PyPI package yana-rt can run; nil = remote only
+	// Marketplace: where the plugin's code is, for "Get" (PluginInstaller). Entries cached before these existed
+	// decode with nil and get them on the next refresh.
+	var repo: String? = nil        // https://github.com/<owner>/<repo>
+	var repoPath: String? = nil    // folder inside that repository
 }
 
 // The one local package of an MCP registry entry that yana-rt can start (it runs stdio servers only).
@@ -206,6 +212,10 @@ final class PluginCatalog: ObservableObject {
 		items = cache.items
 		updated = cache.updated
 		synced = cache.synced ?? [:]
+		// A cache written before entries carried their source has no way to install: load again right away.
+		if items.contains(where: { $0.kind == .marketplace && $0.repo == nil && $0.pin != nil }) { updated = nil }
+		// A built-in feed added after this cache was written has no entries in it yet: load again right away.
+		if StoreFeed.builtIns.contains(where: { feed in !items.contains { $0.feed == feed.id } }) { updated = nil }
 	}
 
 	private func writeCache() {

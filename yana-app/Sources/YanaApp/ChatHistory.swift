@@ -11,6 +11,8 @@ struct SavedLine: Codable, Equatable {
 	var error: String?
 	var inputTokens = 0
 	var outputTokens = 0
+	// When this reply's token numbers arrived (the Usage page counts it on that day). Missing in older chats.
+	var at: Date? = nil
 }
 
 struct SavedChat: Codable, Identifiable, Equatable {
@@ -20,6 +22,17 @@ struct SavedChat: Codable, Identifiable, Equatable {
 	var provider: String
 	var model: String?
 	var lines: [SavedLine]
+	// Set by the person in the sidebar. Optional, so chats saved before these existed still load; the engine
+	// keeps them when it saves the chat again (ChatEngine.saveToHistory).
+	var customTitle: String? = nil
+	var pinned: Bool? = nil
+	var archived: Bool? = nil
+	// The project this chat belongs to (Projects.swift); nil for an ordinary chat. Optional so older chats still load.
+	var projectID: String? = nil
+
+	var displayTitle: String { customTitle.flatMap { $0.isEmpty ? nil : $0 } ?? title }
+	var isPinned: Bool { pinned == true }
+	var isArchived: Bool { archived == true }
 }
 
 @MainActor
@@ -56,6 +69,112 @@ final class ChatHistoryStore: ObservableObject {
 	}
 
 	func chat(_ id: String) -> SavedChat? { chats.first { $0.id == id } }
+
+	// Pinned chats first, then the newest.
+	var ordered: [SavedChat] { chats.filter(\.isPinned) + chats.filter { !$0.isPinned } }
+
+	// The chats that match a search, in the same order; an empty query is every chat.
+	func search(_ query: String) -> [SavedChat] {
+		ordered.filter { ChatLibrary.matches(title: $0.displayTitle, lines: $0.lines.map(\.text), query: query) }
+	}
+
+	func rename(_ id: String, to title: String) {
+		guard var chat = chat(id) else { return }
+		let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+		chat.customTitle = trimmed.isEmpty ? nil : String(trimmed.prefix(Self.titleChars))
+		persist(chat)
+	}
+
+	func setPinned(_ id: String, _ pinned: Bool) {
+		guard var chat = chat(id) else { return }
+		chat.pinned = pinned ? true : nil
+		persist(chat)
+	}
+
+	// Hides a chat from the sidebar lists without deleting it. An archived chat is no longer pinned.
+	func setArchived(_ id: String, _ archived: Bool) {
+		guard var chat = chat(id) else { return }
+		chat.archived = archived ? true : nil
+		if archived { chat.pinned = nil }
+		persist(chat)
+	}
+
+	// Archives every chat that is not archived yet.
+	func archiveAll() {
+		for chat in chats where !chat.isArchived { setArchived(chat.id, true) }
+	}
+
+	// A copy of a chat under a new session id, so the two continue separately. Nil when the chat is unknown.
+	@discardableResult
+	func fork(_ id: String, now: Date = Date()) -> SavedChat? {
+		guard let source = chat(id) else { return nil }
+		var copy = source
+		copy = SavedChat(id: UUID().uuidString.lowercased(), title: source.title, updated: now, provider: source.provider,
+		                 model: source.model, lines: source.lines,
+		                 customTitle: String(format: L("history.forkTitle"), source.displayTitle), pinned: nil, archived: nil)
+		save(copy)
+		return chat(copy.id)
+	}
+
+	// File names for an export: one per chat, unique inside the folder ("Title.md", "Title 2.md"...).
+	static func exportNames(for chats: [SavedChat]) -> [String] {
+		var used = Set<String>()
+		return chats.map { chat in
+			let base = ChatLibrary.fileName(for: chat.displayTitle)
+			var name = base
+			var n = 2
+			while !used.insert(name.lowercased()).inserted {
+				name = String(base.dropLast(3)) + " \(n).md"
+				n += 1
+			}
+			return name
+		}
+	}
+
+	// Writes every chat as a Markdown file into `folder`. Returns how many were written.
+	func exportAll(to folder: URL) throws -> Int {
+		let list = ordered
+		let names = Self.exportNames(for: list)
+		try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+		for (chat, name) in zip(list, names) {
+			try Data(markdown(chat).utf8).write(to: folder.appendingPathComponent(name), options: .atomic)
+		}
+		return list.count
+	}
+
+	// Removes every saved chat (and its file). Nothing else in the folder is touched.
+	func deleteAll() {
+		for chat in chats { try? FileManager.default.removeItem(at: url(chat.id)) }
+		chats = []
+	}
+
+	// Writes a changed chat back without moving it to the top: only a new message does that.
+	// Puts a chat into a project, or back among the ordinary chats with nil.
+	func setProject(_ id: String, _ projectID: String?) {
+		guard var chat = chat(id) else { return }
+		chat.projectID = projectID
+		persist(chat)
+	}
+
+	// A deleted project's chats stay and become ordinary chats.
+	func releaseProject(_ projectID: String) {
+		for chat in chats where chat.projectID == projectID { setProject(chat.id, nil) }
+	}
+
+	private func persist(_ chat: SavedChat) {
+		guard Self.validID(chat.id), let index = chats.firstIndex(where: { $0.id == chat.id }) else { return }
+		do {
+			try encoder.encode(chat).write(to: url(chat.id), options: .atomic)
+			chats[index] = chat
+		} catch {
+			lastError = "\(L("history.saveFailed")): \(error.localizedDescription)"
+		}
+	}
+
+	func markdown(_ chat: SavedChat) -> String {
+		ChatLibrary.markdown(title: chat.displayTitle, provider: chat.provider, model: chat.model, updated: chat.updated,
+		                     lines: chat.lines.map { (user: $0.user, text: $0.text) })
+	}
 
 	func delete(_ id: String) {
 		guard Self.validID(id) else { return }

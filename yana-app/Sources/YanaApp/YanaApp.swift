@@ -4,11 +4,16 @@ import AppKit
 struct RootView: View {
 	@State private var selected: String
 	@ObservedObject private var loc = Loc.shared
+	@ObservedObject private var appSettings = AppSettings.shared
+	// Keep the Mac awake while Yana works, when the person asked (Settings > General; SleepGuard).
+	@AppStorage(SleepGuard.key) private var keepAwake = false
 	// One chat for the window, shared by the chat page and its sidebar. Lives here so a language switch
 	// (which rebuilds the subtree below) keeps the conversation.
 	@StateObject private var engine = ChatEngine()
 	// Whether the chat list sidebar is shown; remembered between launches.
 	@AppStorage("yana.ui.chatSidebar") private var chatSidebar = true
+	// The page the person was on before Settings, so "Back" returns there.
+	@State private var lastPage = "Chat"
 	@StateObject private var runtime = RuntimeUpdater()
 	// Opens Yana Studio (the IDE layer) on demand; it never starts with this app.
 	@StateObject private var editor = EditorLauncher()
@@ -28,7 +33,7 @@ struct RootView: View {
 		let start = AppSettings.shared.startPage
 		let wanted = page ?? (start == "ask" ? "Start" : start)
 		// The terminal lives in the chat page's right panel, so "Terminal" opens Chat with that panel.
-		openTerminal = wanted == "Terminal"
+		openTerminal = LaunchPanel.opensTerminal(startPage: wanted)
 		_selected = State(initialValue: openTerminal ? "Chat" : wanted)
 		self.rendering = rendering
 	}
@@ -41,7 +46,11 @@ struct RootView: View {
 			// The "show chat list" button sits on the chat column itself (ChatHome), so a full-width
 			// browser never has it drawn over its own toolbar.
 			ChatHome(openSettings: { selected = "Settings" }, openApprovals: { selected = "Tool approvals" })
-		case "Settings": SettingsPage { selected = $0 }
+		case "Settings": SettingsPage(back: { selected = lastPage }) { selected = $0 }
+		// YANA_PAGE=Tour shows the guide in the page area, where a snapshot can capture it (a sheet is not captured).
+		case "Tour": OnboardingTourView { selected = "Chat" }
+		// YANA_PAGE=ProviderSheet shows the add-a-provider sheet in the page area, for a snapshot.
+		case "ProviderSheet": CustomProviderSheet(editing: nil) { selected = "Chat" }
 		case "Tool approvals": ApprovalsPage().padding(.top, 30)
 		case "Overview": HomePage().padding(.top, 30)
 		case "Tasks": TasksPage().padding(.top, 30)
@@ -61,18 +70,20 @@ struct RootView: View {
 	var body: some View {
 		HStack(spacing: 0) {
 			if selected == "Start" {
+				// Both cards go to the chat with the right panel closed; its button opens it (LaunchPanel.swift).
 				StartChooser {
-					terminals.wantsPanel = true
 					selected = "Chat"
 				}
 			} else {
-				IconRail(selected: $selected)
+				// Settings has its own list of sections on the left, so the icon rail steps aside there.
+				if LeftSide.railVisible(page: selected) { IconRail(selected: $selected) }
 				if selected == "Chat" && chatSidebar { ChatSidebar { chatSidebar = false } }
 				page
 					.frame(maxWidth: .infinity, maxHeight: .infinity)
-					.background(FB.canvas)
 			}
 		}
+		// Under everything: the soft backdrop that Liquid Glass refracts, or flat white when it is off.
+		.background(GlassBackdrop())
 		// A new id on a language change rebuilds the whole tree so every L(...) is read again.
 		// `selected` lives on RootView, outside this subtree, so the open page is kept.
 		.task {
@@ -99,6 +110,8 @@ struct RootView: View {
 		}
 		.id(loc.lang)
 		.background { if !rendering { KeepWindowOnClose() } }
+		.background { if !rendering { TrafficLightsAnchor() } }
+		.onChange(of: selected) { old, _ in if old != "Settings" { lastPage = old } }
 		.environmentObject(engine)
 		.environmentObject(editor)
 		.environmentObject(terminals)
@@ -109,14 +122,14 @@ struct RootView: View {
 		.ignoresSafeArea()
 		.frame(minWidth: rendering ? 1536 : 1040, idealWidth: 1360, maxWidth: rendering ? 1536 : .infinity,
 		       minHeight: rendering ? 1024 : 680, idealHeight: 860, maxHeight: rendering ? 1024 : .infinity)
-		// Light only: without this, a Mac in dark mode gives the window a dark title area.
-		.preferredColorScheme(.light)
+		// The look is the person's choice (light by default); without a fixed scheme the title area would follow macOS.
+		.preferredColorScheme(Appearance.resolved(appSettings.appearance).colorScheme)
 		.onAppear {
 			if openTerminal { terminals.wantsPanel = true }
 			// The chat list starts hidden at every launch for a wide chat; the sidebar button shows it.
 			// YANA_CHAT_LIST=1 keeps it open (to check it in the live window).
 			if !rendering { chatSidebar = ProcessInfo.processInfo.environment["YANA_CHAT_LIST"] == "1" }
-			NSApplication.shared.appearance = NSAppearance(named: .aqua)
+			Appearance.apply(appSettings.appearance)
 			// Launched from a terminal the app starts without focus; bring it to the front.
 			NSApplication.shared.setActivationPolicy(.regular)
 			NSApplication.shared.activate(ignoringOtherApps: true)
@@ -126,6 +139,24 @@ struct RootView: View {
 		.onChange(of: terminals.wantsPanel) { _, wanted in
 			if wanted && selected != "Chat" && selected != "Start" { selected = "Chat" }
 		}
+		.onChange(of: engine.running) { _, running in SleepGuard.shared.update(enabled: keepAwake, running: running) }
+		// The notch shows Yana's own work, pushed on every change of the chat. Its Allow / Deny buttons answer the
+		// same open approval card as the chat's own buttons.
+		.onChange(of: engine.lines.count) { _, _ in pushToNotch() }
+		.onChange(of: engine.running) { _, _ in pushToNotch() }
+		.onAppear {
+			YanaActivity.shared.decide = { approved in engine.decide(approved, .once) }
+			pushToNotch()
+		}
+		.onChange(of: keepAwake) { _, on in SleepGuard.shared.update(enabled: on, running: engine.running) }
+		// The terminals are AppKit views: they are colored again when the look changes, from Settings or from macOS.
+		.onChange(of: appSettings.appearance) { _, _ in
+			Appearance.apply(appSettings.appearance)
+			terminals.restyle()
+		}
+		.onReceive(DistributedNotificationCenter.default().publisher(for: Notification.Name("AppleInterfaceThemeChangedNotification"))) { _ in
+			Task { try? await Task.sleep(nanoseconds: 200_000_000); terminals.restyle() }
+		}
 		.onReceive(NotificationCenter.default.publisher(for: .yanaMenu)) { note in
 			guard let raw = note.object as? String, let action = MenuAction(rawValue: raw) else { return }
 			perform(action)
@@ -133,6 +164,11 @@ struct RootView: View {
 	}
 
 	// Menu bar actions (AppCommands.swift).
+	private func pushToNotch() {
+		YanaActivity.shared.update(lines: engine.lines, running: engine.running, model: engine.model,
+		                           provider: engine.provider, workspace: engine.workspace)
+	}
+
 	private func perform(_ action: MenuAction) {
 		switch action {
 		case .settings: selected = "Settings"
@@ -146,6 +182,20 @@ struct RootView: View {
 		case .openStudio: editor.open(folder: engine.workspace)
 		case .terminal: terminals.wantsPanel = true; selected = "Chat"
 		case .toggleChatList: chatSidebar.toggle(); selected = "Chat"
+		case .dictate:
+			// The chat box does the listening, so the chat page has to be showing first.
+			let wait = selected == "Chat" ? 0.0 : 0.35
+			selected = "Chat"
+			DispatchQueue.main.asyncAfter(deadline: .now() + wait) { NotificationCenter.default.post(name: .yanaDictateNow, object: nil) }
+		case .appshot:
+			// The picture is of the window behind Yana, so Yana stays where it is; the chat box attaches it.
+			let wait = selected == "Chat" ? 0.0 : 0.35
+			selected = "Chat"
+			DispatchQueue.main.asyncAfter(deadline: .now() + wait) { NotificationCenter.default.post(name: .yanaAppshotNow, object: nil) }
+		case .pinChat:
+			// Only a chat that is already saved can be pinned; a chat with no messages yet is not.
+			let history = ChatHistoryStore.shared
+			if let chat = history.chat(engine.currentChatID) { history.setPinned(chat.id, !chat.isPinned) }
 		case .uninstall: Uninstaller.run()
 		case .tour: showTour = true
 		default:
@@ -209,6 +259,61 @@ func renderPNG(to path: String, page: String) {
 	print("wrote \(path)")
 }
 
+// `YANA_SNAPSHOT=out.png` opens the real window, waits for it to settle, saves the window as a PNG and quits.
+// Unlike `--render`, this draws the live window, so form controls and the material show up. It needs no
+// screen-recording permission because the app only reads its own window.
+func scheduleWindowSnapshot() {
+	guard let path = ProcessInfo.processInfo.environment["YANA_SNAPSHOT"], !path.isEmpty else { return }
+	let wait = Double(ProcessInfo.processInfo.environment["YANA_SNAPSHOT_WAIT"] ?? "") ?? 5
+	DispatchQueue.main.asyncAfter(deadline: .now() + wait) {
+		guard let view = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil })?.contentView,
+		      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+			FileHandle.standardError.write(Data("snapshot: no window\n".utf8))
+			exit(1)
+		}
+		view.cacheDisplay(in: view.bounds, to: rep)
+		guard let png = rep.representation(using: .png, properties: [:]) else { exit(1) }
+		do { try png.write(to: URL(fileURLWithPath: path)) } catch {
+			FileHandle.standardError.write(Data("snapshot: cannot write \(path)\n".utf8))
+			exit(1)
+		}
+		// Where the three window buttons ended up, from the window's top-left corner (to check them without a screenshot).
+		if let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }), let content = window.contentView {
+			for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+				guard let b = window.standardWindowButton(kind) else { continue }
+				let r = b.convert(b.bounds, to: content)
+				print(String(format: "button x %.1f..%.1f  y %.1f..%.1f", r.minX, r.maxX, content.bounds.height - r.maxY, content.bounds.height - r.minY))
+			}
+		}
+		print("snapshot \(path)")
+		exit(0)
+	}
+}
+
+// `YANA_DUMP_MENU=out.txt` writes every menu item that has a shortcut as "title | key | modifiers" and quits.
+// It shows what the menu bar really bound, including changes made in Settings > Shortcuts.
+func scheduleMenuDump() {
+	guard let path = ProcessInfo.processInfo.environment["YANA_DUMP_MENU"], !path.isEmpty else { return }
+	DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+		var lines: [String] = []
+		func walk(_ menu: NSMenu) {
+			for item in menu.items {
+				if !item.keyEquivalent.isEmpty {
+					let m = item.keyEquivalentModifierMask
+					let mods = (m.contains(.control) ? "C" : "") + (m.contains(.option) ? "O" : "")
+						+ (m.contains(.shift) ? "S" : "") + (m.contains(.command) ? "M" : "")
+					lines.append("\(item.title) | \(item.keyEquivalent) | \(mods)")
+				}
+				if let sub = item.submenu { walk(sub) }
+			}
+		}
+		if let main = NSApp.mainMenu { walk(main) }
+		try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+		print("menu \(path)")
+		exit(0)
+	}
+}
+
 @main
 struct YanaApp: App {
 	@NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -228,6 +333,8 @@ struct YanaApp: App {
 			renderPNG(to: args[index + 1], page: index + 2 < args.count ? args[index + 2] : "Chat")
 			exit(0)
 		}
+		scheduleWindowSnapshot()
+		scheduleMenuDump()
 	}
 
 	var body: some Scene {

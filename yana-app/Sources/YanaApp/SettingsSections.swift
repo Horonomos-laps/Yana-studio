@@ -7,6 +7,8 @@ struct ModelSettings: View {
 	@EnvironmentObject private var engine: ChatEngine
 	@State private var editing: KeyTarget? = nil
 	@State private var keyDraft = ""
+	@ObservedObject private var customStore = CustomProviderStore.shared
+	@State private var providerSheet: ProviderSheetTarget? = nil
 
 	private var keyProviders: [ProviderInfo] { providerCatalog.filter { $0.kind != .local } }
 
@@ -15,6 +17,7 @@ struct ModelSettings: View {
 			Section {
 				Picker(L("set.provider"), selection: $settings.provider) {
 					ForEach(providerCatalog) { Text($0.id).tag($0.id) }
+					ForEach(customStore.items) { Text($0.name).tag($0.id) }
 				}
 				TextField(L("set.model"), text: $settings.model, prompt: Text(L("set.modelPrompt")))
 				if settings.provider == "custom" {
@@ -25,6 +28,26 @@ struct ModelSettings: View {
 			} header: { Text(L("set.defaults")) } footer: {
 				SettingsNote("\(L("set.providerNote")) \(L("set.maxTokensNote")) \(L("set.temperatureNote"))")
 			}
+
+			Section {
+				if customStore.items.isEmpty {
+					Text(L("prov.none")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+				}
+				ForEach(customStore.items) { item in
+					LabeledContent(item.name) {
+						HStack(spacing: 8) {
+							Text(URL(string: item.baseURL)?.host ?? item.baseURL).font(.fbCaption).foregroundStyle(FB.textSecondary)
+								.lineLimit(1).truncationMode(.middle)
+							Button(L("prov.edit")) { providerSheet = ProviderSheetTarget(editing: item) }
+							Button(L("set.remove")) { customStore.remove(item.id) }
+						}
+					}
+				}
+				Button(L("prov.add")) { providerSheet = ProviderSheetTarget(editing: nil) }
+					.sheet(item: $providerSheet) { target in
+						CustomProviderSheet(editing: target.editing) { providerSheet = nil }
+					}
+			} header: { Text(L("prov.header")) } footer: { SettingsNote(L("prov.footer")) }
 
 			Section {
 				if engine.models.isEmpty {
@@ -81,7 +104,7 @@ private let keyPages: [String: String] = [
 ]
 
 // The add/replace key dialog: sized to its content, with where to get a key and a show/hide toggle.
-private struct APIKeySheet: View {
+struct APIKeySheet: View {
 	let provider: String
 	let saved: Bool
 	let close: () -> Void
@@ -150,6 +173,9 @@ struct KeyTarget: Identifiable { let id: String }
 struct TerminalSettings: View {
 	@EnvironmentObject private var terminals: TerminalStore
 	@ObservedObject private var settings = AppSettings.shared
+	// The sandbox applies to terminal tabs opened after the change (TerminalSandbox.swift).
+	@AppStorage(TerminalSandbox.enabledKey) private var sandbox = false
+	@AppStorage(TerminalSandbox.blockNetworkKey) private var sandboxNoNetwork = false
 
 	var body: some View {
 		Form {
@@ -163,6 +189,14 @@ struct TerminalSettings: View {
 				LabeledContent(L("set.termShell"), value: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh")
 				LabeledContent(L("set.termTabs"), value: "\(terminals.tabs.count)")
 			} footer: { SettingsNote(L("set.termNote")) }
+
+			Section {
+				Toggle(L("sbx.enable"), isOn: $sandbox)
+				Toggle(L("sbx.noNetwork"), isOn: $sandboxNoNetwork).disabled(!sandbox)
+				if sandbox && !TerminalSandbox.isAvailable {
+					Text(L("sbx.unavailable")).font(.fbCaption).foregroundStyle(FB.warningText)
+				}
+			} header: { Text(L("sbx.title")) } footer: { SettingsNote(L("sbx.note")) }
 		}
 	}
 }
@@ -308,6 +342,7 @@ struct AboutSettings: View {
 
 			Section(L("about.legal")) {
 				LabeledContent(L("about.license")) { Link("Apache License 2.0", destination: Self.license) }
+				LabeledContent(L("about.credits")) { Link("notchd (Apache 2.0)", destination: URL(string: "https://github.com/notchd-app/notchd")!) }
 				LabeledContent(L("about.author"), value: "Vũ Văn Tâm")
 				LabeledContent(L("about.privacy"), value: L("about.privacyValue"))
 			}

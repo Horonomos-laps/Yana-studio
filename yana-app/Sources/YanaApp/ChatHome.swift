@@ -29,7 +29,18 @@ struct Chip: View {
 struct ChatHome: View {
 	@EnvironmentObject private var engine: ChatEngine
 	@State private var text = ""
+	@State private var atBottom = true
+	@AppStorage("yana.ui.suggestions") private var showSuggestions = true
+	@Environment(\.accessibilityReduceMotion) private var reduceMotion
+	// Room above the first message for the chat's title and its menu.
+	private static let conversationTopInset: CGFloat = 84
+	private static let suggestionsMaxWidth: CGFloat = 760
+	// Speaking into the box (Dictation.swift). Audio stays on this Mac unless allowed in Settings > Chat.
+	@StateObject private var dictation = DictationEngine()
+	@AppStorage("yana.dictation.allowServer") private var dictationServer = false
 	@State private var showModels = false
+	@State private var showKeys = false
+	@State private var keyTarget: KeyTarget? = nil
 	@AppStorage("yana.ui.chatSidebar") private var chatSidebar = true
 	@EnvironmentObject private var terminals: TerminalStore
 	// Starts hidden so the chat gets the whole width; the button at the top right opens it.
@@ -64,6 +75,7 @@ struct ChatHome: View {
 	private var plusMenu: some View {
 		VStack(alignment: .leading, spacing: 2) {
 			plusItem("image", L("plus.images"), L("plus.imagesSub")) { pickImages() }
+			plusItem("monitor", L("appshot.title"), L("appshot.sub")) { takeAppshot() }
 			plusItem("folder", L("plus.folder"), URL(fileURLWithPath: engine.workspace).lastPathComponent) { chooseFolder() }
 			plusItem("zap", L("plus.skills"), L("plus.skillsSub")) { text = "/"; engine.loadSkillsIfNeeded() }
 			plusItem(engine.planMode ? "zap" : "eye", engine.planMode ? L("chat.modeAct") : L("chat.modePlan"), L("plus.modeSub")) {
@@ -140,15 +152,48 @@ struct ChatHome: View {
 		.padding(.bottom, 8)
 	}
 
+	// The width the right panel takes, and what the chat column keeps (PanelLayout.swift): the panel gives way
+	// first, so the page is never wider than the window.
+	private func widths(_ total: CGFloat) -> (chat: CGFloat, panel: CGFloat) {
+		switch right {
+		case .hidden: return (total, 0)
+		case .tools, .files: return (max(total - Self.panelWidth, 0), Self.panelWidth)
+		case .browser, .terminal:
+			if browserExpanded { return (0, total) }
+			let split = PanelLayout.split(available: total, requested: browserWidth)
+			return (split.chat, split.panel)
+		}
+	}
+
 	var body: some View {
+		GeometryReader { geo in
+			let w = widths(geo.size.width)
+			pageRow(chatWidth: w.chat, panelWidth: w.panel)
+				.frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
+		}
+		// The start chooser or the start page asked for the terminal: open it in this panel.
+		.onAppear(perform: openTerminalIfAsked)
+		// YANA_OPEN_CHAT=<session id> opens a saved chat at launch (to check the layout with a conversation on screen).
+		.onAppear {
+			if let id = ProcessInfo.processInfo.environment["YANA_OPEN_CHAT"], let chat = ChatHistoryStore.shared.chat(id) { engine.open(chat) }
+		}
+		.onChange(of: terminals.wantsPanel) { _, _ in openTerminalIfAsked() }
+	}
+
+	private func pageRow(chatWidth: CGFloat, panelWidth: CGFloat) -> some View {
 		HStack(spacing: 0) {
 			if !((right == .browser || right == .terminal) && browserExpanded) {
 				chatColumn
+				.frame(width: chatWidth)
+				.clipped()
 				.overlay(alignment: .topLeading) {
 					if !chatSidebar {
 						FBIconButton(icon: "sidebar", variant: .ghost, size: .medium, tooltip: L("sidebar.show")) { chatSidebar = true }
 							.padding(.top, titleBarClearance).padding(.leading, 14)
 					}
+				}
+				.overlay(alignment: .top) {
+					if !engine.lines.isEmpty { ChatHeader().padding(.top, titleBarClearance) }
 				}
 				.overlay(alignment: .topTrailing) {
 					FBIconButton(icon: "sidebar", variant: right == .hidden ? .ghost : .secondary, size: .medium,
@@ -164,7 +209,7 @@ struct ChatHome: View {
 					browserView.frame(maxWidth: .infinity)
 				} else {
 					resizeHandle
-					browserView.frame(width: browserWidth)
+					browserView.floatingPanel().frame(width: panelWidth).clipped()
 				}
 			case .terminal:
 				// Same slot, width, drag handle and expand state as the browser.
@@ -172,7 +217,7 @@ struct ChatHome: View {
 					TerminalPage(expanded: $browserExpanded) { right = .tools }.frame(maxWidth: .infinity)
 				} else {
 					resizeHandle
-					TerminalPage(expanded: $browserExpanded) { right = .tools }.frame(width: browserWidth)
+					TerminalPage(expanded: $browserExpanded) { right = .tools }.floatingPanel().frame(width: panelWidth).clipped()
 				}
 			case .tools:
 				sidePanel(L("panel.tools"), back: false) {
@@ -183,9 +228,6 @@ struct ChatHome: View {
 				sidePanel(L("panel.files"), back: true) { FilesPanel() }
 			}
 		}
-		// The start chooser or the start page asked for the terminal: open it in this panel.
-		.onAppear(perform: openTerminalIfAsked)
-		.onChange(of: terminals.wantsPanel) { _, _ in openTerminalIfAsked() }
 	}
 
 	private func openTerminalIfAsked() {
@@ -201,7 +243,7 @@ struct ChatHome: View {
 
 	// Drag to make the browser wider or narrower (between the min and max widths).
 	private var resizeHandle: some View {
-		FB.divider
+		(LiquidGlass.active ? Color.clear : FB.divider)
 			.frame(width: 5)
 			.contentShape(Rectangle())
 			.onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
@@ -226,17 +268,26 @@ struct ChatHome: View {
 		}
 		.frame(width: Self.panelWidth)
 		.frame(maxHeight: .infinity)
-		.background(FB.chrome)
-		.overlay(alignment: .leading) { FB.divider.frame(width: 1) }
+		.background(LiquidGlass.active ? Color.clear : FB.chrome)
+		.overlay(alignment: .leading) { if !LiquidGlass.active { FB.divider.frame(width: 1) } }
+		.floatingPanel()
 	}
 
 	private var chatColumn: some View {
 		VStack(spacing: 0) {
 			if engine.lines.isEmpty {
 				Spacer(minLength: 0)
+				if let project = ProjectStore.shared.project(engine.projectID) {
+					Label(project.name, systemImage: "folder").font(.system(size: 13, weight: .medium)).foregroundStyle(FB.textSecondary)
+				}
 				Text(L("chat.heading")).font(.system(size: 30, weight: .semibold)).foregroundStyle(FB.text)
 					.padding(.bottom, 22)
 				inputArea
+				// Cards to start from; a click fills the box (it does not send) and hands the focus to typing.
+				if showSuggestions, ChatSuggestion.visible(chatIsEmpty: engine.lines.isEmpty, draft: text) {
+					SuggestionCards { text = $0 }
+						.padding(.horizontal, 8).padding(.top, 18).frame(maxWidth: Self.suggestionsMaxWidth)
+				}
 				// Equal space above and below: heading and composer sit in the vertical middle.
 				Spacer(minLength: 0)
 			} else {
@@ -270,20 +321,43 @@ struct ChatHome: View {
 		.frame(maxWidth: 760)
 	}
 
+	private static let bottomID = "chat-bottom"
+
 	private var conversation: some View {
 		ScrollViewReader { proxy in
 			ScrollView {
 				LazyVStack(alignment: .leading, spacing: 18) {
 					ForEach(engine.lines) { line in
-						MessageView(line: line, running: engine.running, decide: engine.decide).id(line.id)
+						MessageView(line: line, running: engine.running, decide: engine.decide,
+						            canRegenerate: engine.canReplay && line.id == engine.lines.last?.id,
+						            canEdit: engine.canReplay && line.id == engine.lastUserLineID).id(line.id)
 					}
+					// Seen only when the newest message is in view, which is how the jump button knows to show.
+					Color.clear.frame(height: 1).id(Self.bottomID)
+						.onAppear { atBottom = true }
+						.onDisappear { atBottom = false }
 				}
 				.frame(maxWidth: 760)
 				.frame(maxWidth: .infinity)
-				.padding(.vertical, 40)
+				.padding(.top, Self.conversationTopInset).padding(.bottom, 40)
 			}
 			.onChange(of: engine.lines.last?.text) { _, _ in
-				if let last = engine.lines.last { proxy.scrollTo(last.id, anchor: .bottom) }
+				let lastIsUser = engine.lines.last?.role == .user
+				if ScrollFollow.shouldFollow(atBottom: atBottom, lastIsUser: lastIsUser), let last = engine.lines.last {
+					proxy.scrollTo(last.id, anchor: .bottom)
+				}
+			}
+			.overlay(alignment: .bottom) {
+				if !atBottom {
+					FBIconButton(icon: "arrow-down", variant: .secondary, size: .medium, tooltip: L("chathdr.scrollDown")) {
+						withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+					}
+					.padding(.bottom, 12)
+				}
+			}
+			// The edit button on the last question hands its text back to the chat box.
+			.onChange(of: engine.draft) { _, new in
+				if let new { text = new; engine.draft = nil }
 			}
 		}
 	}
@@ -299,13 +373,24 @@ struct ChatHome: View {
 				// ImageRenderer cannot draw a live text field, so the image shows the placeholder as plain text.
 				Text(L("chat.placeholder")).font(.system(size: 15)).foregroundStyle(FB.textTertiary)
 			} else {
-				TextField(L("chat.placeholder"), text: $text, axis: .vertical)
+				// On the empty chat the hint types example requests by itself (TypingPlaceholder.swift); the field's own
+				// hint is left empty then so the two never overlap.
+				let typing = TypingPlaceholder.isActive(text: text, chatIsEmpty: engine.lines.isEmpty, enabled: showSuggestions,
+				                                        reduceMotion: reduceMotion)
+				TextField(typing ? "" : L("chat.placeholder"), text: $text, axis: .vertical)
 					.textFieldStyle(.plain)
 					.font(.system(size: 15))
 					.lineLimit(1 ... 6)
+					.overlay(alignment: .topLeading) {
+						if typing { TypingPlaceholderView(examples: ChatSuggestion.all.map { L($0.promptKey) }).allowsHitTesting(false) }
+					}
 					.onSubmit(send)
-					.onChange(of: text) { _, new in if new.hasPrefix("/") { engine.loadSkillsIfNeeded() } }
+					.onChange(of: text) { _, new in
+						dictation.userEdited(new)
+						if new.hasPrefix("/") { engine.loadSkillsIfNeeded() }
+					}
 			}
+			dictationStatus
 
 			HStack(spacing: 4) {
 				FBIconButton(icon: "plus", variant: .ghost, size: .small, tooltip: L("plus.title")) { showPlus = true }
@@ -323,17 +408,27 @@ struct ChatHome: View {
 					AutoRunChip(store: AutoRunStore.shared, folder: engine.workspace)
 				}
 				Spacer(minLength: 8)
-				// Reasoning depth: yana-rt's headless adapter has no such parameter, so it is shown but off.
-				Chip(icon: "layers", title: L("chat.reasoning"))
-					.opacity(0.45)
-					.help(L("chat.reasoningNA"))
-				Chip(icon: "cpu", title: engine.model.map { "\(engine.provider) · \($0)" } ?? L("model.choose"), trailing: "chevron-down")
+				// Reasoning depth: on only for a provider and model yana-rt says take it (Reasoning.swift).
+				ReasoningChip(store: ReasoningStore.shared, engine: engine)
+				Chip(icon: "cpu", title: engine.model.map { "\(CustomProviders.displayName(engine.provider)) · \($0)" } ?? L("model.choose"), trailing: "chevron-down")
 					.onTapGesture { showModels = true }
 					.popover(isPresented: $showModels, arrowEdge: Self.popoverEdge) {
 						ModelPicker(engine: engine, openSettings: openSettings) { showModels = false }
 					}
 					// YANA_OPEN_MODELS=1 opens the model list at launch (to check where it opens in the live window).
 					.onAppear { if ProcessInfo.processInfo.environment["YANA_OPEN_MODELS"] == "1" { showModels = true } }
+				// API keys without going to Settings; the dialog is the one Settings uses.
+				FBIconButton(icon: "key", variant: .ghost, size: .small, tooltip: L("keys.help")) { showKeys = true }
+					.popover(isPresented: $showKeys, arrowEdge: Self.popoverEdge) {
+						ApiKeysPopover { id in showKeys = false; keyTarget = KeyTarget(id: id) }
+					}
+					.sheet(item: $keyTarget) { target in
+						APIKeySheet(provider: target.id, saved: AppSettings.shared.hasKey(target.id), close: { keyTarget = nil }) { key in
+							AppSettings.shared.saveKey(key, for: target.id)
+							keyTarget = nil
+						}
+					}
+				micButton
 				Button(action: engine.running ? engine.stop : send) {
 					FBIcon(name: engine.running ? "stop" : "arrow-up", size: 15, color: FB.onPrimary)
 						.frame(width: 32, height: 32)
@@ -346,6 +441,37 @@ struct ChatHome: View {
 		.padding(EdgeInsets(top: 16, leading: 18, bottom: 10, trailing: 10))
 		.glassCard(radius: 24)
 		.overlay(RoundedRectangle(cornerRadius: 24).stroke(FB.primary, lineWidth: 2).opacity(dropTargeted ? 1 : 0))
+		.onReceive(NotificationCenter.default.publisher(for: .yanaDictateNow)) { _ in toggleDictation() }
+		.onReceive(NotificationCenter.default.publisher(for: .yanaAppshotNow)) { _ in takeAppshot() }
+		.onDisappear { dictation.stop() }
+	}
+
+	// The microphone: red while listening. Pressing it again, sending, or typing by hand ends the run.
+	private var micButton: some View {
+		Button(action: toggleDictation) {
+			FBIcon(name: "mic", size: 15, color: dictation.listening ? FB.onPrimary : FB.textSecondary)
+				.frame(width: 32, height: 32)
+				.background(Circle().fill(dictation.listening ? FB.error : .clear))
+		}
+		.buttonStyle(.plain)
+		.help(dictation.listening ? L("dict.stop") : L("dict.start"))
+		.accessibilityLabel(Text(dictation.listening ? L("dict.stop") : L("dict.start")))
+	}
+
+	// "Listening…", or why dictation did not start, with a shortcut to the System Settings pane that fixes it.
+	@ViewBuilder
+	private var dictationStatus: some View {
+		if dictation.listening {
+			Text(L("dict.listening")).font(.fbCaption).foregroundStyle(FB.errorText)
+		} else if case .failed(let failure) = dictation.state {
+			HStack(spacing: 8) {
+				Text(failure.messageKey.map { L($0) } ?? { if case .other(let why) = failure { return why } else { return "" } }())
+					.font(.fbCaption).foregroundStyle(FB.warningText)
+				if let url = failure.settingsURL {
+					Button(L("dict.openSettings")) { NSWorkspace.shared.open(url) }.buttonStyle(.link).font(.fbCaption)
+				}
+			}
+		}
 	}
 
 	// Thumbnails of the images waiting to be sent, each with a remove button.
@@ -484,9 +610,29 @@ struct ChatHome: View {
 			return
 		}
 		guard canSend else { return }
+		dictation.stop()
 		let message = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxInputChars))
 		text = ""
 		engine.send(message)
+	}
+
+	// Attaches a picture of the window behind Yana (Appshot.swift). It is an ordinary attachment: the thumbnail
+	// shows in the box and can be removed, and nothing is sent until the message is.
+	private func takeAppshot() {
+		engine.attachError = nil
+		Task {
+			switch await Appshot.capture() {
+			case .success(let shot): engine.attach(shot.image, name: shot.name)
+			case .failure(let failure):
+				if let key = failure.messageKey { engine.attachError = L(key) }
+				else if case .captureFailed(let why) = failure { engine.attachError = "\(L("appshot.failed")): \(why)" }
+			}
+		}
+	}
+
+	private func toggleDictation() {
+		dictation.clearFailure()
+		dictation.toggle(draft: text, language: Loc.shared.lang, allowServer: dictationServer) { text = $0 }
 	}
 }
 
@@ -494,6 +640,10 @@ struct MessageView: View {
 	let line: ChatLine
 	let running: Bool
 	let decide: (Bool, ApprovalScope) -> Void
+	// Set for the last reply (ask it again) and the last question (edit it): see ChatEngine.canReplay.
+	var canRegenerate = false
+	var canEdit = false
+	@EnvironmentObject private var engine: ChatEngine
 
 	var body: some View {
 		if line.role == .user {
@@ -513,17 +663,24 @@ struct MessageView: View {
 						.padding(.horizontal, 14).padding(.vertical, 10)
 						.background(RoundedRectangle(cornerRadius: 18).fill(FB.primarySubtle))
 				}
+				if !line.text.isEmpty || canEdit {
+					HStack(spacing: 2) {
+						if !line.text.isEmpty { CopyIconButton(text: line.text) }
+						if canEdit {
+							FBIconButton(icon: "edit", variant: .ghost, size: .small, tooltip: L("msg.edit")) { engine.editLast() }
+						}
+					}
+				}
 			}
 			.padding(.leading, 120)
 			.frame(maxWidth: .infinity, alignment: .trailing)
 		} else {
 			VStack(alignment: .leading, spacing: 10) {
 				if !line.text.isEmpty {
-					Text(markdown(line.text)).font(.system(size: 14)).foregroundStyle(FB.text)
-						.textSelection(.enabled)
+					RichText(text: line.text)
 						.frame(maxWidth: .infinity, alignment: .leading)
 					HStack(spacing: 8) {
-						MessageActions(text: line.text)
+						MessageActions(text: line.text, canRegenerate: canRegenerate)
 						if AppSettings.shared.showTokens, line.inputTokens + line.outputTokens > 0 {
 							Text("↑ \(line.inputTokens)  ↓ \(line.outputTokens) \(L("usage.tokens"))")
 								.font(.fbCaption).foregroundStyle(FB.textTertiary)
@@ -546,15 +703,12 @@ struct MessageView: View {
 		}
 	}
 
-	private func markdown(_ text: String) -> AttributedString {
-		let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-		return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
-	}
 }
 
 // Under each reply: copy to the clipboard, and read aloud with the macOS voice (on this Mac, no network).
 struct MessageActions: View {
 	let text: String
+	var canRegenerate = false
 	@EnvironmentObject private var engine: ChatEngine
 	@State private var copied = false
 	@StateObject private var speaker = Speaker()
@@ -570,6 +724,9 @@ struct MessageActions: View {
 			}
 			FBIconButton(icon: speaker.speaking ? "stop" : "volume", variant: .ghost, size: .small,
 			             tooltip: speaker.speaking ? L("msg.stopReading") : L("msg.read")) { speaker.toggle(text) }
+			if canRegenerate {
+				FBIconButton(icon: "refresh", variant: .ghost, size: .small, tooltip: L("msg.regenerate")) { engine.regenerate() }
+			}
 		}
 	}
 }

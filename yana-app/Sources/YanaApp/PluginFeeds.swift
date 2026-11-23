@@ -34,6 +34,7 @@ enum FeedReader {
 			case .marketplace: return .success(try parseMarketplace(try await get(feed.url, allowedHosts), feed: feed))
 			case .awesomeList: return .success(parseAwesomeList(String(decoding: try await get(feed.url, allowedHosts), as: UTF8.self), feed: feed))
 			case .mcpRegistry: return .success(try await readRegistry(feed, allowedHosts, since: nil) { _ in })
+			case .cliHub: return .success(parseCliHub(try await get(feed.url, allowedHosts), feed: feed))
 			}
 		} catch {
 			return .failure(error)
@@ -53,6 +54,27 @@ enum FeedReader {
 
 	// MARK: Claude Code marketplace.json
 
+	// CLI-Hub entries (CliHubFeed): what the store shows, plus where the SKILL.md lives so it can be installed.
+	// `parts` carries the CLI's own install command for display only; it is never run.
+	static func parseCliHub(_ data: Data, feed: StoreFeed) -> [StoreItem] {
+		CliHubFeed.parse(data).map { entry in
+			var parts: [String] = []
+			if let command = entry.installCommand, !command.isEmpty { parts.append(command) }
+			if let requires = entry.requires, !requires.isEmpty { parts.append("requires: \(requires)") }
+			return StoreItem(id: "\(feed.id)#\(entry.id)", feed: feed.id, feedLabel: feed.label, kind: .cliHub,
+			                 name: entry.displayName, summary: entry.summary, category: entry.category,
+			                 author: entry.author, link: entry.homepage.flatMap(URL.init(string:)),
+			                 version: entry.version, pin: nil, parts: parts, repo: entry.repo, repoPath: entry.skillDir)
+		}
+	}
+
+	// "https://raw.githubusercontent.com/<owner>/<repo>/<ref>/..." -> "https://github.com/<owner>/<repo>"; nil for any other host.
+	static func marketplaceRepo(_ feedURL: URL) -> String? {
+		guard feedURL.host == "raw.githubusercontent.com" else { return nil }
+		let parts = feedURL.path.split(separator: "/").map(String.init)
+		return parts.count >= 2 ? "https://github.com/\(parts[0])/\(parts[1])" : nil
+	}
+
 	static func parseMarketplace(_ data: Data, feed: StoreFeed) throws -> [StoreItem] {
 		guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
 		      let plugins = json["plugins"] as? [[String: Any]] else { throw FetchError.format }
@@ -64,11 +86,19 @@ enum FeedReader {
 			if p["lspServers"] != nil { parts.append("LSP") }
 			if let url = source?["url"] as? String { parts.append(url) } else if let path = p["source"] as? String { parts.append(path) }
 			let link = (p["homepage"] as? String).flatMap(URL.init(string:)).flatMap { $0.scheme == "https" ? $0 : nil }
+			// Where the code is: a git url (with a pinned sha, maybe a folder), or a folder of the marketplace's own repository.
+			var repo = source?["url"] as? String
+			var repoPath = source?["path"] as? String
+			if repo == nil, let inRepo = p["source"] as? String, let own = marketplaceRepo(feed.url) {
+				repo = own
+				repoPath = inRepo
+			}
 			return StoreItem(id: "\(feed.id)#\(name)", feed: feed.id, feedLabel: feed.label, kind: .marketplace,
 			                 name: (p["displayName"] as? String) ?? prettify(name),
 			                 summary: (p["description"] as? String) ?? "", category: (p["category"] as? String) ?? "other",
 			                 author: (p["author"] as? [String: Any])?["name"] as? String, link: link,
-			                 version: p["version"] as? String, pin: source?["sha"] as? String, parts: parts)
+			                 version: p["version"] as? String, pin: source?["sha"] as? String, parts: parts,
+			                 repo: repo, repoPath: repoPath)
 		}
 	}
 

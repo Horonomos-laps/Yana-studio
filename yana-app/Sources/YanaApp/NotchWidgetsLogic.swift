@@ -1,0 +1,264 @@
+import AppKit
+import Foundation
+
+// The rules behind the notch's widgets, as plain functions and values so they can be tested without a screen or a
+// music player. The widget set (music, timers and a Pomodoro, to-do list, notes, clipboard history) follows the ideas
+// listed in CREDITS.md; the code is Yana's.
+
+// MARK: Music
+
+struct NowPlaying: Equatable {
+	enum Source: String {
+		case spotify = "Spotify", music = "Music"
+		case chrome = "Google Chrome", brave = "Brave Browser", edge = "Microsoft Edge", arc = "Arc", safari = "Safari"
+		case system = "System"   // read from the system's now-playing through the bundled adapter: any app
+		var isBrowser: Bool { [.chrome, .brave, .edge, .arc, .safari].contains(self) }
+		// Apps are named by bundle identifier in scripts and looked up among the running apps: naming an app that is not
+		// installed makes macOS show a "Choose Application" box asking where it is.
+		var bundleID: String {
+			switch self {
+			case .spotify: "com.spotify.client"
+			case .music: "com.apple.Music"
+			case .chrome: "com.google.Chrome"
+			case .brave: "com.brave.Browser"
+			case .edge: "com.microsoft.edgemac"
+			case .arc: "company.thebrowser.Browser"
+			case .safari: "com.apple.Safari"
+			case .system: ""
+			}
+		}
+		// The players asked one by one through AppleScript (the fallback when the adapter does not work).
+		static let all: [Source] = [.spotify, .music, .chrome, .brave, .edge, .arc, .safari]
+	}
+	let source: Source
+	let title: String
+	let artist: String
+	let playing: Bool
+	let duration: Double   // seconds, 0 when unknown
+	let position: Double   // seconds
+	let artworkURL: URL?
+	var artworkData: Data? = nil
+	var appBundleID: String? = nil
+
+	static let separator = "\u{1F}"   // a character no title contains, so a "|" in a song name cannot split it
+
+	var progress: Double { duration > 0 ? min(1, max(0, position / duration)) : 0 }
+
+	// One line from the player script: state, title, artist, duration, position, artwork address.
+	// Spotify reports duration in milliseconds; Music in seconds.
+	static func parse(_ raw: String, source: Source) -> NowPlaying? {
+		let parts = raw.trimmingCharacters(in: .newlines).components(separatedBy: separator)
+		guard parts.count >= 5 else { return nil }
+		let title = parts[1].trimmingCharacters(in: .whitespaces)
+		guard !title.isEmpty, !parts[0].lowercased().contains("stopped") else { return nil }
+		let rawDuration = Double(parts[3].replacingOccurrences(of: ",", with: ".")) ?? 0
+		let position = Double(parts[4].replacingOccurrences(of: ",", with: ".")) ?? 0
+		let artwork = parts.count > 5 ? URL(string: parts[5].trimmingCharacters(in: .whitespaces)) : nil
+		return NowPlaying(source: source, title: title, artist: parts[2].trimmingCharacters(in: .whitespaces),
+		                  playing: parts[0].lowercased().contains("playing"),
+		                  duration: source == .spotify ? rawDuration / 1000 : rawDuration, position: max(0, position),
+		                  artworkURL: artwork?.scheme?.hasPrefix("http") == true ? artwork : nil)
+	}
+
+	// When both players answer, the one that is playing wins; otherwise the first that answered.
+	static func choose(_ candidates: [NowPlaying]) -> NowPlaying? { candidates.first(where: \.playing) ?? candidates.first }
+}
+
+func clockText(_ seconds: TimeInterval) -> String {
+	let total = max(0, Int(seconds.rounded(.up)))
+	let h = total / 3600, m = total % 3600 / 60, s = total % 60
+	return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+}
+
+// MARK: Clipboard history
+
+struct ClipItem: Codable, Equatable, Identifiable {
+	var id = UUID()
+	var text: String
+	var date: Date
+	var pinned = false
+	var app: String? = nil      // the app that was in front when it was copied
+
+	init(id: UUID = UUID(), text: String, date: Date, pinned: Bool = false, app: String? = nil) {
+		self.id = id; self.text = text; self.date = date; self.pinned = pinned; self.app = app
+	}
+
+	// Older saved lists have no pinned or app: they read as unpinned and unknown.
+	init(from decoder: Decoder) throws {
+		let c = try decoder.container(keyedBy: CodingKeys.self)
+		id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+		text = try c.decode(String.self, forKey: .text)
+		date = try c.decode(Date.self, forKey: .date)
+		pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
+		app = try c.decodeIfPresent(String.self, forKey: .app)
+	}
+}
+
+enum ClipboardHistory {
+	static let limit = 30           // unpinned items kept; pinned ones are never dropped
+	static let maxChars = 10_000    // a giant paste would only slow the panel down
+
+	// The newest copy goes first; copying the same text again moves it up instead of adding a duplicate, and keeps its pin.
+	static func insert(_ items: [ClipItem], text: String, app: String? = nil, now: Date = Date()) -> [ClipItem] {
+		guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= maxChars else { return items }
+		let old = items.first { $0.text == text }
+		var out = items.filter { $0.text != text }
+		out.insert(ClipItem(text: text, date: now, pinned: old?.pinned ?? false, app: app ?? old?.app), at: 0)
+		return trim(out)
+	}
+
+	// Keeps every pinned item and the newest `limit` of the others, in their order.
+	static func trim(_ items: [ClipItem]) -> [ClipItem] {
+		var unpinned = 0
+		return items.filter { item in
+			if item.pinned { return true }
+			unpinned += 1
+			return unpinned <= limit
+		}
+	}
+
+	static func togglePin(_ items: [ClipItem], id: UUID) -> [ClipItem] {
+		trim(items.map { $0.id == id ? ClipItem(id: $0.id, text: $0.text, date: $0.date, pinned: !$0.pinned, app: $0.app) : $0 })
+	}
+
+	// What the list shows: all, or only the pinned; then those that contain the search words (case and accents ignored).
+	static func filter(_ items: [ClipItem], pinnedOnly: Bool, query: String) -> [ClipItem] {
+		let words = query.split(whereSeparator: \.isWhitespace).map(String.init)
+		return items.filter { item in
+			(!pinnedOnly || item.pinned) && words.allSatisfy {
+				item.text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+					|| item.app?.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+			}
+		}
+	}
+
+	static func remove(_ items: [ClipItem], id: UUID) -> [ClipItem] { items.filter { $0.id != id } }
+
+	// Password managers mark what they put on the pasteboard; that must never be kept.
+	static let skippedTypes: Set<String> = ["org.nspasteboard.ConcealedType", "org.nspasteboard.TransientType",
+	                                        "org.nspasteboard.AutoGeneratedType", "com.agilebits.onepassword"]
+	static func shouldKeep(types: [String]) -> Bool { skippedTypes.isDisjoint(with: types) }
+}
+
+// MARK: To-do
+
+struct TodoItem: Codable, Equatable, Identifiable {
+	var id = UUID()
+	var title: String
+	var done = false
+}
+
+enum TodoList {
+	static let maxTitle = 200
+
+	static func add(_ items: [TodoItem], title: String) -> [TodoItem] {
+		let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !clean.isEmpty else { return items }
+		return items + [TodoItem(title: String(clean.prefix(maxTitle)))]
+	}
+
+	static func toggle(_ items: [TodoItem], id: UUID) -> [TodoItem] {
+		items.map { $0.id == id ? TodoItem(id: $0.id, title: $0.title, done: !$0.done) : $0 }
+	}
+
+	static func remove(_ items: [TodoItem], id: UUID) -> [TodoItem] { items.filter { $0.id != id } }
+	static func clearDone(_ items: [TodoItem]) -> [TodoItem] { items.filter { !$0.done } }
+	static func openCount(_ items: [TodoItem]) -> Int { items.filter { !$0.done }.count }
+}
+
+// MARK: Timers and Pomodoro
+
+struct CountdownTimer: Codable, Equatable, Identifiable {
+	var id = UUID()
+	var total: TimeInterval
+	var endsAt: Date
+	func remaining(now: Date) -> TimeInterval { max(0, endsAt.timeIntervalSince(now)) }
+	func isDone(now: Date) -> Bool { now >= endsAt }
+}
+
+struct Pomodoro: Codable, Equatable {
+	enum Phase: String, Codable { case focus, shortBreak, longBreak }
+
+	static let focusLength: TimeInterval = 25 * 60
+	static let shortLength: TimeInterval = 5 * 60
+	static let longLength: TimeInterval = 15 * 60
+	static let roundsBeforeLong = 4
+
+	var phase: Phase = .focus
+	var completedFocus = 0          // focus rounds finished today
+	var endsAt: Date?               // set while running
+	var pausedRemaining: TimeInterval?
+
+	var isRunning: Bool { endsAt != nil }
+	var length: TimeInterval {
+		switch phase {
+		case .focus: Self.focusLength
+		case .shortBreak: Self.shortLength
+		case .longBreak: Self.longLength
+		}
+	}
+
+	func remaining(now: Date) -> TimeInterval {
+		if let endsAt { return max(0, endsAt.timeIntervalSince(now)) }
+		return pausedRemaining ?? length
+	}
+
+	mutating func start(now: Date) {
+		endsAt = now.addingTimeInterval(pausedRemaining ?? length)
+		pausedRemaining = nil
+	}
+
+	mutating func pause(now: Date) {
+		pausedRemaining = remaining(now: now)
+		endsAt = nil
+	}
+
+	// Moves to the next phase and waits there for a start: focus, a short break, focus... and a long break after four.
+	mutating func advance() {
+		if phase == .focus {
+			completedFocus += 1
+			phase = completedFocus % Self.roundsBeforeLong == 0 ? .longBreak : .shortBreak
+		} else {
+			phase = .focus
+		}
+		endsAt = nil
+		pausedRemaining = nil
+	}
+
+	// True when the running phase ended at this moment (and the next phase is now waiting).
+	mutating func finishIfDue(now: Date) -> Bool {
+		guard let endsAt, now >= endsAt else { return false }
+		advance()
+		return true
+	}
+
+	mutating func reset() { self = Pomodoro() }
+}
+
+// The average color of a cover, lifted so it stays bright against the black pill: the equalizer bars take this color.
+enum ArtworkTint {
+	static let fallback: UInt32 = 0x34C759
+
+	// Average of the picture's pixels as 0xRRGGBB, with brightness raised to at least about 0.65 so it is visible.
+	static func average(_ data: Data?) -> UInt32 {
+		guard let data, let image = NSImage(data: data),
+		      let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1, pixelsHigh: 1, bitsPerSample: 8, samplesPerPixel: 4,
+		                                 hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 4, bitsPerPixel: 32),
+		      let context = NSGraphicsContext(bitmapImageRep: rep) else { return fallback }
+		NSGraphicsContext.saveGraphicsState()
+		NSGraphicsContext.current = context
+		context.imageInterpolation = .high
+		image.draw(in: NSRect(x: 0, y: 0, width: 1, height: 1), from: .zero, operation: .copy, fraction: 1)
+		NSGraphicsContext.restoreGraphicsState()
+		guard let color = rep.colorAt(x: 0, y: 0)?.usingColorSpace(.deviceRGB) else { return fallback }
+		return lift(r: Double(color.redComponent), g: Double(color.greenComponent), b: Double(color.blueComponent))
+	}
+
+	static func lift(r: Double, g: Double, b: Double, minimum: Double = 0.65) -> UInt32 {
+		let top = max(r, g, b)
+		guard top > 0.02 else { return fallback }
+		let k = top < minimum ? minimum / top : 1
+		func byte(_ v: Double) -> UInt32 { UInt32((min(1, v * k) * 255).rounded()) }
+		return byte(r) << 16 | byte(g) << 8 | byte(b)
+	}
+}
