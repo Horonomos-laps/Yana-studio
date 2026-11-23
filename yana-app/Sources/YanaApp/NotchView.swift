@@ -145,15 +145,16 @@ private struct EqualizerBars: View {
 // Older systems get the frosted material alone.
 struct NotchGlass: View {
 	let shape: NotchShape
-	static let opacity = 0.58   // dark enough to read white text on any desktop, clear enough to see the desktop through
+	static let topOpacity = 0.97      // black at the top, where it joins the camera housing
+	static let bottomOpacity = 0.45   // and clearer going down, so the desktop shows through the lower part
 
 	var body: some View {
 		// Dark see-through glass, drawn here because the system's blur and glass effect do not work in this borderless
-		// panel: a black tint with some transparency, a soft sheen from the top and a faint bright rim.
+		// panel: black at the top fading to a lighter tint at the bottom, with a faint rim that brightens downward.
 		ZStack {
-			shape.fill(Color.black.opacity(Self.opacity))
-			shape.fill(LinearGradient(colors: [Color.white.opacity(0.16), Color.white.opacity(0)], startPoint: .top, endPoint: .center))
-			shape.stroke(LinearGradient(colors: [Color.white.opacity(0.4), Color.white.opacity(0.06)], startPoint: .top, endPoint: .bottom),
+			shape.fill(LinearGradient(colors: [Color.black.opacity(Self.topOpacity), Color.black.opacity(Self.bottomOpacity)],
+			                          startPoint: .top, endPoint: .bottom))
+			shape.stroke(LinearGradient(colors: [Color.white.opacity(0), Color.white.opacity(0.35)], startPoint: .top, endPoint: .bottom),
 			             lineWidth: 1.5)
 		}
 	}
