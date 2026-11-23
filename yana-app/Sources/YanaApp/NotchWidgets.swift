@@ -185,28 +185,61 @@ struct NotesCard: View {
 
 struct ClipboardTab: View {
 	@ObservedObject private var store = ClipboardStore.shared
+	@State private var pinnedOnly = false
+	@State private var query = ""
+	@FocusState private var searching: Bool
+	let typing: (Bool) -> Void
+
 	var body: some View {
+		let shown = ClipboardHistory.filter(store.items, pinnedOnly: pinnedOnly, query: query)
 		VStack(alignment: .leading, spacing: 6) {
-			HStack {
-				Text(L("notch.clipboard")).font(.system(size: 10, weight: .semibold)).foregroundStyle(dim).textCase(.uppercase)
+			HStack(spacing: 8) {
+				filterButton(L("notch.clipAll"), on: !pinnedOnly) { pinnedOnly = false }
+				filterButton(L("notch.clipPinned"), on: pinnedOnly) { pinnedOnly = true }
+				HStack(spacing: 4) {
+					Image(systemName: "magnifyingglass").font(.system(size: 10)).foregroundStyle(dim)
+					TextField(L("notch.clipSearch"), text: $query).textFieldStyle(.plain).font(.system(size: 11)).foregroundStyle(.primary)
+						.focused($searching).onChange(of: searching) { _, now in typing(now) }
+				}
+				.padding(.horizontal, 8).padding(.vertical, 3).background(Color.white.opacity(0.09), in: Capsule())
+				.frame(maxWidth: 200)
 				Spacer()
 				if !store.items.isEmpty { Button(L("notch.clear"), action: store.clear).buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(dim) }
 			}
-			if store.items.isEmpty {
-				Text(L("notch.clipboardEmpty")).font(.system(size: 11)).foregroundStyle(dim)
+			if shown.isEmpty {
+				Text(store.items.isEmpty ? L("notch.clipboardEmpty") : L("notch.clipNone")).font(.system(size: 11)).foregroundStyle(dim)
 			}
 			ScrollView(.horizontal, showsIndicators: false) {
-				HStack(spacing: 8) {
-					ForEach(store.items) { item in
-						Button { store.copy(item) } label: {
-							Text(item.text).font(.system(size: 11)).foregroundStyle(.primary).lineLimit(5).multilineTextAlignment(.leading)
-								.frame(width: 150, height: 90, alignment: .topLeading).padding(8)
-								.background(cardFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-						}.buttonStyle(.plain)
-					}
-				}
+				HStack(spacing: 8) { ForEach(shown) { card($0) } }
 			}
 		}
+	}
+
+	private func filterButton(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
+		Button(action: action) {
+			Text(title).font(.system(size: 10, weight: .semibold)).foregroundStyle(on ? Color.primary : dim)
+				.padding(.horizontal, 8).padding(.vertical, 3).background(on ? Color.white.opacity(0.16) : Color.clear, in: Capsule())
+		}.buttonStyle(.plain)
+	}
+
+	// A card: the text, the app it came from, and a pin and a delete button. Pressing the card copies it back.
+	private func card(_ item: ClipItem) -> some View {
+		VStack(alignment: .leading, spacing: 4) {
+			Button { store.copy(item) } label: {
+				Text(item.text).font(.system(size: 11)).foregroundStyle(.primary).lineLimit(4).multilineTextAlignment(.leading)
+					.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+			}.buttonStyle(.plain)
+			HStack(spacing: 8) {
+				Text(item.app ?? "").font(.system(size: 9)).foregroundStyle(dim).lineLimit(1)
+				Spacer(minLength: 0)
+				Button { store.togglePin(item) } label: { Image(systemName: item.pinned ? "pin.fill" : "pin") }.buttonStyle(.plain)
+					.foregroundStyle(item.pinned ? Color.yellow : dim)
+				Button { store.remove(item) } label: { Image(systemName: "xmark") }.buttonStyle(.plain).foregroundStyle(dim)
+			}
+			.font(.system(size: 9))
+		}
+		.padding(8).frame(width: 150, height: 96)
+		.background(cardFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 	}
 }
 

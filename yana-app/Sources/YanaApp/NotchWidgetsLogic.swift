@@ -76,19 +76,63 @@ struct ClipItem: Codable, Equatable, Identifiable {
 	var id = UUID()
 	var text: String
 	var date: Date
+	var pinned = false
+	var app: String? = nil      // the app that was in front when it was copied
+
+	init(id: UUID = UUID(), text: String, date: Date, pinned: Bool = false, app: String? = nil) {
+		self.id = id; self.text = text; self.date = date; self.pinned = pinned; self.app = app
+	}
+
+	// Older saved lists have no pinned or app: they read as unpinned and unknown.
+	init(from decoder: Decoder) throws {
+		let c = try decoder.container(keyedBy: CodingKeys.self)
+		id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+		text = try c.decode(String.self, forKey: .text)
+		date = try c.decode(Date.self, forKey: .date)
+		pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
+		app = try c.decodeIfPresent(String.self, forKey: .app)
+	}
 }
 
 enum ClipboardHistory {
-	static let limit = 30
-	static let maxChars = 10_000   // a giant paste would only slow the panel down
+	static let limit = 30           // unpinned items kept; pinned ones are never dropped
+	static let maxChars = 10_000    // a giant paste would only slow the panel down
 
-	// The newest copy goes first; copying the same text again moves it up instead of adding a duplicate.
-	static func insert(_ items: [ClipItem], text: String, now: Date = Date()) -> [ClipItem] {
+	// The newest copy goes first; copying the same text again moves it up instead of adding a duplicate, and keeps its pin.
+	static func insert(_ items: [ClipItem], text: String, app: String? = nil, now: Date = Date()) -> [ClipItem] {
 		guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= maxChars else { return items }
+		let old = items.first { $0.text == text }
 		var out = items.filter { $0.text != text }
-		out.insert(ClipItem(text: text, date: now), at: 0)
-		return Array(out.prefix(limit))
+		out.insert(ClipItem(text: text, date: now, pinned: old?.pinned ?? false, app: app ?? old?.app), at: 0)
+		return trim(out)
 	}
+
+	// Keeps every pinned item and the newest `limit` of the others, in their order.
+	static func trim(_ items: [ClipItem]) -> [ClipItem] {
+		var unpinned = 0
+		return items.filter { item in
+			if item.pinned { return true }
+			unpinned += 1
+			return unpinned <= limit
+		}
+	}
+
+	static func togglePin(_ items: [ClipItem], id: UUID) -> [ClipItem] {
+		trim(items.map { $0.id == id ? ClipItem(id: $0.id, text: $0.text, date: $0.date, pinned: !$0.pinned, app: $0.app) : $0 })
+	}
+
+	// What the list shows: all, or only the pinned; then those that contain the search words (case and accents ignored).
+	static func filter(_ items: [ClipItem], pinnedOnly: Bool, query: String) -> [ClipItem] {
+		let words = query.split(whereSeparator: \.isWhitespace).map(String.init)
+		return items.filter { item in
+			(!pinnedOnly || item.pinned) && words.allSatisfy {
+				item.text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+					|| item.app?.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+			}
+		}
+	}
+
+	static func remove(_ items: [ClipItem], id: UUID) -> [ClipItem] { items.filter { $0.id != id } }
 
 	// Password managers mark what they put on the pasteboard; that must never be kept.
 	static let skippedTypes: Set<String> = ["org.nspasteboard.ConcealedType", "org.nspasteboard.TransientType",

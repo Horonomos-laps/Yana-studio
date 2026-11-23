@@ -84,7 +84,7 @@ private struct OpenPanel: View {
 						TodoCard(typing: { model.typing = $0 }); NotesCard(typing: { model.typing = $0 })
 					}
 				case .clipboard:
-					ClipboardTab()
+					ClipboardTab(typing: { model.typing = $0 })
 				}
 			}
 			.frame(maxHeight: .infinity)

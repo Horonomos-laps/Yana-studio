@@ -291,7 +291,7 @@ final class ClipboardStore: ObservableObject {
 		lastCount = board.changeCount
 		let types = (board.types ?? []).map(\.rawValue)
 		guard ClipboardHistory.shouldKeep(types: types), let text = board.string(forType: .string) else { return }
-		items = ClipboardHistory.insert(items, text: text)
+		items = ClipboardHistory.insert(items, text: text, app: NSWorkspace.shared.frontmostApplication?.localizedName)
 		save(items, key: Self.key)
 	}
 
@@ -304,5 +304,8 @@ final class ClipboardStore: ObservableObject {
 		save(items, key: Self.key)
 	}
 
-	func clear() { items = []; save(items, key: Self.key) }
+	// Clearing keeps what is pinned.
+	func clear() { items = items.filter(\.pinned); save(items, key: Self.key) }
+	func togglePin(_ item: ClipItem) { items = ClipboardHistory.togglePin(items, id: item.id); save(items, key: Self.key) }
+	func remove(_ item: ClipItem) { items = ClipboardHistory.remove(items, id: item.id); save(items, key: Self.key) }
 }
