@@ -35,12 +35,12 @@ final class MusicStore: ObservableObject {
 
 	// One script per player. It says nothing when the app is not running, so asking never launches it.
 	private static func script(for source: NowPlaying.Source) -> String {
-		if source.isBrowser { return BrowserMusic.script(app: source.rawValue, js: BrowserMusic.readJS) }
+		if source.isBrowser { return BrowserMusic.script(app: source.rawValue, bundle: source.bundleID, js: BrowserMusic.readJS) }
 		let sep = "(character id 31)"
 		let tail = source == .spotify ? "& \(sep) & (artwork url of current track)" : ""
 		return """
-		if application "\(source.rawValue)" is running then
-			tell application "\(source.rawValue)"
+		if application id "\(source.bundleID)" is running then
+			tell application id "\(source.bundleID)"
 				if player state is stopped then return ""
 				return (player state as string) & \(sep) & (name of current track) & \(sep) & (artist of current track) & \(sep) & (duration of current track) & \(sep) & (player position) \(tail)
 			end tell
@@ -54,7 +54,10 @@ final class MusicStore: ObservableObject {
 			var found: [NowPlaying] = []
 			var refused = false
 			var problem: BrowserMusic.Problem?
-			for source in NowPlaying.Source.all {
+			// Only apps that are running are asked, so an app that is not installed never triggers macOS's
+			// "Choose Application" box.
+			let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+			for source in NowPlaying.Source.all where running.contains(source.bundleID) {
 				var error: NSDictionary?
 				let result = NSAppleScript(source: Self.script(for: source))?.executeAndReturnError(&error)
 				if let code = error?[NSAppleScript.errorNumber] as? Int {
@@ -78,11 +81,11 @@ final class MusicStore: ObservableObject {
 		queue.async { [weak self] in
 			var error: NSDictionary?
 			if source.isBrowser {
-				NSAppleScript(source: BrowserMusic.script(app: source.rawValue, js: BrowserMusic.js(for: command)))?.executeAndReturnError(&error)
+				NSAppleScript(source: BrowserMusic.script(app: source.rawValue, bundle: source.bundleID, js: BrowserMusic.js(for: command)))?.executeAndReturnError(&error)
 			} else {
 				let word: String
 				switch command { case .playPause: word = "playpause"; case .next: word = "next track"; case .previous: word = "previous track" }
-				NSAppleScript(source: "tell application \"\(source.rawValue)\" to \(word)")?.executeAndReturnError(&error)
+				NSAppleScript(source: "tell application id \"\(source.bundleID)\" to \(word)")?.executeAndReturnError(&error)
 			}
 			Task { @MainActor in self?.refresh() }
 		}

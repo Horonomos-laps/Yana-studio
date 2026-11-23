@@ -3,8 +3,8 @@ import XCTest
 
 final class BrowserMusicTests: XCTestCase {
 	func testTheReadScriptNamesTheAppIsSafeInsideAnAppleScriptStringAndNeverLaunchesTheApp() {
-		let s = BrowserMusic.script(app: "Google Chrome", js: BrowserMusic.readJS)
-		XCTAssertTrue(s.contains("application \"Google Chrome\" is running"))
+		let s = BrowserMusic.script(app: "Google Chrome", bundle: "com.google.Chrome", js: BrowserMusic.readJS)
+		XCTAssertTrue(s.contains("application id \"com.google.Chrome\" is running"), "named by bundle id, never by name")
 		XCTAssertTrue(s.contains("execute t javascript"))
 		XCTAssertFalse(BrowserMusic.readJS.contains("\""), "a double quote would end the AppleScript string")
 		XCTAssertFalse(BrowserMusic.readJS.contains("\\"), "a backslash would be read as an escape")
@@ -14,12 +14,12 @@ final class BrowserMusicTests: XCTestCase {
 	}
 
 	func testSafariUsesItsOwnJavaScriptCall() {
-		let s = BrowserMusic.script(app: "Safari", js: "1")
+		let s = BrowserMusic.script(app: "Safari", bundle: "com.apple.Safari", js: "1")
 		XCTAssertTrue(s.contains("do JavaScript \"1\" in t")); XCTAssertFalse(s.contains("execute t javascript"))
 	}
 
 	func testOnlyYouTubePagesAreRead() {
-		let s = BrowserMusic.script(app: "Arc", js: "1")
+		let s = BrowserMusic.script(app: "Arc", bundle: "company.thebrowser.Browser", js: "1")
 		XCTAssertTrue(s.contains("youtube.com/watch")); XCTAssertTrue(s.contains("music.youtube.com"))
 	}
 
@@ -41,5 +41,15 @@ final class BrowserMusicTests: XCTestCase {
 		let bad = ["paused", "T", "C", "NaN", "0", "javascript:alert(1)"].joined(separator: sep)
 		XCTAssertNil(NowPlaying.parse(bad, source: .safari)?.artworkURL)
 		XCTAssertFalse(NowPlaying.Source.spotify.isBrowser); XCTAssertEqual(NowPlaying.Source.all.count, 7)
+	}
+
+	func testEveryPlayerHasADistinctBundleIdentifierAndScriptsNeverNameAnApp() {
+		let ids = NowPlaying.Source.all.map(\.bundleID)
+		XCTAssertEqual(Set(ids).count, ids.count)
+		for id in ids { XCTAssertTrue(id.contains(".")) }
+		for source in NowPlaying.Source.all where source.isBrowser {
+			let s = BrowserMusic.script(app: source.rawValue, bundle: source.bundleID, js: "1")
+			XCTAssertFalse(s.contains("application \"\(source.rawValue)\""), "a name makes macOS ask where the app is")
+		}
 	}
 }

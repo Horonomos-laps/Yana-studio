@@ -38,11 +38,11 @@ enum BrowserMusic {
 
 	// Runs a JavaScript line in the first YouTube tab of the app and returns its text. Says nothing when the app is not
 	// running, so asking never launches it.
-	static func script(app: String, js: String) -> String {
+	static func script(app: String, bundle: String, js: String) -> String {
 		let run = app == safari ? "do JavaScript \"\(js)\" in t" : "execute t javascript \"\(js)\""
 		return """
-		if application "\(app)" is running then
-			tell application "\(app)"
+		if application id "\(bundle)" is running then
+			tell application id "\(bundle)"
 				repeat with w in windows
 					repeat with t in tabs of w
 						set u to URL of t

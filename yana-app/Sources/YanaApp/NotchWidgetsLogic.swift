@@ -11,6 +11,19 @@ struct NowPlaying: Equatable {
 		case spotify = "Spotify", music = "Music"
 		case chrome = "Google Chrome", brave = "Brave Browser", edge = "Microsoft Edge", arc = "Arc", safari = "Safari"
 		var isBrowser: Bool { self != .spotify && self != .music }
+		// Apps are named by bundle identifier in scripts and looked up among the running apps: naming an app that is not
+		// installed makes macOS show a "Choose Application" box asking where it is.
+		var bundleID: String {
+			switch self {
+			case .spotify: "com.spotify.client"
+			case .music: "com.apple.Music"
+			case .chrome: "com.google.Chrome"
+			case .brave: "com.brave.Browser"
+			case .edge: "com.microsoft.edgemac"
+			case .arc: "company.thebrowser.Browser"
+			case .safari: "com.apple.Safari"
+			}
+		}
 		static let all: [Source] = [.spotify, .music, .chrome, .brave, .edge, .arc, .safari]
 	}
 	let source: Source
