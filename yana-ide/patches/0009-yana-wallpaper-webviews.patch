@@ -1,0 +1,52 @@
+diff --git a/src/vs/workbench/contrib/webview/browser/themeing.ts b/src/vs/workbench/contrib/webview/browser/themeing.ts
+index fd4af39d..5c637d0f 100644
+--- a/src/vs/workbench/contrib/webview/browser/themeing.ts
++++ b/src/vs/workbench/contrib/webview/browser/themeing.ts
+@@ -14,6 +14,7 @@ import { getSizeRegistry, sizeValueToCss } from '../../../../platform/theme/comm
+ import { ColorScheme } from '../../../../platform/theme/common/theme.js';
+ import { IWorkbenchColorTheme, IWorkbenchThemeService } from '../../../services/themes/common/workbenchThemeService.js';
+ import { WebviewStyles } from './webview.js';
++import { resolveWallpaper, wallpaperColors } from '../../yanaWallpaper/browser/palette.js';
+ 
+ interface WebviewThemeData {
+ 	readonly activeTheme: string;
+@@ -39,7 +40,7 @@ export class WebviewThemeDataProvider extends Disposable {
+ 			this._reset();
+ 		}));
+ 
+-		const webviewConfigurationKeys = ['editor.fontFamily', 'editor.fontWeight', 'editor.fontSize', 'editor.fontLigatures', 'accessibility.underlineLinks'];
++		const webviewConfigurationKeys = ['editor.fontFamily', 'editor.fontWeight', 'editor.fontSize', 'editor.fontLigatures', 'accessibility.underlineLinks', 'yana.wallpaper'];
+ 		this._register(this._configurationService.onDidChangeConfiguration(e => {
+ 			if (webviewConfigurationKeys.some(key => e.affectsConfiguration(key))) {
+ 				this._reset();
+@@ -89,6 +90,7 @@ export class WebviewThemeDataProvider extends Disposable {
+ 				...exportedColors,
+ 				...exportedSizes,
+ 				'vscode-editor-font-feature-settings': editorFontLigatures,
++				...this._yanaWallpaperStyles(theme),
+ 			};
+ 
+ 			const activeTheme = ApiThemeClassName.fromTheme(theme);
+@@ -98,6 +100,22 @@ export class WebviewThemeDataProvider extends Disposable {
+ 		return this._cachedWebViewThemeData;
+ 	}
+ 
++	/** Yana: khi hình nền bật, nền trang trong webview Yana trong suốt để cảnh liền một lớp. */
++	private _yanaWallpaperStyles(theme: IWorkbenchColorTheme): Record<string, string> {
++		const wallpaper = this._configurationService.getValue<string>('yana.wallpaper.theme');
++		const highContrast = theme.type === ColorScheme.HIGH_CONTRAST_DARK || theme.type === ColorScheme.HIGH_CONTRAST_LIGHT;
++		if (wallpaper === 'off' || highContrast) {
++			return {};
++		}
++		// Khung thẻ đặc hơn nền trang, và đi theo cùng thanh "độ hiện" của người dùng.
++		const visibility = Math.min(80, Math.max(10, this._configurationService.getValue<number>('yana.wallpaper.visibility') ?? 35));
++		const card = Math.round((100 - visibility) * 0.7);
++		const scene = resolveWallpaper(wallpaper ?? 'auto', theme.type);
++		const recolor = this._configurationService.getValue<boolean>('yana.wallpaper.recolor') !== false;
++		const colours = scene && recolor ? wallpaperColors(scene, theme.type) : {};
++		return { ...colours, 'vscode-yana-wallpaper-body': '0%', 'vscode-yana-wallpaper-card': card + '%' };
++	}
++
+ 	private _reset() {
+ 		this._cachedWebViewThemeData = undefined;
+ 		this._onThemeDataChanged.fire();

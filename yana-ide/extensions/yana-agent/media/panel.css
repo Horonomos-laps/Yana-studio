@@ -754,3 +754,15 @@ body.vscode-light .send-btn.primary:hover {
 .queue-btn:hover:not(:disabled) { background: var(--y-container-high); color: var(--y-text); }
 .queue-btn:disabled { opacity: 0.35; cursor: default; }
 .queue-btn:focus-visible { outline: 2px solid var(--y-primary); outline-offset: 1px; }
+
+/* Hình nền Yana: workbench đặt biến này về 0% khi hình nền bật, nên nền trang trong suốt; tắt thì giữ như cũ. */
+body, body.vscode-light { background-color: color-mix(in srgb, var(--y-surface) var(--vscode-yana-wallpaper-body, 100%), transparent); }
+.header, body.vscode-light .header { background-color: color-mix(in srgb, var(--y-base) var(--vscode-yana-wallpaper-body, 100%), transparent); }
+.model-row, .mode-row, .context-row { background-color: color-mix(in srgb, var(--y-surface) var(--vscode-yana-wallpaper-body, 100%), transparent); }
+.composer, body.vscode-light .composer { background-color: color-mix(in srgb, var(--y-surface) var(--vscode-yana-wallpaper-body, 100%), transparent); }
+
+/* Khi hình nền bật, khung thẻ là lớp kính để cảnh lộ qua. Tắt thì các luật trong khối này không áp dụng. */
+@container style(--vscode-yana-wallpaper-body: 0%) {
+	html body[class] .card { background: color-mix(in srgb, var(--y-panel) var(--vscode-yana-wallpaper-card, 100%), transparent); }
+	html body[class] .composer-box { background: color-mix(in srgb, var(--y-base) var(--vscode-yana-wallpaper-card, 100%), transparent); }
+}

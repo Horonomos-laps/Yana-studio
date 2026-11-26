@@ -50,3 +50,6 @@ td:first-child { min-width: 150px; }
 
 .to-top { margin-top: 40px; padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); min-height: 36px; }
 .to-top:hover { border-color: var(--accent); }
+
+/* Hình nền Yana: workbench đặt biến này về 0% khi hình nền bật, nên nền trang trong suốt; tắt thì giữ như cũ. */
+body { background-color: color-mix(in srgb, var(--bg) var(--vscode-yana-wallpaper-body, 100%), transparent); }

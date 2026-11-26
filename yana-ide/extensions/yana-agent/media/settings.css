@@ -321,3 +321,24 @@ th { color: var(--y-muted); font-weight: 600; font-size: 12px; }
 		padding: 20px 16px 40px;
 	}
 }
+
+.wallpaper-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+.wallpaper-tile { display: grid; gap: 6px; padding: 6px; background: var(--y-inner); border: 1px solid var(--y-border); border-radius: 10px; color: var(--y-strong); cursor: pointer; text-align: left; font: inherit; font-size: 12px; }
+.wallpaper-tile:hover { background: var(--y-higher); }
+.wallpaper-tile.active { border-color: var(--y-primary); box-shadow: 0 0 0 1px var(--y-primary); }
+.wallpaper-swatch { display: block; height: 56px; border-radius: 6px; }
+.wallpaper-search, .wallpaper-select { background: var(--y-inner); border: 1px solid var(--y-border-strong); border-radius: 8px; color: var(--y-strong); min-height: 30px; padding: 0 10px; font: inherit; }
+
+/* Hình nền Yana: workbench đặt biến này về 0% khi hình nền bật, nên nền trang trong suốt; tắt thì giữ như cũ. */
+body { background-color: color-mix(in srgb, var(--y-bg) var(--vscode-yana-wallpaper-body, 100%), transparent); }
+.sidebar { background-color: color-mix(in srgb, var(--y-card) var(--vscode-yana-wallpaper-body, 100%), transparent); }
+
+/* Khi hình nền bật, khung thẻ là lớp kính để cảnh lộ qua. Tắt thì các luật trong khối này không áp dụng. */
+@container style(--vscode-yana-wallpaper-body: 0%) {
+	html body[class] .card, html body[class] .quota-card { background: color-mix(in srgb, var(--y-card) var(--vscode-yana-wallpaper-card, 100%), transparent); }
+	html body[class] .box, html body[class] .notice, html body[class] .wallpaper-tile { background: color-mix(in srgb, var(--y-inner) var(--vscode-yana-wallpaper-card, 100%), transparent); }
+}
+
+.wallpaper-swatch.wallpaper-plain-light { background: #ffffff; border: 1px solid #d0d0d7; }
+.wallpaper-swatch.wallpaper-plain-dark { background: #12151c; border: 1px solid #30363d; }
+.wallpaper-preview { display: block; width: 100%; aspect-ratio: 8 / 5; height: auto; border-radius: 6px; }

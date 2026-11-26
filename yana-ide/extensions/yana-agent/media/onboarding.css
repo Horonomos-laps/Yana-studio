@@ -490,3 +490,41 @@ body {
 	background: linear-gradient(135deg, #56d364, #3fb950);
 	box-shadow: 0 0 20px rgba(63, 185, 80, 0.4);
 }
+
+/* Hình nền Yana: workbench đặt biến này về 0% khi hình nền bật, nên nền trang trong suốt; tắt thì giữ như cũ. */
+body { background-color: color-mix(in srgb, var(--bg) var(--vscode-yana-wallpaper-body, 100%), transparent); }
+
+/* Theme sáng: khung giới thiệu trước đây chỉ có màu tối. */
+body.vscode-light {
+	--bg: #f5f5f7;
+	--card-bg: #ffffff;
+	--card-border: #e0e0e5;
+	--card-hover: #ececef;
+	--accent: #2563eb;
+	--accent-glow: rgba(37, 99, 235, 0.12);
+	--accent-rgb: 37, 99, 235;
+	--text: #1d1d1f;
+	--text-muted: #55555c;
+	--success: #1a7f37;
+	--warning: #9a6700;
+	--danger: #cf222e;
+}
+body.vscode-light #app { box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14); }
+body.vscode-light .wizard-header, body.vscode-light .stepper { background: transparent; }
+body.vscode-light .skip-btn:hover { background: rgba(0, 0, 0, 0.05); }
+body.vscode-light .step-indicator.active .step-circle, body.vscode-light .step-indicator.completed .step-circle { color: #ffffff; }
+
+/* Khi hình nền bật, khung và thẻ là lớp kính để cảnh lộ qua. */
+@container style(--vscode-yana-wallpaper-body: 0%) {
+	html body[class] #app { background: color-mix(in srgb, var(--card-bg) var(--vscode-yana-wallpaper-card, 100%), transparent); }
+	html body[class] .wizard-header, html body[class] .stepper { background: transparent; }
+	html body[class] .option-card:not(.selected), html body[class] .lang-btn:not(.active), html body[class] .highlight-item, html body[class] .action-card { background: color-mix(in srgb, var(--bg) var(--vscode-yana-wallpaper-card, 100%), transparent); }
+}
+
+/* Chân khung và nút: màu viết cứng cho theme tối nên cần bản sáng riêng. */
+body.vscode-light .wizard-footer { background: transparent; }
+body.vscode-light .next-btn { color: #ffffff; }
+body.vscode-light .next-btn:hover { background: #1d4ed8; }
+@container style(--vscode-yana-wallpaper-body: 0%) {
+	html body[class] .wizard-footer { background: transparent; }
+}

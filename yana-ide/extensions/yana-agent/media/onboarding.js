@@ -5,6 +5,7 @@
 	const app = document.getElementById('app');
 	const emblemUri = document.body.dataset.emblem || '';
 	const logoUri = document.body.dataset.logo || '';
+	const studioVersion = document.body.dataset.version || '';
 
 	let currentStep = 1;
 	const TOTAL_STEPS = 4;
@@ -193,7 +194,9 @@
 			logo.src = logoUri;
 			brand.append(logo);
 		}
-		brand.append(el('span', 'brand-title', 'Yana Studio'), el('span', 'brand-badge', 'v1.6.2'));
+		brand.append(el('span', 'brand-title', 'Yana Studio'));
+		// Số phiên bản lấy từ product.json của bản đang chạy; không biết thì không hiện, không đoán.
+		if (studioVersion) brand.append(el('span', 'brand-badge', `v${studioVersion}`));
 
 		const skipBtn = el('button', 'skip-btn', t('skip'));
 		skipBtn.onclick = () => {

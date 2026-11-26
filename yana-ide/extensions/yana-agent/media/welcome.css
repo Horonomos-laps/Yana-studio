@@ -562,3 +562,12 @@ body.vscode-light .recent:hover {
 body.vscode-light .recent-name {
 	color: #1d1d1f;
 }
+
+/* Hình nền Yana: workbench đặt biến này về 0% khi hình nền bật, nên nền trang trong suốt; tắt thì giữ như cũ. */
+html, body, body.vscode-light { background-color: color-mix(in srgb, var(--bg) var(--vscode-yana-wallpaper-body, 100%), transparent); }
+
+/* Khi hình nền bật, khung thẻ là lớp kính để cảnh lộ qua. Tắt thì các luật trong khối này không áp dụng. */
+@container style(--vscode-yana-wallpaper-body: 0%) {
+	html body[class] .card, html body[class] .card:hover, html body[class] .list, html body[class] .onboarding-banner, html body[class] .onboarding-step { background: color-mix(in srgb, var(--card-surface) var(--vscode-yana-wallpaper-card, 100%), transparent); }
+	html body[class] .onboarding-step:hover, html body[class] .btn:not(.primary), html body[class] .lang-pill:not(.active) { background: color-mix(in srgb, var(--card) var(--vscode-yana-wallpaper-card, 100%), transparent); }
+}

@@ -95,3 +95,6 @@ textarea.prompt { border-radius: 10px; }
 .tab { border-radius: 8px 8px 0 0; padding: 7px 14px; }
 .frame-wrap { border-radius: 10px; }
 .model-row { gap: 8px; }
+
+/* Hình nền Yana: workbench đặt biến này về 0% khi hình nền bật, nên nền trang trong suốt; tắt thì giữ như cũ. */
+body { background-color: color-mix(in srgb, var(--y-bg) var(--vscode-yana-wallpaper-body, 100%), transparent); }

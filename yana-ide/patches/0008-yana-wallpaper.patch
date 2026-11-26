@@ -1,0 +1,14 @@
+diff --git a/src/vs/workbench/workbench.common.main.ts b/src/vs/workbench/workbench.common.main.ts
+index 6bf90e92..70469863 100644
+--- a/src/vs/workbench/workbench.common.main.ts
++++ b/src/vs/workbench/workbench.common.main.ts
+@@ -379,6 +379,9 @@ import './contrib/inlayHints/browser/inlayHintsAccessibilty.js';
+ // Themes
+ import './contrib/themes/browser/themes.contribution.js';
+ 
++// Yana wallpaper
++import './contrib/yanaWallpaper/browser/yanaWallpaper.contribution.js';
++
+ // Update
+ import './contrib/update/browser/update.contribution.js';
+ 

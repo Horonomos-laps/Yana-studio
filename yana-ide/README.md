@@ -12,6 +12,7 @@ Plan đầy đủ: [`.planning/yana-studio-vscode-base/PLAN.md`](https://github.
 | `product.overrides.json` | Tên, bundle id, thư mục dữ liệu, gallery Open VSX |
 | `patches/` | Patch tối thiểu lên mã upstream |
 | `extensions/yana-theme/` | Theme Yana Dark, lấy màu từ thiết kế Autonomous Runtime Cockpit |
+| `workbench/yanaWallpaper/` | Hình nền động phía sau giao diện, cài đặt ở Yana Settings > Wallpaper ([CREDITS.md](CREDITS.md)) |
 | `scripts/prepare.sh` | Áp tất cả phần trên vào một checkout upstream |
 
 ## Chạy bản dev (macOS)
