@@ -5,6 +5,7 @@ import SwiftUI
 struct ModelSettings: View {
 	@ObservedObject private var settings = AppSettings.shared
 	@EnvironmentObject private var engine: ChatEngine
+	@EnvironmentObject private var editor: EditorLauncher
 	@State private var editing: KeyTarget? = nil
 	@State private var keyDraft = ""
 	@ObservedObject private var customStore = CustomProviderStore.shared
@@ -60,11 +61,19 @@ struct ModelSettings: View {
 			Section {
 				ForEach(keyScreenProviders) { provider in
 					if provider.kind == .local {
-						LabeledContent(provider.id) { Text(L("keys.notNeeded")).font(.fbCaption).foregroundStyle(FB.textSecondary) }
+						LabeledContent(provider.id) {
+							HStack(spacing: 8) {
+								Text(L("keys.notNeeded")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+								Button(L("keys.setUpInStudio")) { editor.openModelSetup(folder: engine.workspace) }
+									.disabled(editor.appURL == nil)
+							}
+						}
 					} else {
 						keyRow(provider.id)
 					}
 				}
+				if editor.appURL == nil { SettingsNote(L("ide.notFound")) }
+				if case .failed(let why) = editor.status { SettingsNote(why) }
 			} header: { Text(L("set.apiKeys")) } footer: { SettingsNote(L("set.apiKeyNote")) }
 		}
 		.onAppear {

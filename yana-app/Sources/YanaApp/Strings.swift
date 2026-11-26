@@ -255,6 +255,7 @@ private let toolRows: [StringRow] = [
 	          "Keys are kept in this Mac's Keychain and sent only to their own provider.",
 	          "키는 이 Mac의 키체인에 저장되며 해당 제공업체에만 전송됩니다."),
 	StringRow("keys.notNeeded", "Chạy trên máy, không cần khóa", "On this Mac, no key needed", "이 Mac에서 실행, 키 필요 없음"),
+	StringRow("keys.setUpInStudio", "Cài trong Studio", "Set up in Studio", "Studio에서 설정"),
 	StringRow("keys.help", "Quản lý khóa API", "Manage API keys", "API 키 관리"),
 	StringRow("model.noneYet", "Chưa có model nào để chọn.", "No models to choose yet.", "아직 선택할 모델이 없습니다."),
 	StringRow("model.noneYetHint", "Thêm khóa API của một nhà cung cấp, hoặc chạy Ollama / LM Studio trên máy. Danh sách lấy thẳng từ nhà cung cấp theo khóa của bạn.", "Add an API key for a provider, or run Ollama / LM Studio on this Mac. The list comes straight from the provider for your key.", "제공자 API 키를 추가하거나 이 Mac에서 Ollama / LM Studio를 실행하세요. 목록은 키에 맞춰 제공자에서 직접 가져옵니다."),

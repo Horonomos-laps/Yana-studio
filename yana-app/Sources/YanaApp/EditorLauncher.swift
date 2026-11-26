@@ -60,6 +60,11 @@ final class EditorLauncher: ObservableObject {
 		open(folder: folder)
 	}
 
+	// Opens Yana Studio on its Models page, where a local server is set up. A failure shows in `status`.
+	func openModelSetup(folder: String) {
+		do { try request(action: "open-models", folder: folder) } catch { status = .failed(error.localizedDescription) }
+	}
+
 	enum LauncherError: LocalizedError {
 		case notFound
 		var errorDescription: String? { L("ide.notFound") }

@@ -7,6 +7,9 @@ import SwiftUI
 struct ApiKeysPopover: View {
 	@ObservedObject private var settings = AppSettings.shared
 	let edit: (String) -> Void
+	// False when no Yana Studio is installed: the set up button is then off and the reason is shown.
+	let studioAvailable: Bool
+	let setUp: () -> Void
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
@@ -18,6 +21,9 @@ struct ApiKeysPopover: View {
 				}
 			}
 			.frame(height: 260)
+			if !studioAvailable {
+				Text(L("ide.notFound")).font(.fbCaption).foregroundStyle(FB.errorText).fixedSize(horizontal: false, vertical: true)
+			}
 		}
 		.padding(14)
 		.frame(width: 380)
@@ -34,6 +40,7 @@ struct ApiKeysPopover: View {
 			Spacer(minLength: 4)
 			if local {
 				Text(L("keys.notNeeded")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+				Button(L("keys.setUpInStudio")) { setUp() }.disabled(!studioAvailable)
 			} else {
 				Text(saved ? L("set.keySaved") : L("set.keyNone")).font(.fbCaption)
 					.foregroundStyle(saved ? FB.successText : FB.textSecondary)

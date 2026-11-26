@@ -74,7 +74,13 @@ echo "Xong. Quay lại app Yana và bấm Kiểm tra lại."
 
 const ACTIONS = {
 	'install-runtime': runInstallRuntime,
+	'open-models': openModels,
 };
+
+// Mở trang Mô hình trong cài đặt Yana, nơi cấu hình máy chủ chạy trên máy.
+function openModels() {
+	return vscode.commands.executeCommand('yana.settings.open', 'models');
+}
 
 function runInstallRuntime() {
 	const script = path.join(os.tmpdir(), 'yana-install-runtime.sh');
@@ -108,14 +114,17 @@ function readRequest(output) {
 function handle(output) {
 	const action = readRequest(output);
 	if (!action) return;
-	const run = ACTIONS[action];
+	// Chỉ tên do chính danh sách khai báo, không lấy thứ kế thừa như "constructor".
+	const run = Object.hasOwn(ACTIONS, action) ? ACTIONS[action] : undefined;
 	if (!run) { output.warn(`app-bridge: unknown action ${JSON.stringify(action)} ignored`); return; }
-	try {
-		run();
-		output.info(`app-bridge: ran ${action}`);
-	} catch (error) {
+	const failed = error => {
 		output.error(`app-bridge: ${action} failed: ${error.stack || error.message}`);
 		vscode.window.showErrorMessage(`Yana: ${error.message}`);
+	};
+	try {
+		Promise.resolve(run()).then(() => output.info(`app-bridge: ran ${action}`), failed);
+	} catch (error) {
+		failed(error);
 	}
 }
 
