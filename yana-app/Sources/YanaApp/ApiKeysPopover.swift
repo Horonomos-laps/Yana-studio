@@ -21,6 +21,7 @@ struct ApiKeysPopover: View {
 				}
 			}
 			.frame(height: 260)
+			SharedKeyNotice()
 			if !studioAvailable {
 				Text(L("ide.notFound")).font(.fbCaption).foregroundStyle(FB.errorText).fixedSize(horizontal: false, vertical: true)
 			}
@@ -42,12 +43,42 @@ struct ApiKeysPopover: View {
 				Text(L("keys.notNeeded")).font(.fbCaption).foregroundStyle(FB.textSecondary)
 				Button(L("keys.setUpInStudio")) { setUp() }.disabled(!studioAvailable)
 			} else {
-				Text(saved ? L("set.keySaved") : L("set.keyNone")).font(.fbCaption)
+				Text(saved ? (settings.isShared(id) ? L("keys.savedShared") : L("set.keySaved")) : L("set.keyNone")).font(.fbCaption)
 					.foregroundStyle(saved ? FB.successText : FB.textSecondary)
 				Button(saved ? L("set.keyReplace") : L("set.keyAdd")) { edit(id) }
 				if saved { Button(L("set.remove")) { settings.removeKey(id) } }
 			}
 		}
 		.frame(height: 32)
+	}
+}
+
+// Offers to move keys only this app holds into the shared store, and says why the last key change failed.
+struct SharedKeyNotice: View {
+	@ObservedObject private var settings = AppSettings.shared
+
+	var body: some View {
+		let waiting = settings.keyVersion >= 0 ? settings.keysToShare : []
+		VStack(alignment: .leading, spacing: 6) {
+			if !waiting.isEmpty {
+				Text(L("keys.shareSub")).font(.fbCaption).foregroundStyle(FB.textSecondary).fixedSize(horizontal: false, vertical: true)
+				Button("\(L("keys.share")) (\(waiting.count))") { settings.shareLocalKeys() }
+			}
+			if let error = settings.keyError {
+				Text(error).font(.fbCaption).foregroundStyle(FB.errorText).fixedSize(horizontal: false, vertical: true)
+			}
+		}
+		.onAppear { settings.refreshSharedKeys() }
+	}
+}
+
+// Says why the last key change failed, then forgets it.
+struct KeyErrorAlert: ViewModifier {
+	@ObservedObject private var settings = AppSettings.shared
+
+	func body(content: Content) -> some View {
+		content.alert(L("keys.title"), isPresented: Binding(get: { settings.keyError != nil }, set: { if !$0 { settings.keyError = nil } })) {
+			Button("OK") { settings.keyError = nil }
+		} message: { Text(settings.keyError ?? "") }
 	}
 }

@@ -31,7 +31,7 @@ async function activeProfile() {
 	const model = cfg.get('model', '');
 	if (!models.info(provider)) throw new Error(`Provider "${provider}" is not in the yana-rt catalog`);
 	const key = await models.keyFor(provider);
-	if (models.needsKey(provider) && !key) throw new Error(`No API key for ${provider}. Add one in Models & Runtime.`);
+	if (models.needsKey(provider) && !(await models.hasKey(provider))) throw new Error(`No API key for ${provider}. Add one in Models & Runtime.`);
 	return { provider, model, key, baseUrl: cfg.get('baseUrl', '') };
 }
 

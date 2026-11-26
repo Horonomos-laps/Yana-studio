@@ -351,7 +351,7 @@ class YanaPanel {
 	}
 
 	async apiKey(provider) {
-		return (await this.context.secrets.get(`yana.key.${provider}`)) || '';
+		return models.keyFor(provider);
 	}
 
 	async handleDroppedUri(rawUri) {
@@ -554,7 +554,10 @@ class YanaPanel {
 			return { error: 'The custom provider needs yana.baseUrl. Set it in Models & Runtime.' };
 		}
 		const key = await this.apiKey(provider);
-		if (models.needsKey(provider) && !key) {
+		if (models.needsKey(provider) && !(await models.hasKey(provider))) {
+			await models.refreshKeys(); // app chat có thể vừa lưu key
+		}
+		if (models.needsKey(provider) && !(await models.hasKey(provider))) {
 			return { error: `No API key for ${provider}. Run "Yana: Set Provider API Key".` };
 		}
 		return { cwd: folder.uri.fsPath, provider, model, baseUrl, key };
@@ -580,7 +583,26 @@ class YanaPanel {
 		if (typeof temperature === 'number') payload.temperature = temperature;
 	}
 
-	async send(text, images = [], mode = 'act', files = []) {
+	// Một lần gửi hoặc duyệt tại một thời điểm: bước chuẩn bị có thể phải chờ yana-rt trả lời.
+	async once(work) {
+		if (this.preparing) return undefined;
+		this.preparing = true;
+		try {
+			return await work();
+		} finally {
+			this.preparing = false;
+		}
+	}
+
+	send(text, images = [], mode = 'act', files = []) {
+		return this.once(() => this.sendNow(text, images, mode, files));
+	}
+
+	decide(approvalId, decision) {
+		return this.once(() => this.decideNow(approvalId, decision));
+	}
+
+	async sendNow(text, images, mode, files) {
 		let task = text.trim();
 		if ((!task && images.length === 0 && files.length === 0) || this.active) {
 			return;
@@ -640,7 +662,7 @@ class YanaPanel {
 		this.run({ ...ready, resume: false, payload, conversationId: conversation.id }, summaryLabel);
 	}
 
-	async decide(approvalId, decision) {
+	async decideNow(approvalId, decision) {
 		if (!approvalId || this.active) {
 			return;
 		}
@@ -649,20 +671,24 @@ class YanaPanel {
 			this.post({ type: 'event', event: { type: 'error', message: ready.error } });
 			return;
 		}
-		const payload = { approval_id: approvalId, decision, decided_by: 'human:yana-studio' };
-		if (ready.key) {
-			payload.api_key = ready.key;
-		}
 		// Tiếp tục đúng lượt đang chờ duyệt, để phần trả lời sau khi duyệt được lưu chung với câu hỏi gốc.
 		const pending = this.pendingTurn || {};
+		// yana-rt chỉ tiếp tục bằng đúng nhà cung cấp đã tạm dừng, kể cả khi người dùng vừa đổi lựa chọn.
+		const provider = pending.provider || ready.provider;
+		const key = provider === ready.provider ? ready.key : await models.keyFor(provider);
+		const payload = { approval_id: approvalId, decision, decided_by: 'human:yana-studio' };
+		if (key) {
+			payload.api_key = key;
+		}
 		this.pendingTurn = undefined;
-		this.run({ ...ready, resume: true, payload, conversationId: pending.conversationId, priorReply: pending.reply, priorEvents: pending.events }, pending.task || '');
+		this.run({ ...ready, provider, model: pending.model || ready.model, key, resume: true, retry: pending, payload, conversationId: pending.conversationId, priorReply: pending.reply, priorEvents: pending.events }, pending.task || '');
 	}
 
 	run(options, task) {
 		let reply = options.priorReply || '';
 		let paused = false;
 		let status = 'done';
+		let stillWaiting = false;
 		const tokens = { input: 0, output: 0 };
 		// Diễn biến công cụ của lượt này (không gồm chữ đang stream và số token) để lưu cùng hội thoại và phát lại sau.
 		const events = Array.isArray(options.priorEvents) ? [...options.priorEvents] : [];
@@ -681,6 +707,8 @@ class YanaPanel {
 				}
 				if (event.type === 'cancelled') status = 'cancelled';
 				if (event.type === 'error') status = 'error';
+				// yana-rt từ chối trước khi dùng phiếu duyệt: cho phép bấm duyệt lại.
+				if (event.type === 'error' && /approval is still waiting|was paused on provider/.test(event.message || '')) stillWaiting = true;
 				if (event.type !== 'text_delta' && event.type !== 'metrics' && events.length < MAX_RAW_EVENTS_PER_TURN) events.push(event);
 				if (event.type === 'error' && /cannot persist pending approval/.test(event.message || '')) {
 					approvalStore.offer(options.cwd);
@@ -692,8 +720,10 @@ class YanaPanel {
 				usage.record(this.context, { root: options.cwd, provider: options.provider, model: options.model, ...tokens })
 					.catch(() => undefined); // thống kê không được làm hỏng lượt chat
 
-				if (paused) {
-					this.pendingTurn = { conversationId: options.conversationId, task, reply, events };
+				if (stillWaiting && options.retry) {
+					this.pendingTurn = options.retry;
+				} else if (paused) {
+					this.pendingTurn = { conversationId: options.conversationId, task, reply, events, provider: options.provider, model: options.model };
 				} else if (task && options.conversationId && (reply || events.length > 0)) {
 					// Lưu cả lượt chỉ dùng công cụ, bị huỷ hoặc báo lỗi (không có chữ trả lời) để mở lại phiên thấy đủ.
 					conversations.appendTurn(options.conversationId, task, reply, { events, status, tokens })

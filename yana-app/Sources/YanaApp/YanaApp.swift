@@ -84,12 +84,19 @@ struct RootView: View {
 		}
 		// Under everything: the soft backdrop that Liquid Glass refracts, or flat white when it is off.
 		.background(GlassBackdrop())
+		// Yana Studio may have changed the shared keys while this app was in the background.
+		.onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+			if !rendering { AppSettings.shared.refreshSharedKeys() }
+		}
+		// Saving a key finishes after its dialog has closed, so a failure is announced wherever the person is.
+		.modifier(KeyErrorAlert())
 		// A new id on a language change rebuilds the whole tree so every L(...) is read again.
 		// `selected` lives on RootView, outside this subtree, so the open page is kept.
 		.task {
 			guard !rendering else { return }
 			// Auto-mode leases left active by an app that quit are revoked: Auto never outlives its window.
 			AutoRunStore.shared.revokeLeftovers(folder: engine.workspace)
+			AppSettings.shared.refreshSharedKeys()
 			if ProcessInfo.processInfo.environment["YANA_UPDATE_DEMO"] == "1" { appUpdater.demo(); return }
 			// YANA_TOUR=1 shows the guide again (to check it in the live window).
 			if ProcessInfo.processInfo.environment["YANA_TOUR"] == "1" || OnboardingTour.shouldShowAtLaunch {

@@ -98,12 +98,17 @@ final class ModelCatalog: ObservableObject {
 			plan.append((item.id, Endpoint(url: CustomProviders.modelsURL(for: item.baseURL), auth: .bearer), settings.apiKey(item.id)))
 		}
 		groups = plan.map { ProviderModels(provider: $0.0, state: $0.1 == nil ? .manual : .loading) }
+		let shared = settings.sharedState.held
 		Task {
 			async let locals = Self.probeLocals()
 			let cloudResults = await withTaskGroup(of: (String, ProviderModels.State, [String]).self) { group in
 				for (provider, endpoint, key) in plan {
 					guard let endpoint else { continue }
-					group.addTask { await Self.fetch(provider, endpoint, key) }
+					if shared.contains(provider) {
+						group.addTask { await SharedKeys.background { Self.fetchShared(provider) } }
+					} else {
+						group.addTask { await Self.fetch(provider, endpoint, key) }
+					}
 				}
 				var all: [(String, ProviderModels.State, [String])] = []
 				for await result in group { all.append(result) }
@@ -169,6 +174,20 @@ final class ModelCatalog: ObservableObject {
 		} catch {
 			return (provider, .failed(L("model.errUnreachable")), [])
 		}
+	}
+
+	// A shared key stays in yana-rt, so yana-rt fetches this list.
+	nonisolated private static func fetchShared(_ provider: String) -> (String, ProviderModels.State, [String]) {
+		guard let reply = SharedKeys.live.modelList(for: provider) else { return (provider, .failed(L("model.errUnreachable")), []) }
+		if reply.status == 0, reply.output.count <= maxBytes + 1 { return (provider, .ready, parse(reply.output)) }
+		if let status = httpStatus(in: reply.error) { return (provider, .failed(reason(status)), []) }
+		return (provider, .failed(L("model.errUnreachable")), [])
+	}
+
+	// yana-rt reports a refused request as "HTTP <status>".
+	nonisolated static func httpStatus(in message: String) -> Int? {
+		guard let range = message.range(of: "HTTP ") else { return nil }
+		return Int(message[range.upperBound...].prefix { $0.isNumber })
 	}
 
 	// Same wording as Studio's discovery errors.

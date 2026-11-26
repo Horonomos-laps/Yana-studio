@@ -63,7 +63,7 @@ async function status() {
 	const cfg = vscode.workspace.getConfiguration('yana');
 	const provider = cfg.get('provider', 'ollama');
 	const info = models.info(provider);
-	const keyed = models.needsKey(provider) ? Boolean(await models.keyFor(provider)) : null;
+	const keyed = models.needsKey(provider) ? await models.hasKey(provider) : null;
 	const [version, local] = await Promise.all([
 		runtimeVersion(bin),
 		inspectLocalModels(fetch, () => '').catch(() => []),

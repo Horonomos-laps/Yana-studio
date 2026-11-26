@@ -46,6 +46,7 @@ function activate(context) {
 	context.subscriptions.push(
 		vscode.workspace.onDidChangeConfiguration(event => event.affectsConfiguration('yana') && fire('config')),
 		context.secrets.onDidChange(() => fire('secrets')),
+		require('./shared-keys').onDidChange(() => fire('secrets')),
 		vscode.workspace.onDidGrantWorkspaceTrust(() => fire('trust')),
 		{ dispose: () => clearTimeout(timer) },
 	);

@@ -45,7 +45,7 @@ async function safe(load, fallback) {
 
 async function keyedProviders() {
 	const ids = publicCatalog().filter(p => p.requiresKey || p.id === 'custom').map(p => p.id);
-	const present = await Promise.all(ids.map(async id => ((await models.keyFor(id)) ? id : '')));
+	const present = await Promise.all(ids.map(async id => ((await models.hasKey(id)) ? id : '')));
 	return present.filter(Boolean);
 }
 

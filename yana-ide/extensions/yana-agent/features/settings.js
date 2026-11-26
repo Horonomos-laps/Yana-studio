@@ -6,7 +6,6 @@ const vscode = require('vscode');
 const crypto = require('node:crypto');
 const { publicCatalog } = require('../host/model-catalog.cjs');
 const { endpoint } = require('../host/local-models.cjs');
-const { discoverModels } = require('../host/model-discovery.cjs');
 const { commandReference, systemOverview } = require('../host/system-surfaces.cjs');
 const { binary, workspaceRoot } = require('../cli');
 const models = require('./models');
@@ -47,7 +46,7 @@ async function pickRuntime() {
 async function syncModels(provider) {
 	if (!isProvider(provider)) throw new Error('Invalid provider');
 	const baseUrl = provider === 'custom' ? vscode.workspace.getConfiguration('yana').get('baseUrl', '') : '';
-	return discoverModels(provider, baseUrl, await models.keyFor(provider));
+	return models.fetchModels(provider, baseUrl);
 }
 
 function fillTerminal(command) {
@@ -187,6 +186,7 @@ function activate(context) {
 			}
 		}),
 		context.secrets.onDidChange(refresh),
+		require('./shared-keys').onDidChange(refresh),
 	);
 	if (process.env.YANA_OPEN_SETTINGS === '1') {
 		setTimeout(() => open(context, 'models'), 2500);

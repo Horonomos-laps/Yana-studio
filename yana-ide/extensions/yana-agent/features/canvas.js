@@ -58,9 +58,11 @@ class CanvasEditor {
 			if (event.document.uri.toString() === document.uri.toString()) sync();
 		});
 		const keySub = this.context.secrets.onDidChange(() => sync());
+		const sharedSub = require('./shared-keys').onDidChange(() => sync());
 		panel.onDidDispose(() => {
 			changeSub.dispose();
 			keySub.dispose();
+			sharedSub.dispose();
 			session.run?.stop();
 		});
 		panel.webview.onDidReceiveMessage(message => this.onMessage(session, message, sync).catch(error => post({ type: 'gen-error', message: error.message })));
@@ -96,7 +98,7 @@ class CanvasEditor {
 		const model = data.provider ? data.model : vscode.workspace.getConfiguration('yana').get('model', '');
 		if (!models.info(provider)) throw new Error(`Provider "${provider}" is not in the yana-rt catalog.`);
 		const key = await models.keyFor(provider);
-		if (models.needsKey(provider) && !key) throw new Error(`No API key for ${provider}. Add one with the key button.`);
+		if (models.needsKey(provider) && !(await models.hasKey(provider))) throw new Error(`No API key for ${provider}. Add one with the key button.`);
 		return { bin, provider, model, key };
 	}
 
@@ -197,7 +199,7 @@ async function providerList() {
 	const catalog = require('../host/model-catalog.cjs').publicCatalog();
 	return Promise.all(catalog.map(async p => ({
 		id: p.id, label: p.label, kind: p.kind, defaultModel: p.defaultModel, models: p.modelCatalog.map(m => m.id),
-		needsKey: Boolean(p.requiresKey), keyed: Boolean(await models.keyFor(p.id)),
+		needsKey: Boolean(p.requiresKey), keyed: await models.hasKey(p.id),
 	})));
 }
 

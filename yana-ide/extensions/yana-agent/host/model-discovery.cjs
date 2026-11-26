@@ -90,6 +90,15 @@ function cleanModels(models) {
   ).sort((left, right) => left.localeCompare(right));
 }
 
+// Đọc JSON danh sách model đã lấy sẵn (do yana-rt lấy bằng key dùng chung), cùng cách lọc như khi tự lấy.
+function parseModelList(provider, text) {
+  const adapter = CLOUD_ADAPTERS[provider];
+  if (!adapter) throw new Error("Provider does not support model discovery");
+  const models = cleanModels(adapter.parse(JSON.parse(text)) || []);
+  if (!models.length) throw new Error("Provider returned no chat models");
+  return models;
+}
+
 async function discoverCloudModels(provider, key, fetcher = fetch) {
   const adapter = CLOUD_ADAPTERS[provider];
   if (!adapter) throw new Error("Provider does not support model discovery");
@@ -138,4 +147,5 @@ module.exports = {
   cleanModels,
   discoverCloudModels,
   discoverModels,
+  parseModelList,
 };

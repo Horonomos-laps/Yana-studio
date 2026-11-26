@@ -59,6 +59,7 @@ struct ModelSettings: View {
 			} header: { Text("\(L("set.localModels")) (\(engine.models.count))") } footer: { SettingsNote(L("set.localNote")) }
 
 			Section {
+				SharedKeyNotice()
 				ForEach(keyScreenProviders) { provider in
 					if provider.kind == .local {
 						LabeledContent(provider.id) {
@@ -88,7 +89,7 @@ struct ModelSettings: View {
 		let saved = settings.keyVersion >= 0 && settings.hasKey(id)
 		return LabeledContent(id) {
 			HStack(spacing: 8) {
-				Text(saved ? L("set.keySaved") : L("set.keyNone")).font(.fbCaption)
+				Text(saved ? (settings.isShared(id) ? L("keys.savedShared") : L("set.keySaved")) : L("set.keyNone")).font(.fbCaption)
 					.foregroundStyle(saved ? FB.successText : FB.textSecondary)
 				Button(saved ? L("set.keyReplace") : L("set.keyAdd")) { keyDraft = ""; editing = KeyTarget(id: id) }
 				if saved { Button(L("set.remove")) { settings.removeKey(id) } }

@@ -2,7 +2,8 @@ const vscode = require('vscode');
 const changes = require('./changes');
 const { publicCatalog, providerById } = require('../host/model-catalog.cjs');
 const { endpoint } = require('../host/local-models.cjs');
-const { discoverModels } = require('../host/model-discovery.cjs');
+const { discoverModels, parseModelList, CLOUD_ADAPTERS } = require('../host/model-discovery.cjs');
+const shared = require('./shared-keys');
 
 const CUSTOM = 'custom';
 const CONFIG_SECTION = 'yana';
@@ -29,6 +30,9 @@ function activate(extensionContext) {
 	context = extensionContext;
 	onDidChangeModelEmitter = new vscode.EventEmitter();
 	registerCommands();
+	refreshKeys().then(offerToShare).catch(() => {});
+	const focus = vscode.window.onDidChangeWindowState?.(window => { if (window.focused) refreshKeys().catch(() => {}); });
+	if (focus) context.subscriptions.push(focus);
 }
 
 function config() {
@@ -43,8 +47,80 @@ function secretName(providerId) {
 	return `${SECRET_PREFIX}${providerId}`;
 }
 
+const SUPERSEDED_KEY = 'yana.sharedKeys.superseded';
+
+// SecretStorage của IDE, theo hình dạng shared-keys.js cần.
+function localStore() {
+	return {
+		read: async id => (await context.secrets.get(secretName(id))) || '',
+		exists: async id => Boolean(await context.secrets.get(secretName(id))),
+		write: (id, key) => context.secrets.store(secretName(id), key),
+		delete: id => context.secrets.delete(secretName(id)),
+		superseded: () => new Set(context.globalState.get(SUPERSEDED_KEY, [])),
+		setSuperseded: set => context.globalState.update(SUPERSEDED_KEY, [...set].sort()),
+	};
+}
+
+// Key của riêng IDE; rỗng nếu đã bị một key dùng chung thay thế.
+async function localKey(providerId) {
+	return localStore().superseded().has(providerId) ? '' : localStore().read(providerId);
+}
+
+// Key gửi kèm yêu cầu. Rỗng với key dùng chung: yana-rt tự đọc.
 async function keyFor(providerId) {
-	return (await context.secrets.get(secretName(providerId))) || '';
+	return shared.has(providerId) ? '' : localKey(providerId);
+}
+
+async function hasKey(providerId) {
+	return shared.has(providerId) || Boolean(await localKey(providerId));
+}
+
+async function saveKey(providerId, key) {
+	if (shared.canShare(providerId)) return shared.save(providerId, key, localStore());
+	return context.secrets.store(secretName(providerId), key);
+}
+
+async function forgetKey(providerId) {
+	if (shared.canShare(providerId)) return shared.remove(providerId, localStore());
+	return context.secrets.delete(secretName(providerId));
+}
+
+// Hỏi lại yana-rt: app chat có thể vừa thêm hoặc xoá key.
+function refreshKeys() {
+	return shared.refresh(localStore());
+}
+
+// Danh sách model của một nhà: key dùng chung thì yana-rt lấy, còn lại IDE tự hỏi bằng key của mình.
+async function fetchModels(providerId, baseUrl, explicitKey) {
+	if (!explicitKey && shared.has(providerId) && CLOUD_ADAPTERS[providerId]) {
+		return parseModelList(providerId, await shared.modelList(providerId));
+	}
+	return discoverModels(providerId, baseUrl, explicitKey || await keyFor(providerId));
+}
+
+const providerIds = () => catalog().map(provider => provider.id);
+
+async function shareLocalKeys() {
+	return shared.migrate(providerIds(), localStore());
+}
+
+async function shareCommand() {
+	const failed = await shareLocalKeys();
+	if (failed.length) vscode.window.showWarningMessage(`Some keys stay only in the IDE. ${failed.join('; ')}`);
+	else vscode.window.showInformationMessage('Your saved API keys are shared with the Yana app.');
+}
+
+const SHARE_ASKED_KEY = 'yana.sharedKeys.asked';
+
+async function offerToShare() {
+	if (context.globalState.get(SHARE_ASKED_KEY)) return;
+	const waiting = await shared.movable(providerIds(), localStore());
+	if (!waiting.length) return;
+	const answer = await vscode.window.showInformationMessage(
+		`Share ${waiting.length} saved API key(s) with the Yana app, so you do not type them again?`, 'Share', 'Not now');
+	if (!answer) return;
+	await context.globalState.update(SHARE_ASKED_KEY, true);
+	if (answer === 'Share') await shareCommand();
 }
 
 function needsKey(providerId) {
@@ -71,10 +147,9 @@ async function setCachedModels(providerId, list) {
 // Đồng bộ danh sách model thật từ provider qua API
 async function syncedModels(provider) {
 	const { baseUrl } = config();
-	const key = await keyFor(provider.id);
 	const list = await vscode.window.withProgress(
 		{ location: vscode.ProgressLocation.Notification, title: `Fetching ${provider.label} models…` },
-		async () => discoverModels(provider.id, provider.id === CUSTOM ? baseUrl : '', key)
+		async () => fetchModels(provider.id, provider.id === CUSTOM ? baseUrl : '')
 	);
 	if (Array.isArray(list) && list.length > 0) {
 		await setCachedModels(provider.id, list);
@@ -88,17 +163,15 @@ async function chooseModel(providerId) {
 	if (!provider) return;
 	if (provider.id === CUSTOM && !(await setCustomEndpoint())) return;
 
-	let key = await keyFor(provider.id);
-	if (provider.requiresKey && !key) {
+	if (provider.requiresKey && !(await hasKey(provider.id))) {
 		vscode.window.showInformationMessage(`${provider.label} needs an API key before you can use it.`);
 		await setApiKey(provider.id);
 		if (config().provider === provider.id) return; // key flow already activated a model
-		key = await keyFor(provider.id);
-		if (!key) return;
+		if (!(await hasKey(provider.id))) return;
 	}
 	let liveList = getCachedModels(provider.id);
 
-	if ((key || !provider.requiresKey) && (!liveList || liveList.length === 0)) {
+	if ((!provider.requiresKey || await hasKey(provider.id)) && (!liveList || liveList.length === 0)) {
 		try {
 			liveList = await syncedModels(provider);
 		} catch (e) {
@@ -141,7 +214,7 @@ async function chooseModel(providerId) {
 		return model === undefined ? undefined : select(provider.id, model.trim());
 	}
 	if (picked.action === 'sync') {
-		if (needsKey(provider.id) && !(await keyFor(provider.id))) {
+		if (needsKey(provider.id) && !(await hasKey(provider.id))) {
 			vscode.window.showWarningMessage(`Add an API key for ${provider.label} before fetching its models.`);
 			return setApiKey(provider.id);
 		}
@@ -213,7 +286,7 @@ async function pickModel() {
 
 async function configuredKeys() {
 	const ids = catalog().filter(provider => provider.requiresKey || provider.id === CUSTOM).map(provider => provider.id);
-	const present = await Promise.all(ids.map(async id => ((await keyFor(id)) ? id : '')));
+	const present = await Promise.all(ids.map(async id => ((await hasKey(id)) ? id : '')));
 	return present.filter(Boolean);
 }
 
@@ -239,7 +312,12 @@ async function setApiKey(providerId) {
 		ignoreFocusOut: true,
 	});
 	if (!key) return;
-	await context.secrets.store(secretName(id), key.trim());
+	try {
+		await saveKey(id, key.trim());
+	} catch (error) {
+		vscode.window.showErrorMessage(`The key was not saved: ${error.message}`);
+		return;
+	}
 	vscode.window.showInformationMessage(`Saved the API key for ${provider?.label || id}. Checking models…`);
 
 	try {
@@ -270,7 +348,12 @@ async function removeKey(item) {
 		'Remove'
 	);
 	if (answer === 'Remove') {
-		await context.secrets.delete(secretName(id));
+		try {
+			await forgetKey(id);
+		} catch (error) {
+			vscode.window.showErrorMessage(`The key was not removed: ${error.message}`);
+			return;
+		}
 		await context.globalState.update(`${CACHE_KEY_PREFIX}${id}`, undefined);
 		vscode.window.showInformationMessage(`Removed the API key for ${info(id)?.label || id}.`);
 	}
@@ -319,6 +402,7 @@ function registerCommands() {
 	context.subscriptions.push(
 		vscode.window.registerTreeDataProvider('yana.models', tree),
 		vscode.commands.registerCommand('yana.pickModel', pickModel),
+		vscode.commands.registerCommand('yana.keys.share', shareCommand),
 		vscode.commands.registerCommand('yana.setApiKey', setApiKey),
 		vscode.commands.registerCommand('yana.models.choose', id => chooseModel(id?.providerId || id)),
 		vscode.commands.registerCommand('yana.models.select', (provider, model) => select(String(provider || ''), String(model || ''))),
@@ -334,11 +418,10 @@ module.exports = {
 	activate,
 	config,
 	info,
-	keyFor,
+	keyFor, hasKey, saveKey, forgetKey, refreshKeys, fetchModels, shareLocalKeys, chooseModel,
 	needsKey,
 	select,
 	syncedModels,
-	chooseModel,
 	setApiKey,
 	removeKey,
 	configuredKeys,

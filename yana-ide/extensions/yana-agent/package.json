@@ -103,6 +103,7 @@
 			{ "command": "yana.governance.revokeLease", "title": "Revoke Lease", "category": "Yana", "icon": "$(circle-slash)" },
 			{ "command": "yana.setApiKey", "title": "Set Provider API Key", "category": "Yana", "icon": "$(key)" },
 			{ "command": "yana.pickModel", "title": "Choose Provider and Model", "category": "Yana" },
+			{ "command": "yana.keys.share", "title": "Share Saved API Keys with the Yana App", "category": "Yana" },
 			{ "command": "yana.focus", "title": "Open Agent Panel", "category": "Yana" },
 			{ "command": "yana.tasks.refresh", "title": "Refresh Tasks", "category": "Yana", "icon": "$(refresh)" },
 			{ "command": "yana.tasks.create", "title": "New Task", "category": "Yana", "icon": "$(add)" },
@@ -200,6 +201,7 @@
 				},
 				"yana.runtimePath": {
 					"type": "string",
+					"scope": "machine",
 					"default": "",
 					"description": "Absolute path to the yana-rt binary. Empty: search ~/.local/bin, /opt/homebrew/bin, /usr/local/bin."
 				},
@@ -211,6 +213,7 @@
 				},
 				"yana.baseUrl": {
 					"type": "string",
+					"scope": "machine",
 					"default": "",
 					"description": "Base URL for the custom provider (HTTPS, or HTTP on 127.0.0.1/localhost)."
 				},
