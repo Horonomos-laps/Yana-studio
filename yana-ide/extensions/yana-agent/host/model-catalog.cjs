@@ -537,6 +537,270 @@ const PROVIDERS = Object.freeze([
     ]
   },
   {
+    "id": "mistral",
+    "label": "Mistral AI",
+    "company": "Mistral",
+    "kind": "cloud",
+    "category": "cloud",
+    "badge": "code",
+    "modelsSummary": "1 default model",
+    "requiresKey": true,
+    "envVar": "MISTRAL_API_KEY",
+    "defaultModel": "mistral-large-latest",
+    "baseUrl": "",
+    "baseModels": [
+      {
+        "id": "mistral-large-latest",
+        "label": "mistral-large-latest",
+        "context": "—",
+        "tags": [
+          "cloud"
+        ]
+      }
+    ],
+    "discoverable": false
+  },
+  {
+    "id": "together",
+    "label": "Together AI",
+    "company": "Together",
+    "kind": "cloud",
+    "category": "cloud",
+    "badge": "open models",
+    "modelsSummary": "1 default model",
+    "requiresKey": true,
+    "envVar": "TOGETHER_API_KEY",
+    "defaultModel": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    "baseUrl": "",
+    "baseModels": [
+      {
+        "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "label": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "context": "—",
+        "tags": [
+          "cloud"
+        ]
+      }
+    ],
+    "discoverable": false
+  },
+  {
+    "id": "fireworks",
+    "label": "Fireworks AI",
+    "company": "Fireworks",
+    "kind": "cloud",
+    "category": "cloud",
+    "badge": "open models",
+    "modelsSummary": "1 default model",
+    "requiresKey": true,
+    "envVar": "FIREWORKS_API_KEY",
+    "defaultModel": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+    "baseUrl": "",
+    "baseModels": [
+      {
+        "id": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+        "label": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+        "context": "—",
+        "tags": [
+          "cloud"
+        ]
+      }
+    ],
+    "discoverable": false
+  },
+  {
+    "id": "deepinfra",
+    "label": "DeepInfra",
+    "company": "DeepInfra",
+    "kind": "cloud",
+    "category": "cloud",
+    "badge": "open models",
+    "modelsSummary": "1 default model",
+    "requiresKey": true,
+    "envVar": "DEEPINFRA_API_KEY",
+    "defaultModel": "meta-llama/Llama-3.3-70B-Instruct",
+    "baseUrl": "",
+    "baseModels": [
+      {
+        "id": "meta-llama/Llama-3.3-70B-Instruct",
+        "label": "meta-llama/Llama-3.3-70B-Instruct",
+        "context": "—",
+        "tags": [
+          "cloud"
+        ]
+      }
+    ],
+    "discoverable": false
+  },
+  {
+    "id": "cerebras",
+    "label": "Cerebras",
+    "company": "Cerebras",
+    "kind": "cloud",
+    "category": "cloud",
+    "badge": "fast",
+    "modelsSummary": "1 default model",
+    "requiresKey": true,
+    "envVar": "CEREBRAS_API_KEY",
+    "defaultModel": "llama-3.3-70b",
+    "baseUrl": "",
+    "baseModels": [
+      {
+        "id": "llama-3.3-70b",
+        "label": "llama-3.3-70b",
+        "context": "—",
+        "tags": [
+          "cloud"
+        ]
+      }
+    ],
+    "discoverable": false
+  },
+  {
+    "id": "sambanova",
+    "label": "SambaNova",
+    "company": "SambaNova",
+    "kind": "cloud",
+    "category": "cloud",
+    "badge": "fast",
+    "modelsSummary": "1 default model",
+    "requiresKey": true,
+    "envVar": "SAMBANOVA_API_KEY",
+    "defaultModel": "Meta-Llama-3.3-70B-Instruct",
+    "baseUrl": "",
+    "baseModels": [
+      {
+        "id": "Meta-Llama-3.3-70B-Instruct",
+        "label": "Meta-Llama-3.3-70B-Instruct",
+        "context": "—",
+        "tags": [
+          "cloud"
+        ]
+      }
+    ],
+    "discoverable": false
+  },
+  {
+    "id": "perplexity",
+    "label": "Perplexity",
+    "company": "Perplexity",
+    "kind": "cloud",
+    "category": "cloud",
+    "badge": "search",
+    "modelsSummary": "1 default model",
+    "requiresKey": true,
+    "envVar": "PERPLEXITY_API_KEY",
+    "defaultModel": "sonar-pro",
+    "baseUrl": "",
+    "baseModels": [
+      {
+        "id": "sonar-pro",
+        "label": "sonar-pro",
+        "context": "—",
+        "tags": [
+          "cloud"
+        ]
+      }
+    ],
+    "discoverable": false
+  },
+  {
+    "id": "qwen",
+    "label": "Qwen",
+    "company": "Alibaba Cloud",
+    "kind": "cloud",
+    "category": "cloud",
+    "badge": "open models",
+    "modelsSummary": "1 default model",
+    "requiresKey": true,
+    "envVar": "QWEN_API_KEY",
+    "defaultModel": "qwen-plus",
+    "baseUrl": "",
+    "baseModels": [
+      {
+        "id": "qwen-plus",
+        "label": "qwen-plus",
+        "context": "—",
+        "tags": [
+          "cloud"
+        ]
+      }
+    ],
+    "discoverable": false
+  },
+  {
+    "id": "cohere",
+    "label": "Cohere",
+    "company": "Cohere",
+    "kind": "cloud",
+    "category": "cloud",
+    "badge": "rag",
+    "modelsSummary": "1 default model",
+    "requiresKey": true,
+    "envVar": "COHERE_API_KEY",
+    "defaultModel": "command-r-plus",
+    "baseUrl": "",
+    "baseModels": [
+      {
+        "id": "command-r-plus",
+        "label": "command-r-plus",
+        "context": "—",
+        "tags": [
+          "cloud"
+        ]
+      }
+    ],
+    "discoverable": false
+  },
+  {
+    "id": "ai21",
+    "label": "AI21 Labs",
+    "company": "AI21",
+    "kind": "cloud",
+    "category": "cloud",
+    "badge": "long-context",
+    "modelsSummary": "1 default model",
+    "requiresKey": true,
+    "envVar": "AI21_API_KEY",
+    "defaultModel": "jamba-large",
+    "baseUrl": "",
+    "baseModels": [
+      {
+        "id": "jamba-large",
+        "label": "jamba-large",
+        "context": "—",
+        "tags": [
+          "cloud"
+        ]
+      }
+    ],
+    "discoverable": false
+  },
+  {
+    "id": "ernie",
+    "label": "ERNIE",
+    "company": "Baidu Qianfan",
+    "kind": "cloud",
+    "category": "cloud",
+    "badge": "cloud",
+    "modelsSummary": "1 default model",
+    "requiresKey": true,
+    "envVar": "ERNIE_API_KEY",
+    "defaultModel": "ernie-4.0-8k",
+    "baseUrl": "",
+    "baseModels": [
+      {
+        "id": "ernie-4.0-8k",
+        "label": "ernie-4.0-8k",
+        "context": "—",
+        "tags": [
+          "cloud"
+        ]
+      }
+    ],
+    "discoverable": false
+  },
+  {
     "id": "ollama",
     "label": "Ollama",
     "company": "On-device engine",
@@ -669,6 +933,54 @@ const PROVIDERS = Object.freeze([
     ]
   },
   {
+    "id": "vllm",
+    "label": "vLLM",
+    "company": "Local vLLM server",
+    "kind": "local",
+    "category": "local",
+    "badge": "local",
+    "modelsSummary": "Standby",
+    "requiresKey": false,
+    "envVar": "",
+    "defaultModel": "local-model",
+    "baseUrl": "http://127.0.0.1:8000/v1",
+    "baseModels": [
+      {
+        "id": "local-model",
+        "label": "local-model",
+        "context": "—",
+        "tags": [
+          "local"
+        ]
+      }
+    ],
+    "discoverable": true
+  },
+  {
+    "id": "jan",
+    "label": "Jan",
+    "company": "Jan local API server",
+    "kind": "local",
+    "category": "local",
+    "badge": "local",
+    "modelsSummary": "Standby",
+    "requiresKey": false,
+    "envVar": "",
+    "defaultModel": "local-model",
+    "baseUrl": "http://127.0.0.1:1337/v1",
+    "baseModels": [
+      {
+        "id": "local-model",
+        "label": "local-model",
+        "context": "—",
+        "tags": [
+          "local"
+        ]
+      }
+    ],
+    "discoverable": true
+  },
+  {
     "id": "9router",
     "label": "9Router",
     "company": "Local gateway aggregator",
@@ -749,7 +1061,7 @@ const PROVIDERS = Object.freeze([
 function publicCatalog() {
   return PROVIDERS.map((provider) => ({
     ...provider,
-    discoverable: provider.kind === "cloud" || provider.discoverable === true,
+    discoverable: provider.discoverable ?? provider.kind === "cloud",
     canonical: provider.canonical !== false,
     models: (provider.baseModels || []).map((model) => model.id),
     modelCatalog: provider.baseModels || [],

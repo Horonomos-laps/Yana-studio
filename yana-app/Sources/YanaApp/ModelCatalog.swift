@@ -69,6 +69,8 @@ final class ModelCatalog: ObservableObject {
 		"ollama": "http://127.0.0.1:11434/api/tags",
 		"lmstudio": "http://127.0.0.1:1234/v1/models",
 		"llamacpp": "http://127.0.0.1:8080/v1/models",
+		"vllm": "http://127.0.0.1:8000/v1/models",
+		"jan": "http://127.0.0.1:1337/v1/models",
 	]
 
 	func refreshIfStale() {

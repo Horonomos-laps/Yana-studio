@@ -16,9 +16,10 @@ struct ProviderInfo: Identifiable {
 
 // The provider ids the IDE offers (yana.provider enum). Local ones run on this Mac and need no key.
 let providerCatalog: [ProviderInfo] = {
-	let local: Set<String> = ["ollama", "lmstudio", "llamacpp", "airllm", "turbofieldfare"]
-	let ids = ["ollama", "lmstudio", "llamacpp", "airllm", "turbofieldfare", "anthropic", "openai", "gemini", "groq",
-	           "deepseek", "openrouter", "xai", "novita", "nvidia", "minimax", "glm", "huggingface", "9router", "kimi", "custom"]
+	let local: Set<String> = ["ollama", "lmstudio", "llamacpp", "airllm", "turbofieldfare", "vllm", "jan"]
+	let ids = ["ollama", "lmstudio", "llamacpp", "airllm", "turbofieldfare", "vllm", "jan", "anthropic", "openai", "gemini", "groq",
+	           "deepseek", "openrouter", "xai", "novita", "nvidia", "minimax", "glm", "huggingface", "9router", "kimi",
+	           "mistral", "together", "fireworks", "deepinfra", "cerebras", "sambanova", "perplexity", "qwen", "cohere", "ai21", "ernie", "custom"]
 	return ids.map { ProviderInfo(id: $0, kind: $0 == "custom" ? .custom : local.contains($0) ? .local : .cloud) }
 }()
 

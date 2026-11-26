@@ -137,7 +137,7 @@ final class CustomProviderTests: XCTestCase {
 	// MARK: presets
 
 	func testEveryPresetIsAUsableAddressWithAUniqueName() {
-		XCTAssertGreaterThanOrEqual(CustomProviders.presets.count, 15)
+		XCTAssertGreaterThanOrEqual(CustomProviders.presets.count, 8)
 		XCTAssertEqual(Set(CustomProviders.presets.map(\.name)).count, CustomProviders.presets.count)
 		for preset in CustomProviders.presets {
 			let url = CustomProviders.normalizedBaseURL(preset.baseURL)

@@ -206,7 +206,7 @@
 				"yana.provider": {
 					"type": "string",
 					"default": "ollama",
-					"enum": ["anthropic", "openai", "gemini", "groq", "deepseek", "openrouter", "xai", "novita", "nvidia", "minimax", "glm", "huggingface", "9router", "kimi", "ollama", "lmstudio", "llamacpp", "turbofieldfare", "airllm", "custom"],
+					"enum": ["anthropic", "openai", "gemini", "groq", "deepseek", "openrouter", "xai", "novita", "nvidia", "minimax", "glm", "huggingface", "9router", "kimi", "ollama", "lmstudio", "llamacpp", "turbofieldfare", "airllm", "mistral", "together", "fireworks", "deepinfra", "cerebras", "sambanova", "perplexity", "qwen", "cohere", "ai21", "ernie", "vllm", "jan", "custom"],
 					"description": "Provider passed to yana-rt chat --provider. Matches the yana-rt catalog; custom means the OpenAI-compatible endpoint in yana.baseUrl."
 				},
 				"yana.baseUrl": {
