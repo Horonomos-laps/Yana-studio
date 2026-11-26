@@ -41,4 +41,12 @@ for (const p of view.filter(item => item.discoverable && item.kind === 'cloud'))
 	assert.ok(new RegExp(`^\\s+"?${p.id}"?: \\{`, 'm').test(discovery), `${p.id} is marked discoverable but has no adapter`);
 }
 console.log('PASS cloud providers marked discoverable have an adapter');
-console.log('provider-catalog: 5 PASS');
+(async () => {
+	const { inspectLocalModels } = require(path.join(ext, 'host/local-models.cjs'));
+	const refuse = async () => { throw new Error('offline'); };
+	const scanned = (await inspectLocalModels(refuse)).map(item => item.provider).sort();
+	const local = PROVIDERS.filter(p => p.kind === 'local').map(p => p.id).sort();
+	assert.deepStrictEqual(scanned, local);
+	console.log('PASS every local provider is scanned');
+	console.log('provider-catalog: 6 PASS');
+})().catch(error => { console.error(error.message); process.exit(1); });

@@ -130,6 +130,8 @@ async function inspectLocalModels(fetcher = fetch, keyFor = () => "") {
       "llamacpp",
       "turbofieldfare",
       "airllm",
+      "vllm",
+      "jan",
     ].map(async (provider) => {
       try {
         const result = await discoverLocalModels(
