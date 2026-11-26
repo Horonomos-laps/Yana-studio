@@ -1298,11 +1298,18 @@
 		}
 	}
 
+	// Lịch sử hội thoại phủ lên panel; mở bằng nút đồng hồ trên thanh tiêu đề hoặc bấm vào tên hội thoại.
+	const historyView = window.yanaHistory ? window.yanaHistory.create({ host: app, post: msg => vscode.postMessage(msg) }) : null;
+	conversationTitle.classList.add('clickable');
+	conversationTitle.title = 'Current conversation. Click to see all conversations.';
+	conversationTitle.addEventListener('click', () => vscode.postMessage({ type: 'history' }));
+
 	window.addEventListener('message', ({ data }) => {
 		if (data?.type === 'state') renderState(data);
 		else if (data?.type === 'intent') renderIntent(data.text, data.at, data.images, data.files);
 		else if (data?.type === 'event') renderEvent(data.event);
-		else if (data?.type === 'conversation') renderConversation(data);
+		else if (data?.type === 'conversation') { historyView?.close(); renderConversation(data); }
+		else if (data?.type === 'history') historyView?.update(data.items, data.open === true);
 		else if (data?.type === 'prefill') { input.value = data.text || ''; input.focus(); }
 		else if (data?.type === 'attachImage') { attachImageObj(data.image); }
 		else if (data?.type === 'attachFile') { attachFileObj(data.file); }
