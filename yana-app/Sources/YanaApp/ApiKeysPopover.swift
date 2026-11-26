@@ -8,15 +8,13 @@ struct ApiKeysPopover: View {
 	@ObservedObject private var settings = AppSettings.shared
 	let edit: (String) -> Void
 
-	private var providers: [ProviderInfo] { providerCatalog.filter { $0.kind != .local } }
-
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			Text(L("keys.title")).font(.fbHeading5).foregroundStyle(FB.text)
 			Text(L("keys.sub")).font(.fbCaption).foregroundStyle(FB.textSecondary).fixedSize(horizontal: false, vertical: true)
 			ScrollView {
 				VStack(spacing: 0) {
-					ForEach(providers) { provider in row(provider.id) }
+					ForEach(keyScreenProviders) { provider in row(provider) }
 				}
 			}
 			.frame(height: 260)
@@ -26,15 +24,22 @@ struct ApiKeysPopover: View {
 		.background(FB.canvas)
 	}
 
-	private func row(_ id: String) -> some View {
-		let saved = settings.keyVersion >= 0 && settings.hasKey(id)
+	private func row(_ provider: ProviderInfo) -> some View {
+		let id = provider.id
+		// A local server takes no key, so nothing is looked up or offered for it.
+		let local = provider.kind == .local
+		let saved = !local && settings.keyVersion >= 0 && settings.hasKey(id)
 		return HStack(spacing: 8) {
 			Text(id).font(.fbBodyMedium).foregroundStyle(FB.text)
 			Spacer(minLength: 4)
-			Text(saved ? L("set.keySaved") : L("set.keyNone")).font(.fbCaption)
-				.foregroundStyle(saved ? FB.successText : FB.textSecondary)
-			Button(saved ? L("set.keyReplace") : L("set.keyAdd")) { edit(id) }
-			if saved { Button(L("set.remove")) { settings.removeKey(id) } }
+			if local {
+				Text(L("keys.notNeeded")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+			} else {
+				Text(saved ? L("set.keySaved") : L("set.keyNone")).font(.fbCaption)
+					.foregroundStyle(saved ? FB.successText : FB.textSecondary)
+				Button(saved ? L("set.keyReplace") : L("set.keyAdd")) { edit(id) }
+				if saved { Button(L("set.remove")) { settings.removeKey(id) } }
+			}
 		}
 		.frame(height: 32)
 	}

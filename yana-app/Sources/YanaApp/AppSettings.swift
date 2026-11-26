@@ -23,6 +23,10 @@ let providerCatalog: [ProviderInfo] = {
 	return ids.map { ProviderInfo(id: $0, kind: $0 == "custom" ? .custom : local.contains($0) ? .local : .cloud) }
 }()
 
+// The API key screens list every provider, like the IDE: those that take a key first, then the local ones.
+let keyScreenProviders: [ProviderInfo] =
+	providerCatalog.filter { $0.kind != .local } + providerCatalog.filter { $0.kind == .local }
+
 final class AppSettings: ObservableObject {
 	static let shared = AppSettings()
 	private let store = UserDefaults.standard

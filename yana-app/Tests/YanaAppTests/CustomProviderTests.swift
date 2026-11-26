@@ -153,6 +153,13 @@ final class CustomProviderTests: XCTestCase {
 		for preset in CustomProviders.presets { XCTAssertFalse(builtIn.contains(preset.name.lowercased()), preset.name) }
 	}
 
+	func testTheKeyScreensListEveryProviderWithLocalOnesLast() {
+		XCTAssertEqual(keyScreenProviders.map(\.id).sorted(), providerCatalog.map(\.id).sorted())
+		let local = keyScreenProviders.map { $0.kind == .local }
+		XCTAssertEqual(local, local.sorted { !$0 && $1 })
+		XCTAssertEqual(local.filter { $0 }.count, 7)
+	}
+
 	// MARK: the store
 
 	@MainActor

@@ -10,8 +10,6 @@ struct ModelSettings: View {
 	@ObservedObject private var customStore = CustomProviderStore.shared
 	@State private var providerSheet: ProviderSheetTarget? = nil
 
-	private var keyProviders: [ProviderInfo] { providerCatalog.filter { $0.kind != .local } }
-
 	var body: some View {
 		Form {
 			Section {
@@ -60,7 +58,13 @@ struct ModelSettings: View {
 			} header: { Text("\(L("set.localModels")) (\(engine.models.count))") } footer: { SettingsNote(L("set.localNote")) }
 
 			Section {
-				ForEach(keyProviders) { provider in keyRow(provider.id) }
+				ForEach(keyScreenProviders) { provider in
+					if provider.kind == .local {
+						LabeledContent(provider.id) { Text(L("keys.notNeeded")).font(.fbCaption).foregroundStyle(FB.textSecondary) }
+					} else {
+						keyRow(provider.id)
+					}
+				}
 			} header: { Text(L("set.apiKeys")) } footer: { SettingsNote(L("set.apiKeyNote")) }
 		}
 		.onAppear {
