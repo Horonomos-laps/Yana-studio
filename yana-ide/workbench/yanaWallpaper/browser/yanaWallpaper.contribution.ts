@@ -12,19 +12,22 @@ import { Disposable, toDisposable } from '../../../../base/common/lifecycle.js';
 import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
 import { localize } from '../../../../nls.js';
 import { IAccessibilityService } from '../../../../platform/accessibility/common/accessibility.js';
-import { Extensions as ConfigurationExtensions, IConfigurationRegistry } from '../../../../platform/configuration/common/configurationRegistry.js';
+import { ConfigurationScope, Extensions as ConfigurationExtensions, IConfigurationRegistry } from '../../../../platform/configuration/common/configurationRegistry.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { Registry } from '../../../../platform/registry/common/platform.js';
+import { isHighContrast } from '../../../../platform/theme/common/theme.js';
 import { IThemeService } from '../../../../platform/theme/common/themeService.js';
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import { IWorkbenchLayoutService } from '../../../services/layout/browser/layoutService.js';
 import { drawAsciiScene } from './scenes.js';
 import { resolveWallpaper, wallpaperColors } from './palette.js';
 import { IWallpaperTheme, WALLPAPER_THEMES } from './themes.js';
+import { WallpaperMedia, wallpaperMediaKind } from './wallpaperMedia.js';
 
 const SECTION = 'yana.wallpaper';
 const AUTO = 'auto';
 const OFF = 'off';
+const CUSTOM = 'custom';
 const DEFAULT_VISIBILITY = 35;
 const MIN_VISIBILITY = 10;
 const MAX_VISIBILITY = 80;
@@ -61,9 +64,16 @@ Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).regis
 	properties: {
 		'yana.wallpaper.theme': {
 			type: 'string',
-			enum: [AUTO, OFF, ...WALLPAPER_THEMES.map(theme => theme.id)],
+			enum: [AUTO, OFF, CUSTOM, ...WALLPAPER_THEMES.map(theme => theme.id)],
 			default: AUTO,
-			description: localize('yanaWallpaper.theme', "Animated wallpaper. 'auto' follows the light or dark colour theme.")
+			description: localize('yanaWallpaper.theme', "Animated wallpaper. 'auto' follows the light or dark colour theme. 'custom' shows the file in yana.wallpaper.file.")
+		},
+		'yana.wallpaper.file': {
+			type: 'string',
+			default: '',
+			// Chỉ cấp người dùng: một thư mục dự án không được chọn file trên máy để hiện.
+			scope: ConfigurationScope.APPLICATION,
+			description: localize('yanaWallpaper.file', "Your own picture (PNG, JPEG, WebP) or video (MP4) for the 'custom' wallpaper.")
 		},
 		'yana.wallpaper.visibility': {
 			type: 'number',
@@ -108,6 +118,9 @@ class YanaWallpaper extends Disposable implements IWorkbenchContribution {
 
 	private canvas: HTMLCanvasElement | undefined;
 	private theme: IWallpaperTheme | undefined;
+	private media: WallpaperMedia | undefined;
+	/** Đường dẫn đã nạp lỗi, để không thử lại liên tục. */
+	private brokenFile = '';
 	private frame = 0;
 	private lastFrameAt = 0;
 	private seconds = 0;
@@ -168,9 +181,19 @@ class YanaWallpaper extends Disposable implements IWorkbenchContribution {
 		}
 	}
 
+	/** File của người dùng khi đang chọn 'custom'; độ tương phản cao thì không có hình nền. */
+	private customFile(): string | undefined {
+		if (this.configurationService.getValue<string>(`${SECTION}.theme`) !== CUSTOM || isHighContrast(this.themeService.getColorTheme().type)) {
+			return undefined;
+		}
+		const file = this.configurationService.getValue<string>(`${SECTION}.file`);
+		return file !== this.brokenFile && wallpaperMediaKind(file) ? file : undefined;
+	}
+
 	private apply(): void {
 		this.theme = this.resolveTheme();
-		if (!this.theme) {
+		const file = this.customFile();
+		if (!this.theme && !file) {
 			this.remove();
 			return;
 		}
@@ -180,6 +203,19 @@ class YanaWallpaper extends Disposable implements IWorkbenchContribution {
 		container.style.setProperty('--yana-wallpaper-veil', `${100 - clamped}%`);
 		container.classList.add('yana-wallpaper');
 		this.recolour(this.theme);
+		if (file) {
+			this.removeCanvas();
+			if (this.media?.path !== file) {
+				this.media?.dispose();
+				this.media = new WallpaperMedia(file, wallpaperMediaKind(file)!, container, () => {
+					this.brokenFile = file;
+					this.apply();
+				});
+			}
+			this.schedule();
+			return;
+		}
+		this.removeMedia();
 		if (!this.canvas) {
 			this.canvas = container.ownerDocument.createElement('canvas');
 			this.canvas.className = 'yana-wallpaper-canvas';
@@ -225,6 +261,10 @@ class YanaWallpaper extends Disposable implements IWorkbenchContribution {
 
 	private schedule(): void {
 		this.cancel();
+		if (this.media) {
+			this.media.setPlaying(!this.media.element.ownerDocument.hidden && !this.isStill());
+			return;
+		}
 		if (!this.canvas || this.canvas.ownerDocument.hidden) {
 			return;
 		}
@@ -257,10 +297,20 @@ class YanaWallpaper extends Disposable implements IWorkbenchContribution {
 		this.frame = 0;
 	}
 
-	private remove(): void {
+	private removeCanvas(): void {
 		this.cancel();
 		this.canvas?.remove();
 		this.canvas = undefined;
+	}
+
+	private removeMedia(): void {
+		this.media?.dispose();
+		this.media = undefined;
+	}
+
+	private remove(): void {
+		this.removeCanvas();
+		this.removeMedia();
 		this.recolour(undefined);
 		this.layoutService.mainContainer.classList.remove('yana-wallpaper');
 		this.layoutService.mainContainer.style.removeProperty('--yana-wallpaper-veil');

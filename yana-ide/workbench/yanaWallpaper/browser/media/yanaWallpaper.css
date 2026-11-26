@@ -17,6 +17,11 @@
 	pointer-events: none;
 }
 
+/* Ảnh và video của người dùng phủ kín cửa sổ, cắt phần thừa. */
+.monaco-workbench.yana-wallpaper > .yana-wallpaper-media {
+	object-fit: cover;
+}
+
 .monaco-workbench.yana-wallpaper > .monaco-grid-view {
 	background: transparent;
 }

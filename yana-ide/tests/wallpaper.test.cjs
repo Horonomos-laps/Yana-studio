@@ -57,6 +57,31 @@ async function test(name, run) {
 		await settings.set('paused', true);
 		assert.strictEqual(written.get('wallpaper.theme'), 'koi');
 	});
+	await test('only a readable picture or video can become the wallpaper', async () => {
+		const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'yana-wall-'));
+		const make = (name, content) => { const file = path.join(dir, name); fs.writeFileSync(file, content); return file; };
+		written.clear();
+		await assert.rejects(settings.set('theme', 'custom'), /Invalid wallpaper setting/, 'no file chosen yet');
+		for (const bad of ['', 'relative.png', make('a.svg', '<svg/>'), make('b.gif', 'x'), make('empty.png', ''), path.join(dir, 'missing.png'), dir + '.png', make('c.png.exe', 'x')]) {
+			await assert.rejects(settings.useFile(bad), Error, bad);
+		}
+		assert.strictEqual(written.size, 0);
+		const good = make('ảnh nền.PNG', 'x');
+		await settings.useFile(good);
+		assert.strictEqual(written.get('wallpaper.file'), good);
+		assert.strictEqual(written.get('wallpaper.theme'), 'custom');
+		assert.strictEqual(settings.data().fileName, 'ảnh nền.PNG');
+		await settings.clearFile();
+		assert.strictEqual(written.get('wallpaper.theme'), 'auto');
+		assert.strictEqual(written.get('wallpaper.file'), '');
+		fs.rmSync(dir, { recursive: true, force: true });
+	});
+	await test('the workbench keeps the file setting out of project settings', () => {
+		const contribution = fs.readFileSync(path.join(workbench, 'yanaWallpaper.contribution.ts'), 'utf8');
+		assert.match(contribution, /'yana\.wallpaper\.file'[\s\S]{0,200}ConfigurationScope\.APPLICATION/);
+		const media = fs.readFileSync(path.join(workbench, 'wallpaperMedia.ts'), 'utf8');
+		for (const ext of ['png', 'jpg', 'jpeg', 'webp', 'mp4']) assert.ok(media.includes(`'.${ext}'`), ext);
+	});
 	await test('rejects empty, oversized, hostile and unknown values', async () => {
 		written.clear();
 		const bad = [

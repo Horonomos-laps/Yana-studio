@@ -5,18 +5,21 @@
 
 	const TEXT = {
 		vi: {
+			own: 'Ảnh hoặc video của bạn', ownSub: 'PNG, JPEG, WebP hoặc MP4, tối đa 200 MB. Video phát không tiếng.', choose: 'Chọn file…', use: 'Dùng file này', removeFile: 'Bỏ file',
 			scenes: 'Cảnh', scenesSub: 'Hình nền động phía sau toàn bộ giao diện.', auto: 'Tự động theo sáng/tối', plain: 'Nguyên bản', plainSub: 'Giao diện gốc một màu, không hình nền.', plainLight: 'Nguyên bản sáng', plainDark: 'Nguyên bản tối',
 			search: 'Tìm cảnh', all: 'Tất cả', light: 'Sáng', dark: 'Tối', empty: 'Không có cảnh nào khớp.',
 			look: 'Hiển thị', visibility: 'Độ hiện của hình nền', visibilitySub: 'Càng cao càng rõ cảnh, chữ khó đọc hơn.',
 			recolor: 'Đổi màu giao diện theo cảnh', recolorSub: 'Thanh bên, nút và viền lấy màu của cảnh.', reactive: 'Phản ứng khi agent chạy', reactiveSub: 'Cảnh nhanh hơn khi Yana đang làm, gợn sóng khi xong.', glyphs: 'Bộ ký tự', density: 'Mật độ lưới', paused: 'Đứng yên', pausedSub: 'Vẽ một khung hình, đỡ tốn pin.',
 		},
 		ko: {
+			own: '내 사진 또는 동영상', ownSub: 'PNG, JPEG, WebP, MP4, 최대 200 MB. 동영상은 무음으로 재생됩니다.', choose: '파일 선택…', use: '이 파일 사용', removeFile: '파일 제거',
 			scenes: '장면', scenesSub: '전체 화면 뒤에 표시되는 움직이는 배경입니다.', auto: '밝기 테마에 맞춤', plain: '기본', plainSub: '배경 없이 단색의 기본 화면입니다.', plainLight: '기본 밝게', plainDark: '기본 어둡게',
 			search: '장면 검색', all: '전체', light: '밝음', dark: '어두움', empty: '일치하는 장면이 없습니다.',
 			look: '표시', visibility: '배경 표시 정도', visibilitySub: '높을수록 장면이 선명하고 글자는 읽기 어려워집니다.',
 			recolor: '장면에 맞춰 화면 색 바꾸기', recolorSub: '사이드바, 버튼, 테두리가 장면 색을 따릅니다.', reactive: '에이전트 실행에 반응', reactiveSub: 'Yana가 작업 중이면 빨라지고 끝나면 파문이 생깁니다.', glyphs: '문자 세트', density: '격자 밀도', paused: '정지', pausedSub: '정지 화면으로 배터리를 아낍니다.',
 		},
 		en: {
+			own: 'Your picture or video', ownSub: 'PNG, JPEG, WebP or MP4, up to 200 MB. Videos play without sound.', choose: 'Choose a file…', use: 'Use this file', removeFile: 'Remove file',
 			scenes: 'Scenes', scenesSub: 'Animated wallpaper behind the whole interface.', auto: 'Follow light or dark theme', plain: 'Original', plainSub: 'The plain original interface, no wallpaper.', plainLight: 'Original light', plainDark: 'Original dark',
 			search: 'Search scenes', all: 'All', light: 'Light', dark: 'Dark', empty: 'No scenes match.',
 			look: 'Appearance', visibility: 'Wallpaper visibility', visibilitySub: 'Higher shows more of the scene and makes text harder to read.',
@@ -105,6 +108,22 @@
 		return node;
 	}
 
+	// Đường dẫn do hộp thoại của máy chọn; trang này chỉ gửi yêu cầu và hiện tên file.
+	function ownCard(data) {
+		const { el, button, card, request, load } = window.YanaUI;
+		const node = card(tr('own'), tr('ownSub'));
+		const run = (command) => request(command, {}).then(() => load('wallpaper'));
+		const actions = el('div', 'row');
+		actions.append(button(tr('choose'), data.theme === 'custom' ? '' : 'primary', () => run('pickWallpaperFile')));
+		if (data.fileName) {
+			node.append(el('div', 'muted', data.fileName));
+			if (data.theme !== 'custom') actions.append(button(tr('use'), 'primary', () => save('theme', 'custom')));
+			actions.append(button(tr('removeFile'), 'danger', () => run('clearWallpaperFile')));
+		}
+		node.append(actions);
+		return node;
+	}
+
 	function scenesCard(data) {
 		const { el, button, card } = window.YanaUI;
 		const node = card(tr('scenes'), tr('scenesSub'));
@@ -155,5 +174,5 @@
 		return node;
 	}
 
-	tabs.wallpaper = data => [plainCard(data), lookCard(data), scenesCard(data)];
+	tabs.wallpaper = data => [plainCard(data), ownCard(data), lookCard(data), scenesCard(data)];
 })();
