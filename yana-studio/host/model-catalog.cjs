@@ -308,6 +308,7 @@ const PROVIDERS = Object.freeze([
     requiresKey: true,
     envVar: "MISTRAL_API_KEY",
     defaultModel: "mistral-large-latest",
+    discoverable: false,
     baseModels: models([
       "mistral-large-latest",
       "mistral-large-latest",
@@ -323,6 +324,7 @@ const PROVIDERS = Object.freeze([
     requiresKey: true,
     envVar: "TOGETHER_API_KEY",
     defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    discoverable: false,
     baseModels: models([
       "meta-llama/Llama-3.3-70B-Instruct-Turbo",
       "meta-llama/Llama-3.3-70B-Instruct-Turbo",
@@ -338,6 +340,7 @@ const PROVIDERS = Object.freeze([
     requiresKey: true,
     envVar: "FIREWORKS_API_KEY",
     defaultModel: "accounts/fireworks/models/llama-v3p3-70b-instruct",
+    discoverable: false,
     baseModels: models([
       "accounts/fireworks/models/llama-v3p3-70b-instruct",
       "accounts/fireworks/models/llama-v3p3-70b-instruct",
@@ -353,6 +356,7 @@ const PROVIDERS = Object.freeze([
     requiresKey: true,
     envVar: "DEEPINFRA_API_KEY",
     defaultModel: "meta-llama/Llama-3.3-70B-Instruct",
+    discoverable: false,
     baseModels: models([
       "meta-llama/Llama-3.3-70B-Instruct",
       "meta-llama/Llama-3.3-70B-Instruct",
@@ -368,6 +372,7 @@ const PROVIDERS = Object.freeze([
     requiresKey: true,
     envVar: "CEREBRAS_API_KEY",
     defaultModel: "gpt-oss-120b",
+    discoverable: false,
     baseModels: models(["gpt-oss-120b", "gpt-oss-120b", "—", ["cloud"]]),
   },
   {
@@ -378,6 +383,7 @@ const PROVIDERS = Object.freeze([
     requiresKey: true,
     envVar: "SAMBANOVA_API_KEY",
     defaultModel: "Meta-Llama-3.3-70B-Instruct",
+    discoverable: false,
     baseModels: models([
       "Meta-Llama-3.3-70B-Instruct",
       "Meta-Llama-3.3-70B-Instruct",
@@ -393,6 +399,7 @@ const PROVIDERS = Object.freeze([
     requiresKey: true,
     envVar: "PERPLEXITY_API_KEY",
     defaultModel: "sonar-pro",
+    discoverable: false,
     baseModels: models(["sonar-pro", "sonar-pro", "—", ["cloud"]]),
   },
   {
@@ -403,6 +410,7 @@ const PROVIDERS = Object.freeze([
     requiresKey: true,
     envVar: "QWEN_API_KEY",
     defaultModel: "qwen-plus",
+    discoverable: false,
     baseModels: models(["qwen-plus", "qwen-plus", "—", ["cloud"]]),
   },
   {
@@ -413,6 +421,7 @@ const PROVIDERS = Object.freeze([
     requiresKey: true,
     envVar: "COHERE_API_KEY",
     defaultModel: "command-a-03-2025",
+    discoverable: false,
     baseModels: models([
       "command-a-03-2025",
       "command-a-03-2025",
@@ -428,6 +437,7 @@ const PROVIDERS = Object.freeze([
     requiresKey: true,
     envVar: "AI21_API_KEY",
     defaultModel: "jamba-large",
+    discoverable: false,
     baseModels: models(["jamba-large", "jamba-large", "—", ["cloud"]]),
   },
   {
@@ -438,6 +448,7 @@ const PROVIDERS = Object.freeze([
     requiresKey: true,
     envVar: "ERNIE_API_KEY",
     defaultModel: "ernie-4.0-8k",
+    discoverable: false,
     baseModels: models(["ernie-4.0-8k", "ernie-4.0-8k", "—", ["cloud"]]),
   },
   {
