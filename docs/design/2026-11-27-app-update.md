@@ -62,9 +62,9 @@ https://github.com/sparkle-project/sparkle-project.github.io/blob/master/documen
 - Chưa thử: giao diện hỏi cập nhật, tải qua Internet từ GitHub Releases, cảnh báo Gatekeeper và Keychain.
 
 ## Phát hành một bản (chủ dự án làm)
-1. Một lần duy nhất: chạy `yana-app/.build/artifacts/sparkle/Sparkle/bin/generate_keys`. Lệnh lưu khóa riêng vào
-   Keychain và in khóa công khai. Cất một bản dự phòng ngoại tuyến (`generate_keys -x <file>`), không đưa vào repo.
-2. `SPARKLE_PUBLIC_KEY=<khóa công khai> STUDIO_APP=<đường dẫn> yana-app/scripts/package.sh 1.1.0`
+1. Khóa đã tạo ngày 2026-11-27 (khóa riêng trong Keychain của chủ dự án, khóa công khai nằm trong
+   `scripts/package.sh`). Cất một bản dự phòng ngoại tuyến bằng `generate_keys -x <file ngoài repo>`.
+2. `STUDIO_APP=<đường dẫn> yana-app/scripts/package.sh 1.1.0`
 3. `yana-app/scripts/appcast.sh 1.1.0`
 4. Đính `appcast.xml`, file `.zip`, các file `.delta` và `.dmg` vào release `app-v1.1.0`.
    Giữ các zip cũ trong `yana-app/dist/updates` để lần sau còn tạo được delta.

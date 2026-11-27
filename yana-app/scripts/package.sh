@@ -64,14 +64,16 @@ info="$app/Contents/Info.plist"
 "$plist_buddy" -c "Add :CFBundleIconFile string Yana" "$info"
 "$plist_buddy" -c "Add :LSApplicationCategoryType string public.app-category.developer-tools" "$info"
 
-# In-place updates are switched on only when the release's public key is given (see scripts/appcast.sh).
-if [[ -n "${SPARKLE_PUBLIC_KEY:-}" ]]; then
+# In-place updates: the public half of the release key (not secret; the private half stays in the releaser's Keychain,
+# see scripts/appcast.sh). SPARKLE_PUBLIC_KEY="" builds an app that does not update itself in place.
+SPARKLE_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY-dpMzbW4MTKc33tpyzguqL8axdXv1PKv1pjzTMllbqDw=}"
+if [[ -n "$SPARKLE_PUBLIC_KEY" ]]; then
 	feed="${SPARKLE_FEED_URL:-https://github.com/Horonomos-laps/Yana-studio/releases/latest/download/appcast.xml}"
 	"$plist_buddy" -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$info"
 	"$plist_buddy" -c "Add :SUFeedURL string $feed" "$info"
 	"$plist_buddy" -c "Add :SUEnableAutomaticChecks bool true" "$info"
 else
-	echo "note: SPARKLE_PUBLIC_KEY is not set, so this build cannot update itself in place" >&2
+	echo "note: SPARKLE_PUBLIC_KEY is empty, so this build cannot update itself in place" >&2
 fi
 
 studio="${STUDIO_APP:-}"
