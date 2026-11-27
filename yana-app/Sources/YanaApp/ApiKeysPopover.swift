@@ -47,6 +47,9 @@ struct ApiKeysPopover: View {
 					.foregroundStyle(saved ? FB.successText : FB.textSecondary)
 				Button(saved ? L("set.keyReplace") : L("set.keyAdd")) { edit(id) }
 				if saved { Button(L("set.remove")) { settings.removeKey(id) } }
+				if !saved, settings.hasOldKeyCopy(id) {
+					Button(L("keys.deleteOld")) { settings.deleteOldKeyCopy(id) }.help(L("keys.deleteOldHelp"))
+				}
 			}
 		}
 		.frame(height: 32)

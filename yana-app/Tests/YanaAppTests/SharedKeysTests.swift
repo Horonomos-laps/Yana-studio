@@ -11,6 +11,10 @@ final class SharedKeysTests: XCTestCase {
 		var probe: Int32? = 0
 		var statusSilent = false
 		var refuse = false
+		var removed: Set<String> = []
+		var unanswered: Set<String> = []
+		var onSet: (() -> Void)?
+		var oldRuntime = false
 
 		lazy var keys = SharedKeys { [unowned self] arguments, input, _ in
 			let text = input.map { String(decoding: $0, as: UTF8.self) }
@@ -18,14 +22,26 @@ final class SharedKeysTests: XCTestCase {
 			func reply(_ status: Int32, _ out: String = "", _ error: String = "") -> RuntimeReply {
 				RuntimeReply(status: status, output: Data(out.utf8), error: error)
 			}
-			if arguments.last == "--help" { return probe.map { reply($0) } }
+			if arguments.last == "--help" { return probe.map { reply($0, oldRuntime ? "set <PROVIDER>" : "set --if-absent <PROVIDER>") } }
 			if arguments[2] == "status" {
 				if statusSilent { return nil }
 				let rows = shared.keys.map { "{\"provider\":\"\($0)\",\"native_secret_configured\":true}" }
+					+ removed.map { "{\"provider\":\"\($0)\",\"native_secret_removed\":true}" }
+					+ unanswered.map { "{\"provider\":\"\($0)\",\"native_secret_unknown\":true}" }
 				return reply(0, "[\(rows.joined(separator: ","))]")
 			}
 			if refuse { return reply(2, "", "[os] locked\n") }
-			if arguments[2] == "set" { shared[arguments[3]] = text } else { shared[arguments[3]] = nil }
+			if arguments[2] == "set" {
+				onSet?()
+				if arguments[3] == "--if-absent" {
+					if shared[arguments[4]] != nil { return reply(SharedKeys.alreadyStored) }
+					shared[arguments[4]] = text
+				} else {
+					shared[arguments[3]] = text
+				}
+			} else {
+				shared[arguments[3]] = nil
+			}
 			return reply(0)
 		}
 
@@ -60,7 +76,7 @@ final class SharedKeysTests: XCTestCase {
 		let world = World()
 		world.items["openai"] = "old"
 		XCTAssertNil(world.keys.save("sk-new", for: "openai", local: world.local).error)
-		let set = world.calls.first { $0.arguments.contains("set") }
+		let set = world.calls.first { $0.arguments.contains("set") && $0.arguments.last != "--help" }
 		XCTAssertEqual(set?.arguments, ["os", "credential", "set", "openai"])
 		XCTAssertEqual(set?.input, "sk-new")
 		XCTAssertNil(world.items["openai"])
@@ -116,11 +132,54 @@ final class SharedKeysTests: XCTestCase {
 		XCTAssertNil(outcome.error)
 		XCTAssertEqual(world.shared["openai"], "newer")
 		XCTAssertEqual(world.shared["groq"], "g")
+		XCTAssertTrue(world.calls.contains { $0.arguments == ["os", "credential", "set", "--if-absent", "groq"] })
 		XCTAssertEqual(outcome.state.held, ["openai", "groq"])
 		XCTAssertEqual(Set(world.items.keys), ["openai", "custom", "9router"])
 		world.items["kimi"] = "k"
 		world.refuse = true
 		XCTAssertNotNil(world.keys.migrate(local: world.local).error)
 		XCTAssertEqual(world.items["kimi"], "k")
+	}
+
+	func testAKeySavedWhileMovingIsNotReplaced() {
+		let world = World()
+		world.items["groq"] = "older"
+		world.onSet = { [unowned world] in world.shared["groq"] = "newer" }
+		let outcome = world.keys.migrate(local: world.local)
+		XCTAssertNil(outcome.error)
+		XCTAssertEqual(world.shared["groq"], "newer")
+		XCTAssertEqual(world.items["groq"], "older", "kept")
+		XCTAssertFalse(world.local.has("groq"))
+		XCTAssertTrue(outcome.state.held.contains("groq"))
+	}
+
+	func testAKeyRemovedElsewhereUnseenDoesNotRevive() {
+		let world = World()
+		world.items["openai"] = "old"
+		world.removed = ["openai"]
+		world.keys.refresh(world.local)
+		XCTAssertFalse(world.local.has("openai"))
+		XCTAssertTrue(SharedKeys.hasOldCopy("openai", local: world.local))
+		XCTAssertEqual(SharedKeys.movable(.known([]), local: world.local), [])
+		SharedKeys.deleteOldCopy("openai", local: world.local)
+		XCTAssertNil(world.items["openai"])
+		XCTAssertTrue(world.superseded.isEmpty)
+		XCTAssertFalse(world.calls.contains { $0.arguments.contains("remove") })
+	}
+
+	func testDeletingAnOldCopyLeavesAKeyInUseAlone() {
+		let world = World()
+		world.items["openai"] = "in-use"
+		SharedKeys.deleteOldCopy("openai", local: world.local)
+		XCTAssertEqual(world.items["openai"], "in-use")
+	}
+
+	func testAnUnansweredProviderMakesTheStateUnknown() {
+		let world = World()
+		world.unanswered = ["openai"]
+		XCTAssertEqual(world.keys.state(), .unknown)
+		world.unanswered = []
+		world.oldRuntime = true
+		XCTAssertEqual(world.keys.state(), .unsupported)
 	}
 }

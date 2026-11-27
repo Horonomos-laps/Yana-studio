@@ -45,7 +45,7 @@ const CLOUD_ADAPTERS = Object.freeze({
     url: "https://integrate.api.nvidia.com/v1/models",
     parse: openAiList,
   },
-  minimax: { url: "https://api.minimaxi.com/v1/models", parse: openAiList },
+  minimax: { url: "https://api.minimax.io/v1/models", parse: openAiList },
   glm: {
     url: "https://open.bigmodel.cn/api/paas/v4/models",
     parse: openAiList,

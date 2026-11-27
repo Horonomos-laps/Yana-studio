@@ -4,7 +4,7 @@ const Module = require('node:module');
 const path = require('node:path');
 
 const ext = path.resolve(process.argv[2] || path.join(__dirname, '../extensions/yana-agent'));
-const world = { secrets: new Map(), global: new Map(), shared: new Map(), calls: [], probe: 0, silent: false, refuse: false };
+const world = { secrets: new Map(), global: new Map(), shared: new Map(), calls: [], probe: 0, silent: false, refuse: false, removed: [], unanswered: [], onSet: undefined };
 const picks = [];
 const fakeVscode = {
 	EventEmitter: class { constructor() { this.listeners = []; } get event() { return fn => { this.listeners.push(fn); return { dispose() {} }; }; } fire() { this.listeners.forEach(fn => fn()); } dispose() {} },
@@ -25,13 +25,22 @@ const models = require(path.join(ext, 'features/models.js'));
 
 async function runtime(args, input) {
 	world.calls.push({ args, input });
-	const [, , verb, id] = args;
+	const [, , verb] = args;
+	const id = args[3] === '--if-absent' ? args[4] : args[3];
 	const reply = (status, output = '', error = '') => ({ status, output, error });
-	if (id === '--help') return world.probe === undefined ? undefined : reply(world.probe);
-	if (verb === 'status') return world.silent ? undefined : reply(0, JSON.stringify([...world.shared.keys()].map(provider => ({ provider, native_secret_configured: true }))));
+	if (id === '--help') return world.probe === undefined ? undefined : reply(world.probe, 'set --if-absent <PROVIDER>');
+	if (verb === 'status') return world.silent ? undefined : reply(0, JSON.stringify([
+		...[...world.shared.keys()].map(provider => ({ provider, native_secret_configured: true })),
+		...world.removed.map(provider => ({ provider, native_secret_removed: true })),
+		...world.unanswered.map(provider => ({ provider, native_secret_unknown: true })),
+	]));
 	if (verb === 'models') return reply(0, JSON.stringify({ data: [{ id: 'gpt-x' }, { id: 'text-embedding-3' }] }));
 	if (world.refuse) return reply(2, '', '[os] locked\n');
-	if (verb === 'set') world.shared.set(id, input); else world.shared.delete(id);
+	if (verb === 'set') {
+		world.onSet?.();
+		if (args[3] === '--if-absent' && world.shared.has(id)) return reply(3);
+		world.shared.set(id, input);
+	} else world.shared.delete(id);
 	return reply(0);
 }
 
@@ -86,8 +95,8 @@ const local = id => world.secrets.get(`yana.key.${id}`);
 	assert.deepStrictEqual(await models.shareLocalKeys(), []);
 	assert.strictEqual(world.shared.get('openai'), 'sk-newer-from-the-app', 'never overwritten');
 	assert.strictEqual(world.shared.get('groq'), 'gsk-mine');
-	const sets = world.calls.filter(c => c.args[2] === 'set');
-	assert.deepStrictEqual(sets.map(c => c.args), [['os', 'credential', 'set', 'groq']]);
+	const sets = world.calls.filter(c => c.args[2] === 'set' && c.args[3] !== '--help');
+	assert.deepStrictEqual(sets.map(c => c.args), [['os', 'credential', 'set', '--if-absent', 'groq']]);
 	assert.ok(!world.secrets.has('yana.key.groq'));
 	console.log('PASS migration moves over stdin and never overwrites a shared key');
 
@@ -110,5 +119,29 @@ const local = id => world.secrets.get(`yana.key.${id}`);
 	for (const id of ['groq', 'ollama', 'openai']) await models.chooseModel(id);
 	assert.ok(picks.length >= 2, 'the model list opens');
 	console.log('PASS a shared key lists models and choosing a model works');
-	console.log('shared-keys: 7 PASS');
+	world.secrets.set('yana.key.kimi', 'older');
+	world.onSet = () => world.shared.set('kimi', 'newer');
+	assert.deepStrictEqual(await models.shareLocalKeys(), []);
+	world.onSet = undefined;
+	assert.strictEqual(world.shared.get('kimi'), 'newer', 'not replaced');
+	assert.strictEqual(world.secrets.get('yana.key.kimi'), 'older', 'kept');
+	console.log('PASS a key saved while moving is not replaced');
+
+	world.secrets.set('yana.key.xai', 'old');
+	world.removed = ['xai'];
+	await models.refreshKeys();
+	assert.strictEqual(await models.hasKey('xai'), false, 'a removed key does not revive');
+	assert.strictEqual(await models.hasOldKeyCopy('xai'), true);
+	world.calls.length = 0;
+	await models.deleteOldKeyCopy('xai');
+	assert.ok(!world.secrets.has('yana.key.xai'));
+	assert.ok(!world.calls.some(c => c.args[2] === 'remove'));
+	world.removed = [];
+	console.log('PASS a key removed elsewhere stays unused and its old copy can be deleted');
+
+	world.unanswered = ['openai'];
+	assert.strictEqual((await models.refreshKeys()).kind, 'unknown');
+	world.unanswered = [];
+	console.log('PASS an unanswered provider makes the state unknown');
+	console.log('shared-keys: 10 PASS');
 })().catch(error => { console.error(error.stack); process.exit(1); });

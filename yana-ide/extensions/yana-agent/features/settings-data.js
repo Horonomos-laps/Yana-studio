@@ -61,7 +61,10 @@ async function modelsTab(context) {
 	const keyed = new Set(await keyedProviders());
 	const bin = binary();
 	const root = workspaceRoot();
+	const old = new Set();
+	for (const p of publicCatalog()) if (!keyed.has(p.id) && await models.hasOldKeyCopy(p.id)) old.add(p.id);
 	const providers = publicCatalog().map(p => ({
+		oldCopy: old.has(p.id),
 		id: p.id, label: p.label, company: p.company, kind: p.kind, category: p.category || (p.kind === 'local' ? 'local' : p.kind === 'cloud' ? 'cloud' : 'enterprise'),
 		badge: p.badge || '', modelsSummary: p.modelsSummary || `${p.modelCatalog.length} models`,
 		requiresKey: p.requiresKey, keyed: keyed.has(p.id), defaultModel: p.defaultModel, baseUrl: p.baseUrl || '',

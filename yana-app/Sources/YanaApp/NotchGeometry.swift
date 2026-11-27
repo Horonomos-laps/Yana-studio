@@ -14,9 +14,23 @@ enum NotchLook: Equatable {
 	case open          // the panel
 }
 
+// How big the open panel is, chosen in Settings.
+enum NotchSize: String, CaseIterable {
+	case small, regular, large
+	var open: CGSize {
+		switch self {
+		case .small: CGSize(width: 560, height: 200)
+		case .regular: NotchGeometry.openSize
+		case .large: CGSize(width: 680, height: 240)
+		}
+	}
+	static func from(_ raw: String?) -> NotchSize { raw.flatMap(NotchSize.init(rawValue:)) ?? .regular }
+}
+
 struct NotchGeometry: Equatable {
 	// The camera housing, nil on a screen without one.
 	let notch: CGSize?
+	var panel: NotchSize = .regular
 	var hasNotch: Bool { notch != nil }
 
 	static let handleSize = CGSize(width: 100, height: 5)   // stand-in on a screen without a notch
@@ -41,7 +55,7 @@ struct NotchGeometry: Equatable {
 		case .activityHover: return CGSize(width: base.width + 2 * Self.wing + 8, height: rowHeight + 3)
 		case .glance:
 			return CGSize(width: base.width + 2 * Self.wing + Self.glanceExtraWidth, height: rowHeight + Self.glanceExtraHeight)
-		case .open: return Self.openSize
+		case .open: return panel.open
 		}
 	}
 

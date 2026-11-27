@@ -40,14 +40,18 @@ final class NotchController {
 	private var closeWork: DispatchWorkItem?
 	private var openWork: DispatchWorkItem?
 	private var debugHold = false   // only with YANA_NOTCH_SHOT
+	private var swipe = SwipeAccumulator()
+	private var dragCountAtDown = NSPasteboard(name: .drag).changeCount
 
 	init(screen: NSScreen) {
 		self.screen = screen
 		model = NotchModel(screen: screen)
 		panel = NotchPanel(frame: NotchGeometry.windowFrame(screenFrame: screen.frame))
-		let host = FirstMouseHostingView(rootView: NotchView(model: model, onSettings: {
+		let host = FirstMouseHostingView(rootView: NotchView(model: model, onSettings: { [weak model] in
+			PageRequest.open("Settings")
 			NSApp.activate(ignoringOtherApps: true)
 			_ = WindowKeeper.show()
+			model?.close()
 		}))
 		host.sizingOptions = []
 		panel.contentView = host
@@ -55,14 +59,68 @@ final class NotchController {
 		panel.orderFrontRegardless()
 		if let path = ProcessInfo.processInfo.environment["YANA_NOTCH_SHOT"] { scheduleShot(to: path) }
 
-		let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .leftMouseDragged]
-		monitors.append(NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
-			Task { @MainActor in self?.update() }
+		let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .leftMouseDragged, .leftMouseUp]
+		monitors.append(NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
+			let type = event.type
+			Task { @MainActor in self?.mouse(type) }
 		} as Any)
 		monitors.append(NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
-			Task { @MainActor in self?.update() }
+			let type = event.type
+			Task { @MainActor in self?.mouse(type) }
 			return event
 		} as Any)
+		// Scrolling over the notch reaches this app because the panel takes the mouse there.
+		monitors.append(NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+			MainActor.assumeIsolated { self?.scrolled(event) == true } ? nil : event
+		} as Any)
+	}
+
+	private func mouse(_ type: NSEvent.EventType) {
+		switch type {
+		case .leftMouseDown: dragCountAtDown = NSPasteboard(name: .drag).changeCount
+		case .leftMouseDragged: watchFileDrag()
+		case .leftMouseUp: model.draggingFiles = false
+		default: break
+		}
+		update()
+	}
+
+	// Files dragged to the top of the screen open the shelf. Only the pasteboard's types are looked at here.
+	private func watchFileDrag() {
+		guard !model.draggingFiles, Shelf.dropZone(screenFrame: screen.frame).contains(NSEvent.mouseLocation) else { return }
+		let board = NSPasteboard(name: .drag)
+		guard Shelf.isFileDrag(countAtMouseDown: dragCountAtDown, countNow: board.changeCount,
+		                       carriesFiles: board.types?.contains(.fileURL) == true) else { return }
+		model.draggingFiles = true
+		model.tab = .files
+		model.open()
+	}
+
+	// True when the scroll was a notch gesture and should go no further.
+	private func scrolled(_ event: NSEvent) -> Bool {
+		guard event.window === panel, event.hasPreciseScrollingDeltas, event.momentumPhase.isEmpty else { return false }
+		if event.phase.contains(.began) { swipe.begin() }
+		guard event.phase.contains(.changed) || event.phase.contains(.began) else { return false }
+		let move = SwipeAccumulator.fingers(dx: event.scrollingDeltaX, dy: event.scrollingDeltaY,
+		                                    inverted: event.isDirectionInvertedFromDevice)
+		guard let direction = swipe.add(move) else { return false }
+		let inHeader = NSEvent.mouseLocation.y > screen.frame.maxY - model.geometry.rowHeight - 8
+		guard let action = NotchSwipeAction.of(direction, open: model.isOpen, inHeader: inHeader,
+		                                       contentScrolls: model.tab.scrolls, hasMusic: model.music != nil) else { return false }
+		perform(action)
+		return true
+	}
+
+	private func perform(_ action: NotchSwipeAction) {
+		switch action {
+		case .open: model.open()
+		case .close: model.close()
+		case .nextPage: withAnimation(.notchHover) { model.tab = model.tab.moved(by: 1) }
+		case .previousPage: withAnimation(.notchHover) { model.tab = model.tab.moved(by: -1) }
+		case .nextTrack: MusicStore.shared.next()
+		case .previousTrack: MusicStore.shared.previous()
+		}
+		if !NotchPrefs.quiet { NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now) }
 	}
 
 	// Debug only: open the notch and save what the panel's content draws, so the panel can be checked without screen
@@ -122,6 +180,8 @@ final class NotchController {
 		// Only over the shape does the panel take the mouse; everywhere else clicks pass through.
 		panel.ignoresMouseEvents = !inside
 		if !inside { openWork?.cancel(); openWork = nil }
+		// A drag that ended on another app may send no mouse-up here.
+		if model.draggingFiles, NSEvent.pressedMouseButtons & 1 == 0 { model.draggingFiles = false }
 		// Typing ended when the panel lost the keyboard (a click elsewhere).
 		if model.typing, !panel.isKeyWindow { model.typing = false }
 		model.setHovering(inside)
@@ -136,7 +196,8 @@ final class NotchController {
 				openWork = work
 				DispatchQueue.main.asyncAfter(deadline: .now() + Self.openDelay, execute: work)
 			}
-		} else if model.isOpen, !model.typing, !debugHold, closeWork == nil {
+		} else if model.isOpen, !model.typing, !model.draggingFiles, !debugHold, closeWork == nil,
+		          NSEvent.pressedMouseButtons & 1 == 0 {
 			let work = DispatchWorkItem { [weak self] in
 				self?.closeWork = nil
 				self?.model.close()
