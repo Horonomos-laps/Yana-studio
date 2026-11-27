@@ -983,7 +983,8 @@ test("local model inspection isolates offline adapters", async () => {
 });
 test("every cloud provider discovers the account-visible model list", async () => {
   const cloudProviders = PROVIDERS.filter(
-    (provider) => provider.kind === "cloud",
+    // Providers marked discoverable: false have no model list here; the person types the model ID.
+    (provider) => provider.kind === "cloud" && provider.discoverable !== false,
   );
   assert.deepEqual(
     Object.keys(CLOUD_ADAPTERS).sort(),
@@ -1072,10 +1073,10 @@ test("Studio provider catalog stays aligned with the canonical Rust catalog", ne
     PROVIDERS.map((provider) => provider.id),
     rustProviders,
   );
-  assert.equal(PROVIDERS.length, 19);
+  assert.equal(PROVIDERS.length, 32);
   assert.equal(
     PROVIDERS.filter((provider) => provider.kind === "local").length,
-    6,
+    8,
   );
   assert.equal(publicCatalog().at(-1).canonical, false);
   assert.throws(() => providerById("invented"), /Unsupported/);
