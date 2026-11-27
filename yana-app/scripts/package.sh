@@ -119,6 +119,12 @@ ln -s /Applications "$stage/Applications"
 # ASCII on purpose, because Finder looks the item up by name below and accented names differ between Unicode forms.
 guide_name="Huong dan - Read me first.png"
 cp "$here/dmg/install-guide.png" "$stage/$guide_name"
+# One button for people on a version that cannot update itself: it swaps the installed app for this one
+# (dmg/update.sh; the old app goes to the Trash). Plain ASCII name, for the same reason as the guide.
+updater_name="Cap nhat Yana.app"
+osacompile -o "$stage/$updater_name" "$here/dmg/update.applescript"
+cp "$here/dmg/update.sh" "$stage/$updater_name/Contents/Resources/update.sh"
+codesign --force --sign - "$stage/$updater_name"
 mkdir -p "$stage/.background"
 "$bin_dir/YanaApp" --dmg-background "$icon_dir/bg@2x.png" >/dev/null
 sips -z 460 640 "$icon_dir/bg@2x.png" --out "$icon_dir/bg.png" >/dev/null
@@ -144,7 +150,8 @@ tell application "Finder"
 		set background picture of opts to file ".background:background.tiff"
 		set position of item "Yana.app" of container window to {160, 200}
 		set position of item "Applications" of container window to {480, 200}
-		set position of item "$guide_name" of container window to {320, 322}
+		set position of item "$guide_name" of container window to {230, 322}
+		set position of item "$updater_name" of container window to {410, 322}
 		close
 		open
 		update without registering applications

@@ -68,3 +68,12 @@ https://github.com/sparkle-project/sparkle-project.github.io/blob/master/documen
 3. `yana-app/scripts/appcast.sh 1.1.0`
 4. Đính `appcast.xml`, file `.zip`, các file `.delta` và `.dmg` vào release `app-v1.1.0`.
    Giữ các zip cũ trong `yana-app/dist/updates` để lần sau còn tạo được delta.
+
+## Lần chuyển từ 1.0.0 (một lần duy nhất)
+- Ổ đĩa cài đặt có nút `Cap nhat Yana.app`: hỏi một lần, rồi `dmg/update.sh` thay app trong Applications; bản cũ vào
+  Thùng rác. Yana hoặc Studio còn mở thì dừng và báo, không tự đóng.
+- Đính file `.dmg` vào release **trước** file `.zip`: app 1.0.0 tải file `.dmg` hoặc `.zip` đầu tiên trong danh sách.
+- Kiểm `bash yana-app/scripts/test-update-helper.sh` (13 trường hợp, trên app giả).
+- Chưa thử: bấm nút trên ổ đĩa thật; ổ đĩa tải bằng trình duyệt (macOS có thể cảnh báo hoặc chạy nút từ chỗ khác,
+  khi đó nút báo lỗi và người dùng kéo tay như cũ).
+
