@@ -10,11 +10,14 @@ const { execFileSync } = require("node:child_process");
 // not hold them, so look for a Yana-AI checkout: YANA_ROOT_DIR, or the old monorepo position three
 // levels up. Locally the comparison is skipped when none is found; in CI (CI is set) it must run
 // and fail loudly instead.
-const yanaAiRoot = process.env.YANA_ROOT_DIR || path.resolve(__dirname, "../../..");
+const yanaAiRoot =
+  process.env.YANA_ROOT_DIR || path.resolve(__dirname, "../../..");
 const yanaAiPath = (...parts) => path.join(yanaAiRoot, ...parts);
 const needsYanaAi = fs.existsSync(yanaAiPath("src", "model", "catalog.rs"))
   ? {}
-  : { skip: process.env.CI ? false : "set YANA_ROOT_DIR to a Yana-AI checkout" };
+  : {
+      skip: process.env.CI ? false : "set YANA_ROOT_DIR to a Yana-AI checkout",
+    };
 const {
   Projects,
   parseStatus,
@@ -119,22 +122,26 @@ test("token usage keeps provider-reported rounds and honest totals", () => {
   assert.equal(summary.lastRecordedAt, "2026-09-08T11:00:00.000Z");
 });
 
-test("Studio capability surface stays aligned with Rust registry", needsYanaAi, () => {
-  const source = fs.readFileSync(
-    yanaAiPath("src", "capability", "registry_data.rs"),
-    "utf8",
-  );
-  const names = [
-    ...source.matchAll(/CapabilityDescriptor\s*\{\s*name:\s*"([^"]+)"/g),
-  ].map((match) => match[1]);
-  assert.deepEqual(
-    CAPABILITIES.map(([name]) => name),
-    names,
-  );
-  // Floor, not an exact count: the registry grows (harness.audit made it 14), and the deepEqual above
-  // already proves Studio lists every capability the Rust registry has, in the same order.
-  assert.ok(names.length >= 13, "the Rust registry lost capabilities");
-});
+test(
+  "Studio capability surface stays aligned with Rust registry",
+  needsYanaAi,
+  () => {
+    const source = fs.readFileSync(
+      yanaAiPath("src", "capability", "registry_data.rs"),
+      "utf8",
+    );
+    const names = [
+      ...source.matchAll(/CapabilityDescriptor\s*\{\s*name:\s*"([^"]+)"/g),
+    ].map((match) => match[1]);
+    assert.deepEqual(
+      CAPABILITIES.map(([name]) => name),
+      names,
+    );
+    // Floor, not an exact count: the registry grows (harness.audit made it 14), and the deepEqual above
+    // already proves Studio lists every capability the Rust registry has, in the same order.
+    assert.ok(names.length >= 13, "the Rust registry lost capabilities");
+  },
+);
 
 test("command reference parser reads real CLI tables", needsYanaAi, () => {
   const markdown = fs.readFileSync(yanaAiPath("COMMANDS.md"), "utf8");
@@ -725,7 +732,12 @@ test("Mixture of Agents preset persists across reopening and rejects invalid con
     name: "Test preset",
     enabled: true,
     referenceModels: [
-      { id: "r1", provider: "anthropic", model: "claude-sonnet-5", enabled: true },
+      {
+        id: "r1",
+        provider: "anthropic",
+        model: "claude-sonnet-5",
+        enabled: true,
+      },
     ],
     aggregator: { provider: "openai", model: "gpt-4o-mini" },
     contextWindow: "auto",
@@ -742,7 +754,9 @@ test("Mixture of Agents preset persists across reopening and rejects invalid con
     () =>
       reopened.save({
         mixtureOfAgents: {
-          presets: [{ ...validPreset, aggregator: { provider: "made-up", model: "x" } }],
+          presets: [
+            { ...validPreset, aggregator: { provider: "made-up", model: "x" } },
+          ],
           defaultPresetId: "",
         },
       }),
@@ -771,7 +785,9 @@ test("Mixture of Agents preset persists across reopening and rejects invalid con
           presets: [
             {
               ...validPreset,
-              referenceModels: [{ ...validPreset.referenceModels[0], enabled: false }],
+              referenceModels: [
+                { ...validPreset.referenceModels[0], enabled: false },
+              ],
             },
           ],
           defaultPresetId: "",
@@ -791,7 +807,10 @@ test("Mixture of Agents preset persists across reopening and rejects invalid con
     /Mixture of Agents/,
     "defaultPresetId must point at a real, enabled preset",
   );
-  assert.equal(isValidMoAConfig({ presets: [validPreset], defaultPresetId: "" }), true);
+  assert.equal(
+    isValidMoAConfig({ presets: [validPreset], defaultPresetId: "" }),
+    true,
+  );
 });
 test("titleModel config persists across reopening, defaults on a fresh store, and rejects invalid configs", (context) => {
   const root = fixture(context);
@@ -811,7 +830,12 @@ test("titleModel config persists across reopening, defaults on a fresh store, an
   assert.throws(
     () =>
       reopened.save({
-        titleModel: { enabled: true, useMainModel: true, provider: "openai", model: "x" },
+        titleModel: {
+          enabled: true,
+          useMainModel: true,
+          provider: "openai",
+          model: "x",
+        },
       }),
     /title model/i,
     "useMainModel:true must not also carry a leftover provider/model",
@@ -819,7 +843,12 @@ test("titleModel config persists across reopening, defaults on a fresh store, an
   assert.throws(
     () =>
       reopened.save({
-        titleModel: { enabled: true, useMainModel: false, provider: "openai", model: "" },
+        titleModel: {
+          enabled: true,
+          useMainModel: false,
+          provider: "openai",
+          model: "",
+        },
       }),
     /title model/i,
     "useMainModel:false requires a real model id",
@@ -827,7 +856,12 @@ test("titleModel config persists across reopening, defaults on a fresh store, an
   assert.throws(
     () =>
       reopened.save({
-        titleModel: { enabled: true, useMainModel: false, provider: "made-up", model: "x" },
+        titleModel: {
+          enabled: true,
+          useMainModel: false,
+          provider: "made-up",
+          model: "x",
+        },
       }),
     /title model/i,
     "useMainModel:false requires a known provider",
@@ -1056,41 +1090,48 @@ test("cloud discovery excludes non-chat model families", () => {
     ["gpt-5"],
   );
 });
-test("Studio provider catalog stays aligned with the canonical Rust catalog", needsYanaAi, () => {
-  const source = fs.readFileSync(
-    yanaAiPath("src", "model", "catalog.rs"),
-    "utf8",
-  );
-  const block = source.match(
-    /const PROVIDERS:[\s\S]*?= &\[([\s\S]*?)\n\];/,
-  )?.[1];
-  assert.ok(block);
-  const rustProviders = [...block.matchAll(/name: "([^"]+)"/g)].map(
-    (match) => match[1],
-  );
-  assert.deepEqual(
-    PROVIDERS.map((provider) => provider.id),
-    rustProviders,
-  );
-  assert.equal(PROVIDERS.length, 19);
-  assert.equal(
-    PROVIDERS.filter((provider) => provider.kind === "local").length,
-    6,
-  );
-  assert.equal(publicCatalog().at(-1).canonical, false);
-  assert.throws(() => providerById("invented"), /Unsupported/);
-  const implementations = [
-    fs.readFileSync(yanaAiPath("src", "chat", "anthropic.rs"), "utf8"),
-    fs.readFileSync(yanaAiPath("src", "chat", "gemini.rs"), "utf8"),
-    fs.readFileSync(yanaAiPath("src", "chat", "openai_compat.rs"), "utf8"),
-  ].join("\n");
-  for (const provider of PROVIDERS) {
-    const model = provider.defaultModel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    assert.match(implementations, new RegExp(model));
-    if (provider.envVar)
-      assert.match(implementations, new RegExp(provider.envVar));
-  }
-});
+test(
+  "Studio provider catalog stays aligned with the canonical Rust catalog",
+  needsYanaAi,
+  () => {
+    const source = fs.readFileSync(
+      yanaAiPath("src", "model", "catalog.rs"),
+      "utf8",
+    );
+    const block = source.match(
+      /const PROVIDERS:[\s\S]*?= &\[([\s\S]*?)\n\];/,
+    )?.[1];
+    assert.ok(block);
+    const rustProviders = [...block.matchAll(/name: "([^"]+)"/g)].map(
+      (match) => match[1],
+    );
+    assert.deepEqual(
+      PROVIDERS.map((provider) => provider.id),
+      rustProviders,
+    );
+    assert.equal(PROVIDERS.length, 32);
+    assert.equal(
+      PROVIDERS.filter((provider) => provider.kind === "local").length,
+      8,
+    );
+    assert.equal(publicCatalog().at(-1).canonical, false);
+    assert.throws(() => providerById("invented"), /Unsupported/);
+    const implementations = [
+      fs.readFileSync(yanaAiPath("src", "chat", "anthropic.rs"), "utf8"),
+      fs.readFileSync(yanaAiPath("src", "chat", "gemini.rs"), "utf8"),
+      fs.readFileSync(yanaAiPath("src", "chat", "openai_compat.rs"), "utf8"),
+    ].join("\n");
+    for (const provider of PROVIDERS) {
+      const model = provider.defaultModel.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
+      assert.match(implementations, new RegExp(model));
+      if (provider.envVar)
+        assert.match(implementations, new RegExp(provider.envVar));
+    }
+  },
+);
 test("model credentials are encrypted and isolated per provider", (context) => {
   const directory = fixture(context);
   const encryptionKey = crypto.randomBytes(32);
