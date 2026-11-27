@@ -75,10 +75,15 @@ struct RootView: View {
 		engine.attach(urls)
 	}
 
+	private func takePageRequest() {
+		if let page = PageRequest.take() { selected = page }
+	}
+
 	var body: some View {
 		window
-			.onAppear { takeInbox() }
+			.onAppear { takeInbox(); takePageRequest() }
 			.onReceive(NotificationCenter.default.publisher(for: ChatInbox.arrived)) { _ in takeInbox() }
+			.onReceive(NotificationCenter.default.publisher(for: PageRequest.arrived)) { _ in takePageRequest() }
 	}
 
 	private var window: some View {

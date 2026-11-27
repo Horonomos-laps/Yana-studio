@@ -55,4 +55,14 @@ final class NotchShelfTests: XCTestCase {
 		XCTAssertFalse(Shelf.dropZone(screenFrame: screen).contains(CGPoint(x: 756, y: 800)))
 		XCTAssertFalse(Shelf.dropZone(screenFrame: screen).contains(CGPoint(x: 100, y: 981)))
 	}
+
+	@MainActor
+	func testAPageRequestIsTakenOnce() {
+		_ = PageRequest.take()
+		XCTAssertNil(PageRequest.take())
+		PageRequest.open("Chat")
+		PageRequest.open("Settings")
+		XCTAssertEqual(PageRequest.take(), "Settings", "the latest wins")
+		XCTAssertNil(PageRequest.take())
+	}
 }

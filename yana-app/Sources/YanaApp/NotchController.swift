@@ -47,9 +47,11 @@ final class NotchController {
 		self.screen = screen
 		model = NotchModel(screen: screen)
 		panel = NotchPanel(frame: NotchGeometry.windowFrame(screenFrame: screen.frame))
-		let host = FirstMouseHostingView(rootView: NotchView(model: model, onSettings: {
+		let host = FirstMouseHostingView(rootView: NotchView(model: model, onSettings: { [weak model] in
+			PageRequest.open("Settings")
 			NSApp.activate(ignoringOtherApps: true)
 			_ = WindowKeeper.show()
+			model?.close()
 		}))
 		host.sizingOptions = []
 		panel.contentView = host

@@ -127,6 +127,23 @@ enum ChatInbox {
 	}
 }
 
+// A page asked for from outside the window (the notch's gear). It waits until the window takes it.
+@MainActor
+enum PageRequest {
+	static let arrived = Notification.Name("yana.page.request")
+	private static var waiting: String?
+
+	static func open(_ page: String) {
+		waiting = page
+		NotificationCenter.default.post(name: arrived, object: nil)
+	}
+
+	static func take() -> String? {
+		defer { waiting = nil }
+		return waiting
+	}
+}
+
 struct FilesTab: View {
 	@ObservedObject private var store = ShelfStore.shared
 
