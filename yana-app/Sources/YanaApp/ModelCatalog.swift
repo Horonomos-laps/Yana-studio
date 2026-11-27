@@ -82,32 +82,35 @@ final class ModelCatalog: ObservableObject {
 		guard !loading else { loadAgain = true; return }
 		loading = true
 		let settings = AppSettings.shared
-		var plan: [(String, Endpoint?, String?)] = [] // provider, endpoint, key
+		var plan: [(String, Endpoint?, Bool)] = [] // provider, endpoint, whether this app's saved key is sent
 		for info in providerCatalog where info.kind == .cloud && settings.hasKey(info.id) {
-			plan.append((info.id, Self.cloud[info.id], settings.apiKey(info.id)))
+			plan.append((info.id, Self.cloud[info.id], settings.usesLocalKey(info.id)))
 		}
 		let base = settings.baseURL.trimmingCharacters(in: .whitespaces)
 		if !base.isEmpty {
 			let url = base.hasSuffix("/chat/completions")
 				? String(base.dropLast("/chat/completions".count)) + "/models"
 				: base.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/models"
-			plan.append(("custom", Endpoint(url: url, auth: .bearer), settings.apiKey("custom")))
+			plan.append(("custom", Endpoint(url: url, auth: .bearer), settings.usesLocalKey("custom")))
 		}
 		// Providers the person added (CustomProviders.swift): each is asked for its own model list.
 		for item in CustomProviderStore.shared.items {
-			plan.append((item.id, Endpoint(url: CustomProviders.modelsURL(for: item.baseURL), auth: .bearer), settings.apiKey(item.id)))
+			plan.append((item.id, Endpoint(url: CustomProviders.modelsURL(for: item.baseURL), auth: .bearer), settings.usesLocalKey(item.id)))
 		}
 		groups = plan.map { ProviderModels(provider: $0.0, state: $0.1 == nil ? .manual : .loading) }
 		let shared = settings.sharedState.held
 		Task {
 			async let locals = Self.probeLocals()
 			let cloudResults = await withTaskGroup(of: (String, ProviderModels.State, [String]).self) { group in
-				for (provider, endpoint, key) in plan {
+				for (provider, endpoint, ownKey) in plan {
 					guard let endpoint else { continue }
 					if shared.contains(provider) {
 						group.addTask { await SharedKeys.background { Self.fetchShared(provider) } }
 					} else {
-						group.addTask { await Self.fetch(provider, endpoint, key) }
+						group.addTask {
+							let key = ownKey ? await KeyReads.read(provider) : nil
+							return await Self.fetch(provider, endpoint, key)
+						}
 					}
 				}
 				var all: [(String, ProviderModels.State, [String])] = []
