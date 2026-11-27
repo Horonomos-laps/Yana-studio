@@ -41,6 +41,10 @@ if [[ -e "$app" ]]; then mv "$app" "$dist/.old-$(date +%s).app"; fi
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 
 cp "$bin_dir/YanaApp" "$app/Contents/MacOS/YanaApp"
+# Sparkle, which updates the app in place, travels inside the bundle.
+mkdir -p "$app/Contents/Frameworks"
+ditto "$bin_dir/Sparkle.framework" "$app/Contents/Frameworks/Sparkle.framework"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$app/Contents/MacOS/YanaApp"
 for bundle in "$bin_dir"/*.bundle; do cp -R "$bundle" "$app/Contents/Resources/"; done
 # The third-party MediaRemote adapter (BSD-3, see Resources/MediaRemote/README.md): lets the notch read what any app plays.
 cp -R "$(dirname "$0")/../Resources/MediaRemote" "$app/Contents/Resources/MediaRemote"
@@ -59,6 +63,16 @@ info="$app/Contents/Info.plist"
 "$plist_buddy" -c "Add :CFBundlePackageType string APPL" "$info"
 "$plist_buddy" -c "Add :CFBundleIconFile string Yana" "$info"
 "$plist_buddy" -c "Add :LSApplicationCategoryType string public.app-category.developer-tools" "$info"
+
+# In-place updates are switched on only when the release's public key is given (see scripts/appcast.sh).
+if [[ -n "${SPARKLE_PUBLIC_KEY:-}" ]]; then
+	feed="${SPARKLE_FEED_URL:-https://github.com/Horonomos-laps/Yana-studio/releases/latest/download/appcast.xml}"
+	"$plist_buddy" -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$info"
+	"$plist_buddy" -c "Add :SUFeedURL string $feed" "$info"
+	"$plist_buddy" -c "Add :SUEnableAutomaticChecks bool true" "$info"
+else
+	echo "note: SPARKLE_PUBLIC_KEY is not set, so this build cannot update itself in place" >&2
+fi
 
 studio="${STUDIO_APP:-}"
 if [[ -n "$studio" ]]; then
@@ -79,6 +93,7 @@ if [[ -n "$studio" ]]; then
 	codesign --force --deep --sign - "$app/Contents/Applications/Yana Studio.app"
 fi
 
+codesign --force --deep --sign - "$app/Contents/Frameworks/Sparkle.framework"
 codesign --force --sign - "$app"
 codesign --verify --deep --strict "$app"
 
@@ -86,6 +101,11 @@ zip_out="$dist/Yana-$version.zip"
 dmg_out="$dist/Yana-$version.dmg"
 rm -f "$zip_out" "$dmg_out"
 ditto -c -k --keepParent "$app" "$zip_out"
+# SKIP_DMG=1 stops after the .zip (trial builds; the .dmg needs Finder to lay out its window).
+if [[ -n "${SKIP_DMG:-}" ]]; then
+	echo "built $zip_out"
+	exit 0
+fi
 
 # The install window: DmgBackground (1x + 2x in one tiff) behind Yana.app on the left and the Applications
 # link on the right. Finder writes the layout into the volume's .DS_Store, so the image is laid out on a

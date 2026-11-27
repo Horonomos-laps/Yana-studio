@@ -27,3 +27,8 @@ No code or files of OneNotch were used or examined; only what its screens show.
 | A closed pill with a mark on the left wing and moving bars on the right wing while something runs | Its live activity |
 
 If code from notchd is ever copied, it will keep its license header and be marked here as copied.
+
+## In-place updates
+
+Sparkle (https://github.com/sparkle-project/Sparkle, MIT with the external licenses listed in its LICENSE),
+version 2.10.1, bundled as Sparkle.framework.

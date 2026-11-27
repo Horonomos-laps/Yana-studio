@@ -42,6 +42,12 @@ final class AppUpdater: ObservableObject {
 
 	// `userAsked` shows "you have the newest" feedback and ignores a skipped version.
 	func check(userAsked: Bool = false) async {
+		// A build set up for in-place updates leaves checking, downloading and installing to Sparkle.
+		InPlaceUpdater.shared.start()
+		if InPlaceUpdater.shared.isOn {
+			if userAsked { InPlaceUpdater.shared.check() }
+			return
+		}
 		guard let installed = Self.installedVersion else { return }
 		guard let release = await Self.latestRelease() else {
 			if userAsked { phase = .failed(L("upd.offline")) }
