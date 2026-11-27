@@ -4,7 +4,19 @@ import SwiftUI
 
 // What one screen's notch is doing. The controller changes it from mouse events; the view only draws it.
 
-enum NotchTab: Int, Equatable, CaseIterable { case yana, home, clipboard }
+enum NotchTab: Int, Equatable, CaseIterable {
+	case yana, home, files, clipboard
+
+	// The page this many steps away, stopping at either end.
+	func moved(by steps: Int) -> NotchTab {
+		let all = Self.allCases
+		let here = all.firstIndex(of: self) ?? 0
+		return all[min(max(here + steps, 0), all.count - 1)]
+	}
+
+	// Pages whose content scrolls by itself, so a swipe over it belongs to the list.
+	var scrolls: Bool { self != .yana }
+}
 
 @MainActor
 final class NotchModel: ObservableObject {
@@ -15,6 +27,7 @@ final class NotchModel: ObservableObject {
 	// Set from YanaActivity: something is happening (a reply is being written or a command waits for a decision).
 	@Published var hasActivity = false
 	@Published var glancing = false
+	var draggingFiles = false   // a file drag is over the notch: do not close
 	@Published var music: NowPlaying?            // the track playing now, nil when nothing plays
 	@Published var musicTint: UInt32 = ArtworkTint.fallback
 	private var yanaActive = false
@@ -30,7 +43,7 @@ final class NotchModel: ObservableObject {
 		let size = NotchGeometry.notch(topInset: screen.safeAreaInsets.top, screenWidth: screen.frame.width,
 		                               leftAreaWidth: screen.auxiliaryTopLeftArea?.width,
 		                               rightAreaWidth: screen.auxiliaryTopRightArea?.width)
-		geometry = NotchGeometry(notch: size)
+		geometry = NotchGeometry(notch: size, panel: NotchPrefs.size)
 		displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) ?? 0
 		// Yana's own work drives the closed look: wings while busy, and a line under them while it waits for a decision.
 		cancellable = YanaActivity.shared.$run.receive(on: RunLoop.main).sink { [weak self] run in
@@ -86,6 +99,8 @@ enum NotchPrefs {
 	static let quietKey = "yana.notch.noHaptics"
 	static let hoverKey = "yana.notch.openOnHover"
 	static let solidKey = "yana.notch.solid"
+	static let sizeKey = "yana.notch.size"
+	static var size: NotchSize { NotchSize.from(UserDefaults.standard.string(forKey: sizeKey)) }
 	static var enabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
 	static var quiet: Bool { UserDefaults.standard.bool(forKey: quietKey) }
 	// On unless switched off: resting the pointer on the notch opens it.

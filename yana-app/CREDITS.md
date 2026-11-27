@@ -27,3 +27,11 @@ No code or files of OneNotch were used or examined; only what its screens show.
 | A closed pill with a mark on the left wing and moving bars on the right wing while something runs | Its live activity |
 
 If code from notchd is ever copied, it will keep its license header and be marked here as copied.
+
+## Notch gestures and file shelf
+
+Ideas only; no code was copied.
+
+- Two-finger gestures, a player that stays in the header and a size choice: boring.notch
+  (https://github.com/TheBoredTeam/boring.notch, GPL-3.0).
+- A file shelf with AirDrop: NotchDrop (https://github.com/Lakr233/NotchDrop, MIT).

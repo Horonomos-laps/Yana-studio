@@ -8,6 +8,7 @@ struct NotchView: View {
 	var onSettings: () -> Void = {}
 	@AppStorage(NotchPrefs.solidKey) private var solid = false
 	@ObservedObject private var activity = YanaActivity.shared
+	@Environment(\.accessibilityReduceMotion) private var reduceMotion
 
 	var body: some View {
 		let look = model.look
@@ -35,7 +36,7 @@ struct NotchView: View {
 			if model.isOpen {
 				OpenPanel(model: model, onSettings: onSettings)
 					.frame(width: size.width, height: size.height, alignment: .top)
-					.transition(.opacity.combined(with: .scale(scale: 0.86, anchor: .top)))
+					.transition(reduceMotion ? .opacity : .notchContent)
 			}
 		}
 		.frame(width: size.width + 2 * radii.top, height: size.height)
@@ -43,6 +44,12 @@ struct NotchView: View {
 		.shadow(color: .black.opacity(model.isOpen ? 0.5 : 0), radius: 14, y: 6)
 		.contentShape(shape)
 		.onTapGesture { model.open() }
+		.onDrop(of: [.fileURL], isTargeted: nil) { providers in
+			ShelfStore.accept(providers) {
+				model.tab = .files
+				model.open()
+			}
+		}
 		.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 		.accessibilityElement(children: .contain)
 		.accessibilityLabel(Text("Yana"))
@@ -66,6 +73,8 @@ private struct OpenPanel: View {
 				}
 				Spacer(minLength: model.geometry.hasNotch ? notch.width + 20 : 40)
 				HStack(spacing: 14) {
+					// The player stays at hand while another page is open.
+					if model.music != nil, model.tab != .home { MiniPlayer(playing: model.music?.playing == true) }
 					Button(action: onSettings) { Image(systemName: "gearshape") }.buttonStyle(.plain)
 					Button(action: model.close) { Image(systemName: "chevron.up") }.buttonStyle(.plain)
 				}
@@ -83,6 +92,8 @@ private struct OpenPanel: View {
 						MusicCard(); TimerCard()
 						TodoCard(typing: { model.typing = $0 }); NotesCard(typing: { model.typing = $0 })
 					}
+				case .files:
+					FilesTab()
 				case .clipboard:
 					ClipboardTab(typing: { model.typing = $0 })
 				}
@@ -105,8 +116,41 @@ private struct OpenPanel: View {
 		switch tab {
 		case .yana: "Yana"
 		case .home: L("notch.home")
+		case .files: L("notch.files")
 		case .clipboard: L("notch.clipboard")
 		}
+	}
+}
+
+private struct MiniPlayer: View {
+	let playing: Bool
+	var body: some View {
+		HStack(spacing: 10) {
+			button("backward.fill") { MusicStore.shared.previous() }
+			button(playing ? "pause.fill" : "play.fill") { MusicStore.shared.playPause() }
+			button("forward.fill") { MusicStore.shared.next() }
+		}
+		.foregroundStyle(.primary)
+	}
+
+	private func button(_ symbol: String, action: @escaping () -> Void) -> some View {
+		Button(action: action) { Image(systemName: symbol).font(.system(size: 11, weight: .semibold)) }.buttonStyle(.plain)
+	}
+}
+
+// The panel's content comes in slightly small and blurred and sharpens as the shape settles; it leaves quickly.
+private struct NotchArrival: ViewModifier {
+	let away: Bool
+	func body(content: Content) -> some View {
+		content.blur(radius: away ? 10 : 0).scaleEffect(away ? 0.86 : 1, anchor: .top).opacity(away ? 0 : 1)
+	}
+}
+
+extension AnyTransition {
+	static var notchContent: AnyTransition {
+		.asymmetric(insertion: .modifier(active: NotchArrival(away: true), identity: NotchArrival(away: false))
+			.animation(.spring(response: 0.45, dampingFraction: 0.78).delay(0.05)),
+		            removal: .opacity.animation(.easeOut(duration: 0.14)))
 	}
 }
 
