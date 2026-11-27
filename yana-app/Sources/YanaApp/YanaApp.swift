@@ -67,7 +67,26 @@ struct RootView: View {
 		}
 	}
 
+	// Files sent from the notch's shelf go to the chat.
+	private func takeInbox() {
+		let urls = ChatInbox.take()
+		guard !urls.isEmpty else { return }
+		selected = "Chat"
+		engine.attach(urls)
+	}
+
+	private func takePageRequest() {
+		if let page = PageRequest.take() { selected = page }
+	}
+
 	var body: some View {
+		window
+			.onAppear { takeInbox(); takePageRequest() }
+			.onReceive(NotificationCenter.default.publisher(for: ChatInbox.arrived)) { _ in takeInbox() }
+			.onReceive(NotificationCenter.default.publisher(for: PageRequest.arrived)) { _ in takePageRequest() }
+	}
+
+	private var window: some View {
 		HStack(spacing: 0) {
 			if selected == "Start" {
 				// Both cards go to the chat with the right panel closed; its button opens it (LaunchPanel.swift).
