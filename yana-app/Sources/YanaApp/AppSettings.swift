@@ -143,6 +143,13 @@ final class AppSettings: ObservableObject {
 		changeShared(announce: false) { KeyOutcome(state: SharedKeys.live.refresh(local)) }
 	}
 
+	func hasOldKeyCopy(_ provider: String) -> Bool { SharedKeys.hasOldCopy(provider, local: localKeys) }
+
+	func deleteOldKeyCopy(_ provider: String) {
+		SharedKeys.deleteOldCopy(provider, local: localKeys)
+		keyVersion += 1
+	}
+
 	// Keys still kept only by this app that Yana Studio could use too.
 	var keysToShare: [String] { SharedKeys.movable(sharedState, local: localKeys) }
 
