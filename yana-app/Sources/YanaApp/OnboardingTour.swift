@@ -13,33 +13,39 @@ struct TourPage: Identifiable {
 }
 
 enum OnboardingTour {
-	// The guide grew (chats, voice, shortcuts, the look). `seenKey` is for the current guide; `legacySeenKey` is the
-	// one the first five pages set, so a person who finished those is shown only the new pages, once.
+	// The guide grew twice. `seenKey` is for the current guide; `previousSeenKey` was set by the nine page guide and
+	// `legacySeenKey` by the first five pages, so a person who finished one of those is shown only what came after, once.
 	static let legacySeenKey = "yana.onboarding.seen"
-	static let seenKey = "yana.onboarding.seen.v2"
+	static let previousSeenKey = "yana.onboarding.seen.v2"
+	static let seenKey = "yana.onboarding.seen.v3"
 	static let pages: [TourPage] = [
 		TourPage(id: "welcome", layout: .hero, tint: FB.primarySubtle),
 		TourPage(id: "models", layout: .mediaLeft, tint: FB.surfaceTertiary),
 		TourPage(id: "approve", layout: .mediaTop, tint: FB.warningSubtle),
 		TourPage(id: "tools", layout: .mediaRight, tint: FB.successSubtle),
 		TourPage(id: "memory", layout: .mediaTop, tint: FB.primarySubtle),
-		TourPage(id: "chats", layout: .mediaLeft, tint: FB.primarySubtle, badge: "tour.new"),
-		TourPage(id: "voice", layout: .mediaRight, tint: FB.warningSubtle, badge: "tour.new"),
-		TourPage(id: "shortcuts", layout: .mediaTop, tint: FB.surfaceTertiary, badge: "tour.new"),
-		TourPage(id: "look", layout: .mediaLeft, tint: FB.successSubtle, badge: "tour.new"),
+		TourPage(id: "chats", layout: .mediaLeft, tint: FB.primarySubtle),
+		TourPage(id: "voice", layout: .mediaRight, tint: FB.warningSubtle),
+		TourPage(id: "shortcuts", layout: .mediaTop, tint: FB.surfaceTertiary),
+		TourPage(id: "look", layout: .mediaLeft, tint: FB.successSubtle),
+		TourPage(id: "notch", layout: .mediaTop, tint: FB.primarySubtle, badge: "tour.new"),
+		TourPage(id: "shelf", layout: .mediaRight, tint: FB.successSubtle, badge: "tour.new"),
+		TourPage(id: "keys", layout: .mediaLeft, tint: FB.warningSubtle, badge: "tour.new"),
+		TourPage(id: "update", layout: .mediaTop, tint: FB.surfaceTertiary, badge: "tour.new"),
 	]
 	static let cardSize = CGSize(width: 680, height: 500)
 
 	static var shouldShowAtLaunch: Bool { !UserDefaults.standard.bool(forKey: seenKey) }
 	static func markSeen() {
-		UserDefaults.standard.set(true, forKey: seenKey)
-		UserDefaults.standard.set(true, forKey: legacySeenKey)
+		for key in [seenKey, previousSeenKey, legacySeenKey] { UserDefaults.standard.set(true, forKey: key) }
 	}
 
-	// Where the guide opens: at the first new page for someone who saw the old guide, at the start otherwise.
-	static func startIndex(legacySeen: Bool, seen: Bool, pages: [TourPage] = OnboardingTour.pages) -> Int {
-		guard legacySeen, !seen else { return 0 }
-		return pages.firstIndex { $0.badge != nil } ?? 0
+	// Where the guide opens: at the first page the person has not been shown, or at the start.
+	static func startIndex(legacySeen: Bool, previousSeen: Bool, seen: Bool, pages: [TourPage] = OnboardingTour.pages) -> Int {
+		guard !seen else { return 0 }
+		if previousSeen { return pages.firstIndex { $0.badge != nil } ?? 0 }
+		if legacySeen { return pages.firstIndex { $0.id == "chats" } ?? 0 }
+		return 0
 	}
 }
 
@@ -69,6 +75,7 @@ struct OnboardingTourView: View {
 		guard seenKey == OnboardingTour.seenKey, ProcessInfo.processInfo.environment["YANA_TOUR_PAGE"] == nil else { return }
 		let defaults = UserDefaults.standard
 		index = OnboardingTour.startIndex(legacySeen: defaults.bool(forKey: OnboardingTour.legacySeenKey),
+		                                  previousSeen: defaults.bool(forKey: OnboardingTour.previousSeenKey),
 		                                  seen: defaults.bool(forKey: OnboardingTour.seenKey), pages: pages)
 	}
 	private var isLast: Bool { index >= pages.count - 1 }
