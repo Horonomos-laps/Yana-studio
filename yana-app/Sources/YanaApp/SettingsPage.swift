@@ -204,6 +204,7 @@ struct GeneralSettings: View {
 	@AppStorage(NotchPrefs.quietKey) private var notchQuiet = false
 	@AppStorage(NotchPrefs.hoverKey) private var notchHover = true
 	@AppStorage(NotchPrefs.solidKey) private var notchSolid = false
+	@AppStorage(NotchPrefs.sizeKey) private var notchSize = NotchSize.regular.rawValue
 
 	var body: some View {
 		Form {
@@ -245,11 +246,18 @@ struct GeneralSettings: View {
 					Toggle(L("set.notchHover"), isOn: $notchHover)
 					Toggle(L("set.notchSolid"), isOn: $notchSolid)
 					Toggle(L("set.notchQuiet"), isOn: $notchQuiet)
+					Picker(L("set.notchSize"), selection: $notchSize) {
+						Text(L("set.notchSizeSmall")).tag(NotchSize.small.rawValue)
+						Text(L("set.notchSizeRegular")).tag(NotchSize.regular.rawValue)
+						Text(L("set.notchSizeLarge")).tag(NotchSize.large.rawValue)
+					}
+					SettingsNote(L("set.notchSwipe"))
 					AgentConnectRow()
 				}
 			} footer: { SettingsNote(L("set.notchNote")) }
 		}
 		.onChange(of: notchOn) { _, _ in NotchCenter.shared.apply() }
+		.onChange(of: notchSize) { _, _ in NotchCenter.shared.apply() }   // the panels are rebuilt at the new size
 	}
 
 	private func chooseFolder() {
