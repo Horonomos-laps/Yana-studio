@@ -65,6 +65,7 @@ private final class CloseHidesWindow: NSObject, NSWindowDelegate {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
 	func applicationDidFinishLaunching(_ notification: Notification) {
+		InPlaceUpdater.shared.start()
 		NotchCenter.shared.apply()
 	}
 

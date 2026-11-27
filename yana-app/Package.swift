@@ -11,17 +11,25 @@ let package = Package(
 	platforms: [.macOS(.v14)],
 	dependencies: [
 		.package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.20.0"),
+		// Sparkle (MIT) updates the app in place. Pinned and approved 2026-11-27. Ship .zip updates only:
+		// advisory GHSA-gcjm-h3jh-p2vc (package installs) has no released fix in this version.
+		.package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.1"),
 	],
 	targets: [
 		.executableTarget(
 			name: "YanaApp",
-			dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm")],
+			dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm"),
+			               .product(name: "Sparkle", package: "Sparkle")],
 			path: "Sources/YanaApp",
 			resources: [.process("Resources")],
 			// Embeds Info.plist (CFBundleName "Yana") in the executable so the menu bar reads "Yana".
 			linkerSettings: [.unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT",
 			                               "-Xlinker", "__info_plist", "-Xlinker", "Info.plist"])]
 		),
-		.testTarget(name: "YanaAppTests", dependencies: ["YanaApp"], path: "Tests/YanaAppTests"),
+		.testTarget(
+			name: "YanaAppTests", dependencies: ["YanaApp"], path: "Tests/YanaAppTests",
+			// The test bundle finds Sparkle.framework beside it in the build folder.
+			linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@loader_path/../../.."])]
+		),
 	]
 )

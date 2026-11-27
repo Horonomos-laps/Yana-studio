@@ -35,3 +35,4 @@ Ideas only; no code was copied.
 - Two-finger gestures, a player that stays in the header and a size choice: boring.notch
   (https://github.com/TheBoredTeam/boring.notch, GPL-3.0).
 - A file shelf with AirDrop: NotchDrop (https://github.com/Lakr233/NotchDrop, MIT).
+
