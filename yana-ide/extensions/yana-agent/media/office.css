@@ -36,3 +36,6 @@ p { max-width: 80ch; }
 .office-workspace.split .preview { height: 480px; }
 .preview.expanded { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; border: 0; border-radius: 0; background: var(--vscode-editor-background); }
 .exit-fullscreen-btn { position: fixed; top: 16px; right: 16px; z-index: 10000; }
+
+/* Hình nền Yana: workbench đặt biến này về 0% khi hình nền bật, nên nền trang trong suốt; tắt thì giữ như cũ. */
+body { background-color: color-mix(in srgb, var(--vscode-editor-background) var(--vscode-yana-wallpaper-body, 100%), transparent); }

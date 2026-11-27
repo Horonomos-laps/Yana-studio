@@ -137,7 +137,7 @@ final class CustomProviderTests: XCTestCase {
 	// MARK: presets
 
 	func testEveryPresetIsAUsableAddressWithAUniqueName() {
-		XCTAssertGreaterThanOrEqual(CustomProviders.presets.count, 15)
+		XCTAssertGreaterThanOrEqual(CustomProviders.presets.count, 8)
 		XCTAssertEqual(Set(CustomProviders.presets.map(\.name)).count, CustomProviders.presets.count)
 		for preset in CustomProviders.presets {
 			let url = CustomProviders.normalizedBaseURL(preset.baseURL)
@@ -151,6 +151,13 @@ final class CustomProviderTests: XCTestCase {
 	func testNoPresetClashesWithABuiltInProviderId() {
 		let builtIn = Set(providerCatalog.map { $0.id.lowercased() })
 		for preset in CustomProviders.presets { XCTAssertFalse(builtIn.contains(preset.name.lowercased()), preset.name) }
+	}
+
+	func testTheKeyScreensListEveryProviderWithLocalOnesLast() {
+		XCTAssertEqual(keyScreenProviders.map(\.id).sorted(), providerCatalog.map(\.id).sorted())
+		let local = keyScreenProviders.map { $0.kind == .local }
+		XCTAssertEqual(local, local.sorted { !$0 && $1 })
+		XCTAssertEqual(local.filter { $0 }.count, 7)
 	}
 
 	// MARK: the store

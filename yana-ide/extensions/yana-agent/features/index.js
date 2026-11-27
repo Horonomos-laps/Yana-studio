@@ -31,6 +31,7 @@ const FEATURES = [
 	require('./edits'),
 	require('./onboarding'),
 	require('./app-bridge'),
+	require('./wallpaper-activity'),
 ];
 
 const FIRST_RUN_KEY = 'yana.firstRunRevealed';

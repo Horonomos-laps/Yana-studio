@@ -7,7 +7,7 @@ with native VS Code surfaces (TreeView, QuickPick, editor, terminal), not copied
 
 | File | Used by |
 | --- | --- |
-| model-catalog.cjs | features/models.js, extension.js (19 runtime providers + custom) |
+| model-catalog.cjs | features/models.js, extension.js (32 runtime providers + custom) |
 | local-models.cjs | features/models.js (Ollama, LM Studio, llama.cpp, 9Router, TurboFieldfare, AirLLM) |
 | model-discovery.cjs | features/models.js (cloud model sync with the stored key) |
 | project-memory.cjs | features/project.js, extension.js (`.yana-ai/project-memory.md` sent as `system`) |

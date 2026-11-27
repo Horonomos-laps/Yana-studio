@@ -420,7 +420,9 @@ struct ChatHome: View {
 				// API keys without going to Settings; the dialog is the one Settings uses.
 				FBIconButton(icon: "key", variant: .ghost, size: .small, tooltip: L("keys.help")) { showKeys = true }
 					.popover(isPresented: $showKeys, arrowEdge: Self.popoverEdge) {
-						ApiKeysPopover { id in showKeys = false; keyTarget = KeyTarget(id: id) }
+						ApiKeysPopover(edit: { id in showKeys = false; keyTarget = KeyTarget(id: id) },
+						               studioAvailable: editor.appURL != nil,
+						               setUp: { showKeys = false; editor.openModelSetup(folder: engine.workspace) })
 					}
 					.sheet(item: $keyTarget) { target in
 						APIKeySheet(provider: target.id, saved: AppSettings.shared.hasKey(target.id), close: { keyTarget = nil }) { key in

@@ -5,6 +5,7 @@
 	const app = document.getElementById('app');
 	const emblemUri = document.body.dataset.emblem || '';
 	const logoUri = document.body.dataset.logo || '';
+	const studioVersion = document.body.dataset.version || '';
 
 	let currentStep = 1;
 	const TOTAL_STEPS = 4;
@@ -48,13 +49,13 @@
 			modeAutoDesc: 'Agent tự động thực thi các chuỗi lệnh trong sandbox an toàn với ngân sách giới hạn.',
 			// Step 3
 			modelTitle: 'Cấu hình Mô hình Trí tuệ Nhân tạo',
-			modelDesc: 'Yana tích hợp sẵn 19 nhà cung cấp: từ các engine chạy offline trên máy đến các siêu mô hình đám mây mạnh mẽ nhất.',
+			modelDesc: 'Yana tích hợp sẵn 32 nhà cung cấp: từ các engine chạy offline trên máy đến các siêu mô hình đám mây mạnh mẽ nhất.',
 			modelLocalTitle: 'Mô hình Cục bộ (Ollama / Local)',
 			modelLocalBadge: 'Miễn phí & Offline',
 			modelLocalDesc: '7 nhà cung cấp cục bộ: Ollama, LM Studio, llama.cpp, vLLM, TurboFieldfare... Hoạt động offline 100%, riêng tư tuyệt đối.',
-			modelCloudTitle: 'Mô hình Đám mây (Claude / GPT-6 Astra / Gemini / 19 Providers)',
+			modelCloudTitle: 'Mô hình Đám mây (Claude / GPT-6 Astra / Gemini / 32 Providers)',
 			modelCloudBadge: 'Mạnh mẽ nhất',
-			modelCloudDesc: '34 nhà cung cấp đám mây & router: OpenAI, Claude, Gemini, DeepSeek, Groq, OpenRouter, Mistral, Azure... Khóa API lưu an toàn trong Keychain.',
+			modelCloudDesc: '25 nhà cung cấp đám mây & router: OpenAI, Claude, Gemini, DeepSeek, Groq, OpenRouter, Mistral, Cohere... Khóa API lưu an toàn trong Keychain.',
 			modelLaterTitle: 'Thiết lập sau',
 			modelLaterBadge: 'Mặc định',
 			modelLaterDesc: 'Sử dụng cấu hình mặc định sẵn có. Bạn có thể chọn mô hình bất cứ lúc nào trong bảng cài đặt.',
@@ -99,13 +100,13 @@
 			modeAutoDesc: 'Agent autonomously executes chained actions inside safe sandboxes with defined task budgets.',
 			// Step 3
 			modelTitle: 'Configure AI Model Engine',
-			modelDesc: 'Yana integrates 19 built-in providers: from offline local engines to top-tier frontier cloud models.',
+			modelDesc: 'Yana integrates 32 built-in providers: from offline local engines to top-tier frontier cloud models.',
 			modelLocalTitle: 'Local Models (Ollama / Local)',
 			modelLocalBadge: 'Free & Offline',
 			modelLocalDesc: '7 local engines: Ollama, LM Studio, llama.cpp, vLLM, TurboFieldfare... 100% offline, private and free.',
-			modelCloudTitle: 'Cloud Models (Claude / GPT-6 Astra / Gemini / 19 Providers)',
+			modelCloudTitle: 'Cloud Models (Claude / GPT-6 Astra / Gemini / 32 Providers)',
 			modelCloudBadge: 'Highest Reasoning',
-			modelCloudDesc: '34 cloud providers & routers: OpenAI, Claude, Gemini, DeepSeek, Groq, OpenRouter, Mistral, Azure... Encrypted in OS Keychain.',
+			modelCloudDesc: '25 cloud providers & routers: OpenAI, Claude, Gemini, DeepSeek, Groq, OpenRouter, Mistral, Cohere... Encrypted in OS Keychain.',
 			modelLaterTitle: 'Configure Later',
 			modelLaterBadge: 'Default',
 			modelLaterDesc: 'Use standard defaults. You can switch models anytime from the status bar or settings.',
@@ -150,13 +151,13 @@
 			modeAutoDesc: '정해진 예산 내에서 안전한 샌드박스를 통해 에이전트가 자율적으로 명령을 실행합니다.',
 			// Step 3
 			modelTitle: 'AI 모델 엔진 설정',
-			modelDesc: 'Yana는 19개의 공식 공급자를 기본 지원합니다: 로컬 오프라인 엔진부터 최고 수준의 클라우드 모델까지.',
+			modelDesc: 'Yana는 32개의 공식 공급자를 기본 지원합니다: 로컬 오프라인 엔진부터 최고 수준의 클라우드 모델까지.',
 			modelLocalTitle: '로컬 모델 (Ollama / Local)',
 			modelLocalBadge: '무료 & 오프라인',
 			modelLocalDesc: '7개 로컬 엔진: Ollama, LM Studio, llama.cpp, vLLM, TurboFieldfare... 100% 오프라인, 완벽한 프라이버시.',
-			modelCloudTitle: '클라우드 모델 (Claude / GPT-6 Astra / Gemini / 19 공급자)',
+			modelCloudTitle: '클라우드 모델 (Claude / GPT-6 Astra / Gemini / 32 공급자)',
 			modelCloudBadge: '최고 성능',
-			modelCloudDesc: '34개 클라우드 공급자 및 라우터: OpenAI, Claude, Gemini, DeepSeek, Groq, OpenRouter, Mistral, Azure... 키체인 암호화 보관.',
+			modelCloudDesc: '25개 클라우드 공급자 및 라우터: OpenAI, Claude, Gemini, DeepSeek, Groq, OpenRouter, Mistral, Cohere... 키체인 암호화 보관.',
 			modelLaterTitle: '나중에 설정',
 			modelLaterBadge: '기본값',
 			modelLaterDesc: '기본 설정을 사용합니다. 설정 패널에서 언제든지 변경할 수 있습니다.',
@@ -193,7 +194,9 @@
 			logo.src = logoUri;
 			brand.append(logo);
 		}
-		brand.append(el('span', 'brand-title', 'Yana Studio'), el('span', 'brand-badge', 'v1.6.2'));
+		brand.append(el('span', 'brand-title', 'Yana Studio'));
+		// Số phiên bản lấy từ product.json của bản đang chạy; không biết thì không hiện, không đoán.
+		if (studioVersion) brand.append(el('span', 'brand-badge', `v${studioVersion}`));
 
 		const skipBtn = el('button', 'skip-btn', t('skip'));
 		skipBtn.onclick = () => {

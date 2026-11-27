@@ -31,6 +31,8 @@ Module._resolveFilename = function (request, ...rest) {
 };
 require.cache.vscode = { id: 'vscode', filename: 'vscode', loaded: true, exports: fakeVscode };
 
+// Không bao giờ để test chạm yana-rt thật: kho khóa dùng chung được thay bằng một runtime giả không có kho.
+require(path.join(ext, 'features/shared-keys.js')).use(async () => ({ status: 127, output: '', error: '' }));
 const models = require(path.join(ext, 'features/models.js'));
 const context = {
 	secrets: { get: async k => secrets.get(k), store: async (k, v) => secrets.set(k, v), delete: async k => secrets.delete(k), onDidChange: () => ({}) },

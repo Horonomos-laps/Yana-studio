@@ -36,23 +36,13 @@ enum CustomProviders {
 	// MARK: presets (each base URL is from the provider's documentation, checked 2026-11-22)
 
 	static let presets: [ProviderPreset] = [
-		ProviderPreset(name: "Together AI", baseURL: "https://api.together.ai/v1"),
-		ProviderPreset(name: "Fireworks AI", baseURL: "https://api.fireworks.ai/inference/v1"),
-		ProviderPreset(name: "Mistral AI", baseURL: "https://api.mistral.ai/v1"),
-		ProviderPreset(name: "Cerebras", baseURL: "https://api.cerebras.ai/v1"),
-		ProviderPreset(name: "SambaNova", baseURL: "https://api.sambanova.ai/v1"),
-		ProviderPreset(name: "DeepInfra", baseURL: "https://api.deepinfra.com/v1/openai"),
 		ProviderPreset(name: "Hyperbolic", baseURL: "https://api.hyperbolic.xyz/v1"),
-		ProviderPreset(name: "Perplexity", baseURL: "https://api.perplexity.ai"),
 		ProviderPreset(name: "Nebius", baseURL: "https://api.studio.nebius.com/v1"),
 		ProviderPreset(name: "Venice AI", baseURL: "https://api.venice.ai/api/v1"),
 		ProviderPreset(name: "GitHub Models", baseURL: "https://models.github.ai/inference"),
-		ProviderPreset(name: "Qwen (Intl)", baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"),
 		ProviderPreset(name: "Qwen (CN)", baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1"),
 		ProviderPreset(name: "SiliconFlow (Intl)", baseURL: "https://api.siliconflow.com/v1"),
 		ProviderPreset(name: "SiliconFlow (CN)", baseURL: "https://api.siliconflow.cn/v1"),
-		ProviderPreset(name: "vLLM", baseURL: "http://127.0.0.1:8000/v1", keyless: true, local: true),
-		ProviderPreset(name: "Jan", baseURL: "http://127.0.0.1:1337/v1", keyless: true, local: true),
 		ProviderPreset(name: "LiteLLM proxy", baseURL: "http://127.0.0.1:4000", keyless: true, local: true),
 	]
 

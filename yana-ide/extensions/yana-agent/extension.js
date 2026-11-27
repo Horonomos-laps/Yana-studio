@@ -81,6 +81,40 @@ class YanaPanel {
 		this.post({ type: 'conversation', title: current?.title || 'New conversation', messages: current?.messages || [] });
 	}
 
+	postHistory(open = false) {
+		this.post({ type: 'history', items: conversations.summaries(), open });
+	}
+
+	// Mở màn hình Lịch sử trong panel (nút đồng hồ trên thanh tiêu đề và lệnh yana.chat.history đi qua đây).
+	async openHistory() {
+		await vscode.commands.executeCommand('yana.panel.focus');
+		this.postHistory(true);
+	}
+
+	async onHistoryMessage(message) {
+		const id = String(message.id || '');
+		switch (message.type) {
+			case 'history.list': return this.postHistory(false);
+			case 'history.open':
+				// không đổi hội thoại giữa lúc một lượt đang chạy
+				if (this.active && conversations.active()?.id !== id) {
+					vscode.window.showInformationMessage('Wait for the current turn to finish, or stop it, before opening another conversation.');
+					return undefined;
+				}
+				return conversations.select(id);
+			case 'history.pin': return conversations.pin(id, message.pinned === true);
+			case 'history.rename': return conversations.rename(id, String(message.title || ''));
+			case 'history.delete': {
+				const item = conversations.summaries().find(entry => entry.id === id);
+				if (!item || (this.active && item.active)) return;
+				const answer = await vscode.window.showWarningMessage(`Delete "${item.title}" and its ${item.turns} turns?`, { modal: true }, 'Delete');
+				if (answer === 'Delete') await conversations.remove(id);
+				return;
+			}
+			default: return undefined;
+		}
+	}
+
 	// System prompt của hội thoại mới: Project Memory + hướng dẫn của trợ lý đang chọn.
 	systemFor(root) {
 		const items = this.context.globalState.get('yana.assistants.v1', this.defaultAssistants());
@@ -115,14 +149,16 @@ class YanaPanel {
 		const auditViewJs = webview.asWebviewUri(vscode.Uri.joinPath(media, 'audit-view.js'));
 		const editsJs = webview.asWebviewUri(vscode.Uri.joinPath(media, 'edits.js'));
 		const promptQueueJs = webview.asWebviewUri(vscode.Uri.joinPath(media, 'prompt-queue.js'));
+		const historyJs = webview.asWebviewUri(vscode.Uri.joinPath(media, 'history-view.js'));
+		const historyCss = webview.asWebviewUri(vscode.Uri.joinPath(media, 'history-view.css'));
 		const js = webview.asWebviewUri(vscode.Uri.joinPath(media, 'panel.js'));
 		const emblem = webview.asWebviewUri(vscode.Uri.joinPath(media, 'yana-emblem.svg'));
 		const csp = `default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} data: blob: https:; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};`;
 		return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="${css}"></head>
-<body data-emblem="${emblem}"><div id="app"></div><script nonce="${nonce}" src="${markdown}"></script><script nonce="${nonce}" src="${assistantsJs}"></script><script nonce="${nonce}" src="${voiceJs}"></script><script nonce="${nonce}" src="${mentionsJs}"></script><script nonce="${nonce}" src="${auditViewJs}"></script><script nonce="${nonce}" src="${editsJs}"></script><script nonce="${nonce}" src="${promptQueueJs}"></script><script nonce="${nonce}" src="${js}"></script></body></html>`;
+<link rel="stylesheet" href="${css}"><link rel="stylesheet" href="${historyCss}"></head>
+<body data-emblem="${emblem}"><div id="app"></div><script nonce="${nonce}" src="${markdown}"></script><script nonce="${nonce}" src="${assistantsJs}"></script><script nonce="${nonce}" src="${voiceJs}"></script><script nonce="${nonce}" src="${mentionsJs}"></script><script nonce="${nonce}" src="${auditViewJs}"></script><script nonce="${nonce}" src="${editsJs}"></script><script nonce="${nonce}" src="${promptQueueJs}"></script><script nonce="${nonce}" src="${historyJs}"></script><script nonce="${nonce}" src="${js}"></script></body></html>`;
 	}
 
 	async onMessage(message) {
@@ -137,7 +173,12 @@ class YanaPanel {
 			case 'openOnboarding': return vscode.commands.executeCommand('yana.onboarding.open');
 			case 'guide':
 			case 'openGuide': return vscode.commands.executeCommand('yana.guide.open');
-			case 'history': return vscode.commands.executeCommand('yana.chat.history');
+			case 'history': return this.postHistory(true);
+			case 'history.list':
+			case 'history.open':
+			case 'history.pin':
+			case 'history.rename':
+			case 'history.delete': return this.onHistoryMessage(message);
 			case 'settings': return vscode.commands.executeCommand('yana.settings.open');
 			case 'send': return this.send(String(message.text || ''), Array.isArray(message.images) ? message.images : [], message.mode === 'plan' ? 'plan' : 'act', Array.isArray(message.files) ? message.files : []);
 			case 'decide': return this.decide(String(message.approvalId || ''), message.decision === true);
@@ -310,7 +351,7 @@ class YanaPanel {
 	}
 
 	async apiKey(provider) {
-		return (await this.context.secrets.get(`yana.key.${provider}`)) || '';
+		return models.keyFor(provider);
 	}
 
 	async handleDroppedUri(rawUri) {
@@ -513,7 +554,10 @@ class YanaPanel {
 			return { error: 'The custom provider needs yana.baseUrl. Set it in Models & Runtime.' };
 		}
 		const key = await this.apiKey(provider);
-		if (models.needsKey(provider) && !key) {
+		if (models.needsKey(provider) && !(await models.hasKey(provider))) {
+			await models.refreshKeys(); // app chat có thể vừa lưu key
+		}
+		if (models.needsKey(provider) && !(await models.hasKey(provider))) {
 			return { error: `No API key for ${provider}. Run "Yana: Set Provider API Key".` };
 		}
 		return { cwd: folder.uri.fsPath, provider, model, baseUrl, key };
@@ -539,7 +583,26 @@ class YanaPanel {
 		if (typeof temperature === 'number') payload.temperature = temperature;
 	}
 
-	async send(text, images = [], mode = 'act', files = []) {
+	// Một lần gửi hoặc duyệt tại một thời điểm: bước chuẩn bị có thể phải chờ yana-rt trả lời.
+	async once(work) {
+		if (this.preparing) return undefined;
+		this.preparing = true;
+		try {
+			return await work();
+		} finally {
+			this.preparing = false;
+		}
+	}
+
+	send(text, images = [], mode = 'act', files = []) {
+		return this.once(() => this.sendNow(text, images, mode, files));
+	}
+
+	decide(approvalId, decision) {
+		return this.once(() => this.decideNow(approvalId, decision));
+	}
+
+	async sendNow(text, images, mode, files) {
 		let task = text.trim();
 		if ((!task && images.length === 0 && files.length === 0) || this.active) {
 			return;
@@ -599,7 +662,7 @@ class YanaPanel {
 		this.run({ ...ready, resume: false, payload, conversationId: conversation.id }, summaryLabel);
 	}
 
-	async decide(approvalId, decision) {
+	async decideNow(approvalId, decision) {
 		if (!approvalId || this.active) {
 			return;
 		}
@@ -608,20 +671,24 @@ class YanaPanel {
 			this.post({ type: 'event', event: { type: 'error', message: ready.error } });
 			return;
 		}
-		const payload = { approval_id: approvalId, decision, decided_by: 'human:yana-studio' };
-		if (ready.key) {
-			payload.api_key = ready.key;
-		}
 		// Tiếp tục đúng lượt đang chờ duyệt, để phần trả lời sau khi duyệt được lưu chung với câu hỏi gốc.
 		const pending = this.pendingTurn || {};
+		// yana-rt chỉ tiếp tục bằng đúng nhà cung cấp đã tạm dừng, kể cả khi người dùng vừa đổi lựa chọn.
+		const provider = pending.provider || ready.provider;
+		const key = provider === ready.provider ? ready.key : await models.keyFor(provider);
+		const payload = { approval_id: approvalId, decision, decided_by: 'human:yana-studio' };
+		if (key) {
+			payload.api_key = key;
+		}
 		this.pendingTurn = undefined;
-		this.run({ ...ready, resume: true, payload, conversationId: pending.conversationId, priorReply: pending.reply, priorEvents: pending.events }, pending.task || '');
+		this.run({ ...ready, provider, model: pending.model || ready.model, key, resume: true, retry: pending, payload, conversationId: pending.conversationId, priorReply: pending.reply, priorEvents: pending.events }, pending.task || '');
 	}
 
 	run(options, task) {
 		let reply = options.priorReply || '';
 		let paused = false;
 		let status = 'done';
+		let stillWaiting = false;
 		const tokens = { input: 0, output: 0 };
 		// Diễn biến công cụ của lượt này (không gồm chữ đang stream và số token) để lưu cùng hội thoại và phát lại sau.
 		const events = Array.isArray(options.priorEvents) ? [...options.priorEvents] : [];
@@ -640,6 +707,8 @@ class YanaPanel {
 				}
 				if (event.type === 'cancelled') status = 'cancelled';
 				if (event.type === 'error') status = 'error';
+				// yana-rt từ chối trước khi dùng phiếu duyệt: cho phép bấm duyệt lại.
+				if (event.type === 'error' && /approval is still waiting|was paused on provider/.test(event.message || '')) stillWaiting = true;
 				if (event.type !== 'text_delta' && event.type !== 'metrics' && events.length < MAX_RAW_EVENTS_PER_TURN) events.push(event);
 				if (event.type === 'error' && /cannot persist pending approval/.test(event.message || '')) {
 					approvalStore.offer(options.cwd);
@@ -651,8 +720,10 @@ class YanaPanel {
 				usage.record(this.context, { root: options.cwd, provider: options.provider, model: options.model, ...tokens })
 					.catch(() => undefined); // thống kê không được làm hỏng lượt chat
 
-				if (paused) {
-					this.pendingTurn = { conversationId: options.conversationId, task, reply, events };
+				if (stillWaiting && options.retry) {
+					this.pendingTurn = options.retry;
+				} else if (paused) {
+					this.pendingTurn = { conversationId: options.conversationId, task, reply, events, provider: options.provider, model: options.model };
 				} else if (task && options.conversationId && (reply || events.length > 0)) {
 					// Lưu cả lượt chỉ dùng công cụ, bị huỷ hoặc báo lỗi (không có chữ trả lời) để mở lại phiên thấy đủ.
 					conversations.appendTurn(options.conversationId, task, reply, { events, status, tokens })
@@ -679,6 +750,7 @@ class YanaPanel {
 function activate(context) {
 	require('./features').activateAll(context);
 	const panel = new YanaPanel(context);
+	conversations.setHistoryOpener(() => panel.openHistory());
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider('yana.panel', panel, { webviewOptions: { retainContextWhenHidden: true } }),
 		vscode.commands.registerCommand('yana.focus', () => vscode.commands.executeCommand('yana.panel.focus')),
@@ -691,7 +763,7 @@ function activate(context) {
 			await panel.newConversation();
 			await vscode.commands.executeCommand('yana.panel.focus');
 		}),
-		conversations.onDidChange(() => panel.showConversation(false)),
+		conversations.onDidChange(() => { panel.showConversation(false); panel.postHistory(false); }),
 		// Điền sẵn chữ vào ô chat (dùng khi Design Canvas cũ gửi mô tả sang chat), người dùng tự bấm Send.
 		vscode.commands.registerCommand('yana.chat.prefill', async text => {
 			await vscode.commands.executeCommand('yana.panel.focus');

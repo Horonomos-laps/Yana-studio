@@ -71,6 +71,14 @@ echo "[yana-ide] replaced editor watermark"
 cp "$IDE_DIR/branding/yana.icns" "$VSCODE_DIR/$ICON_FILE"
 echo "[yana-ide] replaced app icon"
 
+# Mã workbench riêng của Yana (toàn file mới, nên chép vào thay vì viết thành patch).
+for part in "$IDE_DIR"/workbench/*/; do
+	name="$(basename "$part")"
+	mkdir -p "$VSCODE_DIR/src/vs/workbench/contrib/$name"
+	rsync -a --delete "$part" "$VSCODE_DIR/src/vs/workbench/contrib/$name/"
+	echo "[yana-ide] copied workbench part $name"
+done
+
 node "$IDE_DIR/scripts/merge-product.mjs" "$VSCODE_DIR/product.json" "$IDE_DIR/product.overrides.json"
 
 for ext in "$IDE_DIR"/extensions/*/; do

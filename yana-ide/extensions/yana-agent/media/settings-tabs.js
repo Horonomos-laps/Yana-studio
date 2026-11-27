@@ -3,7 +3,7 @@
 (function () {
 	const { el, button, badge, card, notice, number, bytes, request, t } = window.YanaUI;
 	const tabs = window.YanaSettingsTabs = window.YanaSettingsTabs || {};
-	const YANA_THEMES = ['Yana Dark', 'Yana Web (vutam.link)', 'Yana Light', 'Yana High Contrast', 'Yana High Contrast Light'];
+	const YANA_THEMES = ['Yana Dark', 'Yana Light', 'Yana High Contrast', 'Yana High Contrast Light'];
 
 	const TAB_I18N = {
 		vi: {
@@ -40,9 +40,9 @@
 			yanaOtherSub: 'Bảng màu tương ứng cho chế độ sáng và độ tương phản cao.',
 			chooseTheme: 'Chọn giao diện',
 			useYanaDark: 'Dùng Yana Dark',
-			useYanaWeb: 'Dùng Yana Web',
-			yanaWebSub: 'Phong cách website yana.vutam.link — nền trắng sáng tối giản, thanh lịch chuẩn Apple.',
 			useYanaLight: 'Dùng Yana Light',
+			useYanaHc: 'Dùng tương phản cao',
+			yanaHcSub: 'Tương phản tối đa và viền rõ nét, dễ nhìn hơn.',
 			yanaLightSub: 'Bảng màu sáng nhẹ nhàng, tối ưu làm việc ban ngày.',
 
 			rulesTitle: 'Quy tắc Yana & Rào chắn an toàn',
@@ -186,8 +186,6 @@
 			yanaOtherSub: '밝은 모드 및 고대비 모드를 위한 해당 팔레트.',
 			chooseTheme: '테마 선택',
 			useYanaDark: 'Yana Dark 사용',
-			useYanaWeb: 'Yana Web 사용',
-			yanaWebSub: 'yana.vutam.link 공식 웹사이트 스타일 — 미니멀하고 깔끔한 화이트 테마.',
 			useYanaLight: 'Yana Light 사용',
 			yanaLightSub: '주간 작업을 위한 깔끔한 밝은 테마.',
 
@@ -332,8 +330,6 @@
 			yanaOtherSub: 'Same palette for light mode and high contrast. Pick them in the theme picker.',
 			chooseTheme: 'Choose theme',
 			useYanaDark: 'Use Yana Dark',
-			useYanaWeb: 'Use Yana Web',
-			yanaWebSub: 'Official yana.vutam.link homepage aesthetic — minimalist, clean white design.',
 			useYanaLight: 'Use Yana Light',
 			yanaLightSub: 'Clean and bright aesthetic for daytime productivity.',
 			useYanaHc: 'Use High Contrast',
@@ -493,7 +489,6 @@
 		const node = card(tr('appearanceTitle'), tr('appearanceSub'), badge(data.colorTheme || 'default', usingYana ? 'ok' : ''));
 		node.append(list([
 			item('Yana Dark (Cockpit)', tr('yanaDarkSub'), button(data.colorTheme === 'Yana Dark' ? tr('active') : tr('useYanaDark'), data.colorTheme === 'Yana Dark' ? '' : 'primary', () => request('useYanaTheme', {}))),
-			item('Yana Web (yana.vutam.link)', tr('yanaWebSub'), button(data.colorTheme === 'Yana Web (vutam.link)' ? tr('active') : tr('useYanaWeb'), data.colorTheme === 'Yana Web (vutam.link)' ? '' : 'primary', () => request('useYanaWebTheme', {}))),
 			item('Yana Light', tr('yanaLightSub'), button(data.colorTheme === 'Yana Light' ? tr('active') : tr('useYanaLight'), '', () => request('useYanaLightTheme', {}))),
 			item('Yana High Contrast', tr('yanaHcSub'), button(data.colorTheme === 'Yana High Contrast' ? tr('active') : tr('useYanaHc'), '', () => request('useYanaHcTheme', {}))),
 			item(tr('chooseTheme'), tr('yanaOtherSub'), button(tr('chooseTheme'), '', () => request('pickTheme', {}))),

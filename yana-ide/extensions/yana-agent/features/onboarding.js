@@ -24,7 +24,7 @@ function html(webview, media) {
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="${uri('onboarding.css')}"><title>Chào mừng bạn đến với Yana Studio</title></head>
-<body data-emblem="${uri('yana-emblem.svg')}" data-logo="${uri('yana.svg')}"><div id="app"></div><script nonce="${nonce}" src="${uri('onboarding.js')}"></script></body></html>`;
+<body data-emblem="${uri('yana-emblem.svg')}" data-logo="${uri('yana.svg')}" data-version="${require('./updates').studioCurrentVersion() || ''}"><div id="app"></div><script nonce="${nonce}" src="${uri('onboarding.js')}"></script></body></html>`;
 }
 
 async function getState() {

@@ -16,11 +16,16 @@ struct ProviderInfo: Identifiable {
 
 // The provider ids the IDE offers (yana.provider enum). Local ones run on this Mac and need no key.
 let providerCatalog: [ProviderInfo] = {
-	let local: Set<String> = ["ollama", "lmstudio", "llamacpp", "airllm", "turbofieldfare"]
-	let ids = ["ollama", "lmstudio", "llamacpp", "airllm", "turbofieldfare", "anthropic", "openai", "gemini", "groq",
-	           "deepseek", "openrouter", "xai", "novita", "nvidia", "minimax", "glm", "huggingface", "9router", "kimi", "custom"]
+	let local: Set<String> = ["ollama", "lmstudio", "llamacpp", "airllm", "turbofieldfare", "vllm", "jan"]
+	let ids = ["ollama", "lmstudio", "llamacpp", "airllm", "turbofieldfare", "vllm", "jan", "anthropic", "openai", "gemini", "groq",
+	           "deepseek", "openrouter", "xai", "novita", "nvidia", "minimax", "glm", "huggingface", "9router", "kimi",
+	           "mistral", "together", "fireworks", "deepinfra", "cerebras", "sambanova", "perplexity", "qwen", "cohere", "ai21", "ernie", "custom"]
 	return ids.map { ProviderInfo(id: $0, kind: $0 == "custom" ? .custom : local.contains($0) ? .local : .cloud) }
 }()
+
+// The API key screens list every provider, like the IDE: those that take a key first, then the local ones.
+let keyScreenProviders: [ProviderInfo] =
+	providerCatalog.filter { $0.kind != .local } + providerCatalog.filter { $0.kind == .local }
 
 final class AppSettings: ObservableObject {
 	static let shared = AppSettings()
@@ -63,6 +68,10 @@ final class AppSettings: ObservableObject {
 	}
 	// Bumped when a key is saved or removed, so views that show key status refresh.
 	@Published private(set) var keyVersion = 0
+	// What yana-rt holds in the store shared with Yana Studio (SharedKeys.swift).
+	@Published private(set) var sharedState: SharedState = .unknown
+	// Why the last save or move failed, for the key screens.
+	@Published var keyError: String? = nil
 
 	private init() {
 		provider = store.string(forKey: "yana.provider") ?? "ollama"
@@ -91,17 +100,70 @@ final class AppSettings: ObservableObject {
 	var maxTokensValue: Int? { Int(maxTokens.trimmingCharacters(in: .whitespaces)).flatMap { (1 ... 32000).contains($0) ? $0 : nil } }
 	var temperatureValue: Double? { Double(temperature.trimmingCharacters(in: .whitespaces)).flatMap { (0 ... 2).contains($0) ? $0 : nil } }
 
-	func hasKey(_ provider: String) -> Bool { Keychain.exists(provider) }
-	func apiKey(_ provider: String) -> String? { Keychain.read(provider) }
+	var localKeys: LocalKeys {
+		let defaults = UserDefaults.standard
+		let name = "yana.keys.superseded"
+		return LocalKeys(read: { Keychain.read($0) }, exists: { Keychain.exists($0) }, write: { Keychain.write($0, for: $1) },
+		                 delete: { Keychain.delete($0) }, superseded: { Set(defaults.stringArray(forKey: name) ?? []) },
+		                 setSuperseded: { defaults.set($0.sorted(), forKey: name) })
+	}
+
+	func isShared(_ provider: String) -> Bool { sharedState.held.contains(provider) }
+	func hasKey(_ provider: String) -> Bool { isShared(provider) || localKeys.has(provider) }
+	// The key to send with a request. Nil for a shared key, which yana-rt reads itself, and for a superseded one.
+	func apiKey(_ provider: String) -> String? { !isShared(provider) && localKeys.has(provider) ? Keychain.read(provider) : nil }
+
 	func saveKey(_ value: String, for provider: String) {
 		let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
 		guard !trimmed.isEmpty else { return }
-		Keychain.write(trimmed, for: provider)
-		keyVersion += 1
+		keyError = nil
+		guard SharedKeys.canShare(provider) else {
+			Keychain.write(trimmed, for: provider)
+			keyVersion += 1
+			return
+		}
+		let local = localKeys
+		changeShared { SharedKeys.live.save(trimmed, for: provider, local: local) }
 	}
+
 	func removeKey(_ provider: String) {
-		Keychain.delete(provider)
-		keyVersion += 1
+		keyError = nil
+		guard SharedKeys.canShare(provider) else {
+			Keychain.delete(provider)
+			keyVersion += 1
+			return
+		}
+		let local = localKeys
+		changeShared { SharedKeys.live.remove(provider, local: local) }
+	}
+
+	// Asks yana-rt what it holds; the other app may have changed it.
+	func refreshSharedKeys() {
+		let local = localKeys
+		changeShared(announce: false) { KeyOutcome(state: SharedKeys.live.refresh(local)) }
+	}
+
+	// Keys still kept only by this app that Yana Studio could use too.
+	var keysToShare: [String] { SharedKeys.movable(sharedState, local: localKeys) }
+
+	func shareLocalKeys() {
+		keyError = nil
+		let local = localKeys
+		changeShared { SharedKeys.live.migrate(local: local) }
+	}
+
+	private func changeShared(announce: Bool = true, _ work: @escaping @Sendable () -> KeyOutcome) {
+		Task {
+			let outcome = await SharedKeys.serial(work)
+			await MainActor.run {
+				let settings = AppSettings.shared
+				if let error = outcome.error { settings.keyError = error }
+				// No answer keeps what was known, so shared providers do not all turn into "no key".
+				let changed = outcome.state != .unknown && settings.sharedState != outcome.state
+				if changed { settings.sharedState = outcome.state }
+				if changed || outcome.error != nil || announce { settings.keyVersion += 1 }
+			}
+		}
 	}
 }
 

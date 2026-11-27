@@ -35,6 +35,18 @@ const LOCAL_ADAPTERS = Object.freeze({
     modelsPath: "/models",
     parse: (body) => body.data?.map((model) => model.id),
   },
+  vllm: {
+    name: "vLLM",
+    baseUrl: "http://127.0.0.1:8000/v1",
+    modelsPath: "/models",
+    parse: (body) => body.data?.map((model) => model.id),
+  },
+  jan: {
+    name: "Jan",
+    baseUrl: "http://127.0.0.1:1337/v1",
+    modelsPath: "/models",
+    parse: (body) => body.data?.map((model) => model.id),
+  },
   custom: {
     name: "OpenAI-compatible",
     baseUrl: "",
@@ -118,6 +130,8 @@ async function inspectLocalModels(fetcher = fetch, keyFor = () => "") {
       "llamacpp",
       "turbofieldfare",
       "airllm",
+      "vllm",
+      "jan",
     ].map(async (provider) => {
       try {
         const result = await discoverLocalModels(

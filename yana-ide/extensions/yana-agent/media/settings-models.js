@@ -21,7 +21,7 @@
 			apiKey: 'Khóa API',
 			needsKeyNotice: '{0} cần có khóa API trước khi bạn có thể chat hoặc lấy danh mục mô hình.',
 			localTitle: 'AI cục bộ trên máy này',
-			localSub: 'Tìm kiếm 9Router, Ollama, LM Studio, llama.cpp, TurboFieldfare trên loopback.',
+			localSub: 'Tìm kiếm 9Router, Ollama, LM Studio, llama.cpp, TurboFieldfare, AirLLM, vLLM và Jan trên loopback.',
 			scanLocal: 'Quét AI cục bộ',
 			scanning: 'Đang quét…',
 			runtimeTitle: 'Yana Runtime',
@@ -31,7 +31,7 @@
 			missing: 'Thiếu',
 			runtimeDesc: 'Ranh giới thẩm quyền: Chat → TurnEngine → RuntimeAuthority → Giám thị (Supervisor). Terminal luôn là shell riêng của bạn, không bao giờ là lối tắt thực thi ngầm của AI.',
 			providerLib: 'Thư viện nhà cung cấp',
-			providerLibSub: '19 nhà cung cấp chính thức từ catalog Rust yana-rt • Cloud, Local & Specialized Gateway.',
+			providerLibSub: '32 nhà cung cấp chính thức từ catalog Rust yana-rt • Cloud, Local & Specialized Gateway.',
 			filterPlaceholder: 'Lọc theo tên catalog, model hoặc khả năng (vision, reasoning, cheap…)',
 			use: 'Dùng',
 			changeKey: 'Đổi khóa',
@@ -48,11 +48,11 @@
 			keySaved: 'Đã lưu khóa',
 			needsKey: 'Cần khóa',
 			noKeyNeeded: 'Không cần khóa',
-			catAll: 'Tất cả (20)',
-			catCloud: 'Cloud LLM (18)',
-			catLocal: 'Local / On-device (7)',
-			catRouter: 'Open-source Router (10)',
-			catEnterprise: 'Doanh nghiệp (6)',
+			catAll: 'Tất cả',
+			catCloud: 'Cloud LLM',
+			catLocal: 'Local / On-device',
+			catRouter: 'Open-source Router',
+			catEnterprise: 'Doanh nghiệp',
 		},
 		ko: {
 			activeTitle: '활성 모델',
@@ -68,7 +68,7 @@
 			apiKey: 'API 키',
 			needsKeyNotice: '{0} 모델과 대화하거나 목록을 가져오려면 API 키가 필요합니다.',
 			localTitle: '이 컴퓨터의 로컬 AI',
-			localSub: '루프백에서 9Router, Ollama, LM Studio, llama.cpp, TurboFieldfare 등을 검색합니다.',
+			localSub: '루프백에서 9Router, Ollama, LM Studio, llama.cpp, TurboFieldfare, AirLLM, vLLM, Jan을 검색합니다.',
 			scanLocal: '로컬 검색',
 			scanning: '검색 중…',
 			runtimeTitle: 'Yana 런타임',
@@ -78,7 +78,7 @@
 			missing: '누락됨',
 			runtimeDesc: '권한 경계: Chat → TurnEngine → RuntimeAuthority → Supervisor (giamthi). 터미널은 자체 셸로 유지되며 AI의 실행 경로가 아닙니다.',
 			providerLib: '공급자 라이브러리',
-			providerLibSub: 'Rust yana-rt 카탈로그의 19개 공식 공급자 • Cloud, Local & Specialized Gateway.',
+			providerLibSub: 'Rust yana-rt 카탈로그의 32개 공식 공급자 • Cloud, Local & Specialized Gateway.',
 			filterPlaceholder: '카탈로그 이름, 모델 또는 기능(vision, reasoning, cheap…)으로 필터링',
 			use: '사용',
 			changeKey: '키 변경',
@@ -95,11 +95,11 @@
 			keySaved: '키 저장됨',
 			needsKey: '키 필요',
 			noKeyNeeded: '키 불필요',
-			catAll: '전체 (20)',
-			catCloud: 'Cloud LLM (18)',
-			catLocal: 'Local / 온디바이스 (7)',
-			catRouter: '오픈소스 라우터 (10)',
-			catEnterprise: '엔터프라이즈 (6)',
+			catAll: '전체',
+			catCloud: 'Cloud LLM',
+			catLocal: 'Local / 온디바이스',
+			catRouter: '오픈소스 라우터',
+			catEnterprise: '엔터프라이즈',
 		},
 		en: {
 			activeTitle: 'Active model',
@@ -115,7 +115,7 @@
 			apiKey: 'API key',
 			needsKeyNotice: '{0} needs an API key before you can chat or fetch its models.',
 			localTitle: 'Local AI on this machine',
-			localSub: 'Looks for 9Router, Ollama, LM Studio, llama.cpp, TurboFieldfare and AirLLM on loopback.',
+			localSub: 'Looks for 9Router, Ollama, LM Studio, llama.cpp, TurboFieldfare, AirLLM, vLLM and Jan on loopback.',
 			scanLocal: 'Scan local',
 			scanning: 'Scanning…',
 			runtimeTitle: 'Yana runtime',
@@ -125,7 +125,7 @@
 			missing: 'Missing',
 			runtimeDesc: 'Authority boundary: Chat → TurnEngine → RuntimeAuthority → Supervisor (giamthi). The terminal stays your own shell and is never an AI execution path. API keys live in the Keychain through the IDE SecretStorage.',
 			providerLib: 'Provider library',
-			providerLibSub: '19 official providers from Rust yana-rt catalog • Cloud, Local & Specialized Gateway.',
+			providerLibSub: '32 official providers from Rust yana-rt catalog • Cloud, Local & Specialized Gateway.',
 			filterPlaceholder: 'Filter by catalog name, model or capabilities (vision, reasoning, cheap…)',
 			use: 'Use',
 			changeKey: 'Change key',
@@ -142,11 +142,11 @@
 			keySaved: 'Key saved',
 			needsKey: 'Needs key',
 			noKeyNeeded: 'No key needed',
-			catAll: 'All (20)',
-			catCloud: 'Cloud LLM (18)',
-			catLocal: 'Local / On-device (7)',
-			catRouter: 'Open-source Router (10)',
-			catEnterprise: 'Enterprise (6)',
+			catAll: 'All',
+			catCloud: 'Cloud LLM',
+			catLocal: 'Local / On-device',
+			catRouter: 'Open-source Router',
+			catEnterprise: 'Enterprise',
 		}
 	};
 
@@ -309,16 +309,20 @@
 		library = el('div', 'grid3');
 		library.append(...providers.map(providerCard));
 		let currentCat = 'all';
+		// Một điều kiện cho cả việc lọc lẫn con số trên tab, nên hai thứ không lệch nhau.
+		const inCategory = (cardNode, cat) => cat === 'all' || cardNode.dataset.category === cat
+			|| (cat === 'cloud' && cardNode.dataset.kind === 'cloud') || (cat === 'local' && cardNode.dataset.kind === 'local');
 		const apply = () => {
 			const query = search.value.trim().toLowerCase();
 			for (const cardNode of library.children) {
-				const matchesCat = currentCat === 'all' || cardNode.dataset.category === currentCat || (currentCat === 'cloud' && cardNode.dataset.kind === 'cloud') || (currentCat === 'local' && cardNode.dataset.kind === 'local');
+				const matchesCat = inCategory(cardNode, currentCat);
 				const matchesSearch = !query || cardNode.dataset.search.includes(query);
 				cardNode.hidden = !(matchesCat && matchesSearch);
 			}
 		};
 		for (const [id, label] of kinds) {
-			const chip = el('button', id === currentCat ? 'chip active' : 'chip', label);
+			const count = [...library.children].filter(cardNode => inCategory(cardNode, id)).length;
+			const chip = el('button', id === currentCat ? 'chip active' : 'chip', `${label} (${count})`);
 			chip.type = 'button';
 			chip.addEventListener('click', () => {
 				currentCat = id;

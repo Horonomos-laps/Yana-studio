@@ -5,12 +5,11 @@ import SwiftUI
 struct ModelSettings: View {
 	@ObservedObject private var settings = AppSettings.shared
 	@EnvironmentObject private var engine: ChatEngine
+	@EnvironmentObject private var editor: EditorLauncher
 	@State private var editing: KeyTarget? = nil
 	@State private var keyDraft = ""
 	@ObservedObject private var customStore = CustomProviderStore.shared
 	@State private var providerSheet: ProviderSheetTarget? = nil
-
-	private var keyProviders: [ProviderInfo] { providerCatalog.filter { $0.kind != .local } }
 
 	var body: some View {
 		Form {
@@ -60,7 +59,22 @@ struct ModelSettings: View {
 			} header: { Text("\(L("set.localModels")) (\(engine.models.count))") } footer: { SettingsNote(L("set.localNote")) }
 
 			Section {
-				ForEach(keyProviders) { provider in keyRow(provider.id) }
+				SharedKeyNotice()
+				ForEach(keyScreenProviders) { provider in
+					if provider.kind == .local {
+						LabeledContent(provider.id) {
+							HStack(spacing: 8) {
+								Text(L("keys.notNeeded")).font(.fbCaption).foregroundStyle(FB.textSecondary)
+								Button(L("keys.setUpInStudio")) { editor.openModelSetup(folder: engine.workspace) }
+									.disabled(editor.appURL == nil)
+							}
+						}
+					} else {
+						keyRow(provider.id)
+					}
+				}
+				if editor.appURL == nil { SettingsNote(L("ide.notFound")) }
+				if case .failed(let why) = editor.status { SettingsNote(why) }
 			} header: { Text(L("set.apiKeys")) } footer: { SettingsNote(L("set.apiKeyNote")) }
 		}
 		.onAppear {
@@ -75,7 +89,7 @@ struct ModelSettings: View {
 		let saved = settings.keyVersion >= 0 && settings.hasKey(id)
 		return LabeledContent(id) {
 			HStack(spacing: 8) {
-				Text(saved ? L("set.keySaved") : L("set.keyNone")).font(.fbCaption)
+				Text(saved ? (settings.isShared(id) ? L("keys.savedShared") : L("set.keySaved")) : L("set.keyNone")).font(.fbCaption)
 					.foregroundStyle(saved ? FB.successText : FB.textSecondary)
 				Button(saved ? L("set.keyReplace") : L("set.keyAdd")) { keyDraft = ""; editing = KeyTarget(id: id) }
 				if saved { Button(L("set.remove")) { settings.removeKey(id) } }

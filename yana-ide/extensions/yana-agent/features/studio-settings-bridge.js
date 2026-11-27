@@ -88,14 +88,13 @@ async function saveProfile(context, value, apiKey) {
 		throw new Error('Auto and Mixture of Agents cannot drive the IDE chat yet. Pick a provider and model.');
 	}
 	const provider = providerById(next.provider);
-	const credential = apiKey.trim() || await models.keyFor(next.provider);
 	if (provider.kind === 'cloud') {
-		const available = await discover(next, credential);
+		const available = await listed(next, apiKey.trim());
 		if (!available.includes(next.model)) {
 			throw new Error(`Model '${next.model}' is not available for this key. Sync models and choose an available model.`);
 		}
 	}
-	if (apiKey.trim()) await context.secrets.store(models.secretName(next.provider), apiKey.trim());
+	if (apiKey.trim()) await models.saveKey(next.provider, apiKey.trim());
 	const cfg = vscode.workspace.getConfiguration('yana');
 	await cfg.update('provider', next.provider, vscode.ConfigurationTarget.Global);
 	await cfg.update('model', next.model, vscode.ConfigurationTarget.Global);
@@ -105,14 +104,20 @@ async function saveProfile(context, value, apiKey) {
 
 async function clearProviderKey(context, id) {
 	providerById(id);
-	await context.secrets.delete(models.secretName(id));
+	await models.forgetKey(id);
 	return bootstrap(context);
 }
 
 async function discoverModels(_context, value, apiKey) {
-	const parsed = profileInput(value);
-	const key = typeof apiKey === 'string' && apiKey ? apiKey : await models.keyFor(parsed.provider);
-	return discover(parsed, key);
+	return listed(profileInput(value), typeof apiKey === 'string' ? apiKey : '');
+}
+
+// Model của một hồ sơ: bằng key vừa gõ nếu có, nếu không bằng key đã lưu (dùng chung hoặc của IDE).
+async function listed(parsed, typedKey) {
+	if (typedKey) return discover(parsed, typedKey);
+	const stored = await models.keyFor(parsed.provider);
+	if (!stored && await models.hasKey(parsed.provider)) return models.fetchModels(parsed.provider, parsed.baseUrl);
+	return discover(parsed, stored);
 }
 
 async function keyMap() {

@@ -6,14 +6,14 @@ const vscode = require('vscode');
 const crypto = require('node:crypto');
 const { publicCatalog } = require('../host/model-catalog.cjs');
 const { endpoint } = require('../host/local-models.cjs');
-const { discoverModels } = require('../host/model-discovery.cjs');
 const { commandReference, systemOverview } = require('../host/system-surfaces.cjs');
 const { binary, workspaceRoot } = require('../cli');
 const models = require('./models');
 const data = require('./settings-data');
+const wallpaper = require('./wallpaper-settings');
 const { getActiveLanguage, applyLanguage } = require('./language');
 
-const TABS = ['account', 'general', 'appearance', 'models', 'customizations', 'browser', 'tab', 'editor', 'usage', 'connections', 'permissions', 'tools', 'commands', 'data'];
+const TABS = ['account', 'general', 'appearance', 'wallpaper', 'models', 'customizations', 'browser', 'tab', 'editor', 'usage', 'connections', 'permissions', 'tools', 'commands', 'data'];
 const MAX_MODEL_ID = 200;
 
 let panel;
@@ -46,7 +46,7 @@ async function pickRuntime() {
 async function syncModels(provider) {
 	if (!isProvider(provider)) throw new Error('Invalid provider');
 	const baseUrl = provider === 'custom' ? vscode.workspace.getConfiguration('yana').get('baseUrl', '') : '';
-	return discoverModels(provider, baseUrl, await models.keyFor(provider));
+	return models.fetchModels(provider, baseUrl);
 }
 
 function fillTerminal(command) {
@@ -86,9 +86,12 @@ const ACTIONS = {
 	pickRuntime,
 	revokeLease: msg => typeof msg.id === 'string' && vscode.commands.executeCommand('yana.governance.revokeLease', { leaseId: msg.id }),
 	useYanaTheme: () => vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Yana Dark', vscode.ConfigurationTarget.Global),
-	useYanaWebTheme: () => vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Yana Web (vutam.link)', vscode.ConfigurationTarget.Global),
 	useYanaLightTheme: () => vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Yana Light', vscode.ConfigurationTarget.Global),
 	useYanaHcTheme: () => vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Yana High Contrast', vscode.ConfigurationTarget.Global),
+	setWallpaper: msg => wallpaper.set(String(msg.key), msg.value),
+	setPlainWallpaper: msg => wallpaper.setPlain(String(msg.variant)),
+	pickWallpaperFile: () => wallpaper.pickFile(),
+	clearWallpaperFile: () => wallpaper.clearFile(),
 	pickTheme: () => vscode.commands.executeCommand('workbench.action.selectTheme'),
 	pickLanguage: () => vscode.commands.executeCommand('workbench.action.configureLocale'),
 	setLanguage: async msg => {
@@ -134,7 +137,7 @@ async function onMessage(context, msg) {
 function html(webview, media) {
 	const nonce = crypto.randomBytes(16).toString('base64');
 	const css = webview.asWebviewUri(vscode.Uri.joinPath(media, 'settings.css'));
-	const scripts = ['settings.js', 'settings-models.js', 'settings-tabs.js']
+	const scripts = ['settings.js', 'settings-models.js', 'settings-tabs.js', 'wallpaper-scenes.js', 'settings-wallpaper.js']
 		.map(name => `<script nonce="${nonce}" src="${webview.asWebviewUri(vscode.Uri.joinPath(media, name))}"></script>`).join('');
 	const csp = `default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; img-src ${webview.cspSource};`;
 	const lang = getActiveLanguage();
@@ -185,6 +188,7 @@ function activate(context) {
 			}
 		}),
 		context.secrets.onDidChange(refresh),
+		require('./shared-keys').onDidChange(refresh),
 	);
 	if (process.env.YANA_OPEN_SETTINGS === '1') {
 		setTimeout(() => open(context, 'models'), 2500);

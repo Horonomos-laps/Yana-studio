@@ -2,7 +2,7 @@
 // DOM chỉ dựng bằng textContent/createElementNS, không innerHTML. Renderer từng tab nằm trong settings-tabs.js.
 (function () {
 	const vscode = acquireVsCodeApi();
-	const TAB_KEYS = ['account', 'general', 'appearance', 'models', 'usage', 'customizations', 'browser', 'tab', 'editor', 'permissions', 'tools', 'commands', 'data'];
+	const TAB_KEYS = ['account', 'general', 'appearance', 'wallpaper', 'models', 'usage', 'customizations', 'browser', 'tab', 'editor', 'permissions', 'tools', 'commands', 'data'];
 
 	const DICT = {
 		vi: {
@@ -21,6 +21,9 @@
 			'tab.appearance.nav': 'Giao diện',
 			'tab.appearance.title': 'Giao diện & Chủ đề',
 			'tab.appearance.sub': 'Chủ đề màu sắc buồng lái, độ tương phản và phông chữ.',
+			'tab.wallpaper.nav': 'Hình nền',
+			'tab.wallpaper.title': 'Hình nền',
+			'tab.wallpaper.sub': 'Cảnh động vẽ bằng ký tự phía sau giao diện.',
 			'tab.models.nav': 'Mô hình & Mức sử dụng',
 			'tab.models.title': 'Mô hình & Mức sử dụng',
 			'tab.models.sub': 'Quản lý hạn ngạch mô hình AI, nhà cung cấp và token.',
@@ -69,6 +72,9 @@
 			'tab.appearance.nav': '모양',
 			'tab.appearance.title': '모양 및 테마',
 			'tab.appearance.sub': '조종석 색상 테마, 대비 팔레트 및 타이포그래피.',
+			'tab.wallpaper.nav': '배경',
+			'tab.wallpaper.title': '배경 화면',
+			'tab.wallpaper.sub': '편집기 뒤의 움직이는 장면.',
 			'tab.models.nav': '모델 및 사용량',
 			'tab.models.title': '모델 및 사용량',
 			'tab.models.sub': 'AI 모델 할당량, 제공자 및 토큰 사용량을 관리합니다.',
@@ -117,6 +123,9 @@
 			'tab.appearance.nav': 'Appearance',
 			'tab.appearance.title': 'Appearance',
 			'tab.appearance.sub': 'Visual theme, contrast palettes, and typography.',
+			'tab.wallpaper.nav': 'Wallpaper',
+			'tab.wallpaper.title': 'Wallpaper',
+			'tab.wallpaper.sub': 'Animated character scenes behind the interface.',
 			'tab.models.nav': 'Models & Usage',
 			'tab.models.title': 'Models & Usage',
 			'tab.models.sub': 'Manage your model quota, credits, and providers.',

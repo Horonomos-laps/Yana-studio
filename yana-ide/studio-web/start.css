@@ -22,6 +22,11 @@ body {
 	line-height: 1.5;
 }
 
+/* Yana wallpaper: the workbench sets this variable to 0% when the wallpaper is on, so the side bar shows through. */
+body {
+	background-color: color-mix(in srgb, var(--vscode-sideBar-background, var(--surface-page)) var(--vscode-yana-wallpaper-body, 100%), transparent);
+}
+
 /* The hero is a compact header in the narrow side bar: a 66px rabbit (22 pixel cells x 3, so edges stay crisp). */
 .yana-start .cline-ui-agent-welcome-hero {
 	--welcome-hero-height: 104px;

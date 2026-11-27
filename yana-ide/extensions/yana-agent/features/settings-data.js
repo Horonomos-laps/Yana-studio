@@ -14,6 +14,7 @@ const models = require('./models');
 const usage = require('./usage');
 const { memorySystem } = require('./project');
 const { getActiveLanguage } = require('./language');
+const wallpaper = require('./wallpaper-settings');
 
 // Các luồng phụ trợ của app cũ chưa có nơi nào gọi tới (host/model-orchestration.cjs AUXILIARY_FLOWS).
 const AUXILIARY_FLOWS = [
@@ -44,7 +45,7 @@ async function safe(load, fallback) {
 
 async function keyedProviders() {
 	const ids = publicCatalog().filter(p => p.requiresKey || p.id === 'custom').map(p => p.id);
-	const present = await Promise.all(ids.map(async id => ((await models.keyFor(id)) ? id : '')));
+	const present = await Promise.all(ids.map(async id => ((await models.hasKey(id)) ? id : '')));
 	return present.filter(Boolean);
 }
 
@@ -220,6 +221,7 @@ async function load(tab, context) {
 		case 'account': result = { language: lang, machine: vscode.env.appName, workspaces: getWorkspaces() }; break;
 		case 'general': result = await generalTab(); break;
 		case 'appearance': result = await themeTab(); break;
+		case 'wallpaper': result = wallpaper.data(); break;
 		case 'models': result = await modelsTab(context); break;
 		case 'customizations': result = await customizationsTab(); break;
 		case 'browser': result = await browserTab(); break;

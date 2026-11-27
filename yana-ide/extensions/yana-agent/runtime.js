@@ -4,6 +4,7 @@
 // Giao thức: src/chat/headless.rs (HeadlessTurnInput, HeadlessResumeInput, write_event).
 
 const { spawn, execFile } = require('node:child_process');
+const { EventEmitter } = require('node:events');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -20,6 +21,15 @@ const SEARCH_DIRS = [
 	'/usr/local/bin',
 	...(process.resourcesPath ? [path.join(process.resourcesPath, 'runtime')] : [])
 ];
+
+// Số lượt đang chạy, để hình nền (và sau này cầu nối) biết agent có đang làm việc không.
+const activity = new EventEmitter();
+let runningTurns = 0;
+
+function countTurn(change) {
+	runningTurns = Math.max(0, runningTurns + change);
+	activity.emit('turns', runningTurns);
+}
 
 function resolveBinary(configured) {
 	const candidates = configured ? [configured] : SEARCH_DIRS.map(dir => path.join(dir, BIN_NAME));
@@ -62,6 +72,7 @@ function startTurn(options, onEvent, onFinish) {
 		detached: process.platform !== 'win32',
 		env: process.env,
 	});
+	countTurn(1);
 	const redact = redactor(options.payload.api_key);
 	const state = { buffer: '', stderr: '', stopped: false, failure: '', sawTerminal: false, killTimer: undefined };
 
@@ -141,6 +152,7 @@ function startTurn(options, onEvent, onFinish) {
 			const message = state.failure || state.stderr || `Runtime exited without completion (${code})`;
 			publish({ type: 'error', message: redact(message).slice(0, 1500) });
 		}
+		countTurn(-1);
 		onFinish(code);
 	});
 	child.stdin.on('error', error => {
@@ -192,4 +204,4 @@ function forgetProbe() {
 	probeCache.clear();
 }
 
-module.exports = { resolveBinary, runtimeVersion, startTurn, supportsTurnControls, forgetProbe };
+module.exports = { resolveBinary, runtimeVersion, startTurn, supportsTurnControls, forgetProbe, activity };
