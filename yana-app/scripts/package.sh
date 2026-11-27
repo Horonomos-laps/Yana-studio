@@ -41,6 +41,10 @@ if [[ -e "$app" ]]; then mv "$app" "$dist/.old-$(date +%s).app"; fi
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 
 cp "$bin_dir/YanaApp" "$app/Contents/MacOS/YanaApp"
+# Sparkle, which updates the app in place, travels inside the bundle.
+mkdir -p "$app/Contents/Frameworks"
+ditto "$bin_dir/Sparkle.framework" "$app/Contents/Frameworks/Sparkle.framework"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$app/Contents/MacOS/YanaApp"
 for bundle in "$bin_dir"/*.bundle; do cp -R "$bundle" "$app/Contents/Resources/"; done
 # The third-party MediaRemote adapter (BSD-3, see Resources/MediaRemote/README.md): lets the notch read what any app plays.
 cp -R "$(dirname "$0")/../Resources/MediaRemote" "$app/Contents/Resources/MediaRemote"
@@ -59,6 +63,18 @@ info="$app/Contents/Info.plist"
 "$plist_buddy" -c "Add :CFBundlePackageType string APPL" "$info"
 "$plist_buddy" -c "Add :CFBundleIconFile string Yana" "$info"
 "$plist_buddy" -c "Add :LSApplicationCategoryType string public.app-category.developer-tools" "$info"
+
+# In-place updates: the public half of the release key (not secret; the private half stays in the releaser's Keychain,
+# see scripts/appcast.sh). SPARKLE_PUBLIC_KEY="" builds an app that does not update itself in place.
+SPARKLE_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY-dpMzbW4MTKc33tpyzguqL8axdXv1PKv1pjzTMllbqDw=}"
+if [[ -n "$SPARKLE_PUBLIC_KEY" ]]; then
+	feed="${SPARKLE_FEED_URL:-https://github.com/Horonomos-laps/Yana-studio/releases/latest/download/appcast.xml}"
+	"$plist_buddy" -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$info"
+	"$plist_buddy" -c "Add :SUFeedURL string $feed" "$info"
+	"$plist_buddy" -c "Add :SUEnableAutomaticChecks bool true" "$info"
+else
+	echo "note: SPARKLE_PUBLIC_KEY is empty, so this build cannot update itself in place" >&2
+fi
 
 studio="${STUDIO_APP:-}"
 if [[ -n "$studio" ]]; then
@@ -79,6 +95,7 @@ if [[ -n "$studio" ]]; then
 	codesign --force --deep --sign - "$app/Contents/Applications/Yana Studio.app"
 fi
 
+codesign --force --deep --sign - "$app/Contents/Frameworks/Sparkle.framework"
 codesign --force --sign - "$app"
 codesign --verify --deep --strict "$app"
 
@@ -86,6 +103,11 @@ zip_out="$dist/Yana-$version.zip"
 dmg_out="$dist/Yana-$version.dmg"
 rm -f "$zip_out" "$dmg_out"
 ditto -c -k --keepParent "$app" "$zip_out"
+# SKIP_DMG=1 stops after the .zip (trial builds; the .dmg needs Finder to lay out its window).
+if [[ -n "${SKIP_DMG:-}" ]]; then
+	echo "built $zip_out"
+	exit 0
+fi
 
 # The install window: DmgBackground (1x + 2x in one tiff) behind Yana.app on the left and the Applications
 # link on the right. Finder writes the layout into the volume's .DS_Store, so the image is laid out on a
@@ -97,6 +119,12 @@ ln -s /Applications "$stage/Applications"
 # ASCII on purpose, because Finder looks the item up by name below and accented names differ between Unicode forms.
 guide_name="Huong dan - Read me first.png"
 cp "$here/dmg/install-guide.png" "$stage/$guide_name"
+# One button for people on a version that cannot update itself: it swaps the installed app for this one
+# (dmg/update.sh; the old app goes to the Trash). Plain ASCII name, for the same reason as the guide.
+updater_name="Cap nhat Yana.app"
+osacompile -o "$stage/$updater_name" "$here/dmg/update.applescript"
+cp "$here/dmg/update.sh" "$stage/$updater_name/Contents/Resources/update.sh"
+codesign --force --sign - "$stage/$updater_name"
 mkdir -p "$stage/.background"
 "$bin_dir/YanaApp" --dmg-background "$icon_dir/bg@2x.png" >/dev/null
 sips -z 460 640 "$icon_dir/bg@2x.png" --out "$icon_dir/bg.png" >/dev/null
@@ -122,7 +150,8 @@ tell application "Finder"
 		set background picture of opts to file ".background:background.tiff"
 		set position of item "Yana.app" of container window to {160, 200}
 		set position of item "Applications" of container window to {480, 200}
-		set position of item "$guide_name" of container window to {320, 322}
+		set position of item "$guide_name" of container window to {230, 322}
+		set position of item "$updater_name" of container window to {410, 322}
 		close
 		open
 		update without registering applications

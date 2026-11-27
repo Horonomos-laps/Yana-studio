@@ -110,8 +110,10 @@ final class AppSettings: ObservableObject {
 
 	func isShared(_ provider: String) -> Bool { sharedState.held.contains(provider) }
 	func hasKey(_ provider: String) -> Bool { isShared(provider) || localKeys.has(provider) }
+	// Whether this app's own saved key is the one to use. Asking this never prompts.
+	func usesLocalKey(_ provider: String) -> Bool { !isShared(provider) && localKeys.has(provider) }
 	// The key to send with a request. Nil for a shared key, which yana-rt reads itself, and for a superseded one.
-	func apiKey(_ provider: String) -> String? { !isShared(provider) && localKeys.has(provider) ? Keychain.read(provider) : nil }
+	func apiKey(_ provider: String) -> String? { usesLocalKey(provider) ? Keychain.read(provider) : nil }
 
 	func saveKey(_ value: String, for provider: String) {
 		let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
