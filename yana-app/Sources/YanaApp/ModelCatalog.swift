@@ -58,7 +58,7 @@ final class ModelCatalog: ObservableObject {
 		"xai": .init(url: "https://api.x.ai/v1/language-models", auth: .bearer),
 		"novita": .init(url: "https://api.novita.ai/openai/v1/models", auth: .bearer),
 		"nvidia": .init(url: "https://integrate.api.nvidia.com/v1/models", auth: .bearer),
-		"minimax": .init(url: "https://api.minimaxi.com/v1/models", auth: .bearer),
+		"minimax": .init(url: "https://api.minimax.io/v1/models", auth: .bearer),
 		"glm": .init(url: "https://open.bigmodel.cn/api/paas/v4/models", auth: .bearer),
 		"huggingface": .init(url: "https://router.huggingface.co/v1/models", auth: .bearer),
 		"kimi": .init(url: "https://api.moonshot.ai/v1/models", auth: .bearer),

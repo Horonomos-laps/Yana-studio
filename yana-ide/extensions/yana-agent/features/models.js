@@ -85,6 +85,9 @@ async function forgetKey(providerId) {
 	return context.secrets.delete(secretName(providerId));
 }
 
+const hasOldKeyCopy = providerId => shared.hasOldCopy(providerId, localStore());
+const deleteOldKeyCopy = providerId => shared.dropOldCopy(providerId, localStore());
+
 // Hỏi lại yana-rt: app chat có thể vừa thêm hoặc xoá key.
 function refreshKeys() {
 	return shared.refresh(localStore());
@@ -418,7 +421,7 @@ module.exports = {
 	activate,
 	config,
 	info,
-	keyFor, hasKey, saveKey, forgetKey, refreshKeys, fetchModels, shareLocalKeys, chooseModel,
+	keyFor, hasKey, saveKey, forgetKey, hasOldKeyCopy, deleteOldKeyCopy, refreshKeys, fetchModels, shareLocalKeys, chooseModel,
 	needsKey,
 	select,
 	syncedModels,

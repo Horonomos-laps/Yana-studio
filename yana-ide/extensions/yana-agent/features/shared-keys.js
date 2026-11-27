@@ -16,6 +16,7 @@ const { resolveBinary } = require('../runtime');
 
 const NOT_SHARED = new Set(['custom', '9router']);
 const NOT_INSTALLED = 127;
+const ALREADY_STORED = 3; // `set --if-absent` thấy đã có key
 const MAX_KEY_BYTES = 8 * 1024; // giới hạn của yana-rt
 const PROBE_TIMEOUT_MS = 20000;
 const CHANGE_TIMEOUT_MS = 120000; // thao tác có thể chờ hộp thoại Keychain; ngắt giữa chừng có thể mất key
@@ -68,26 +69,34 @@ function publish(answer) {
 	if (differs) emitter?.fire();
 }
 
-function parseStatus(text) {
-	let rows;
+function parseRows(text) {
 	try {
-		rows = JSON.parse(text);
+		const rows = JSON.parse(text);
+		return Array.isArray(rows) ? rows : undefined;
 	} catch {
 		return undefined;
 	}
-	if (!Array.isArray(rows)) return undefined;
-	return new Set(rows.filter(row => row?.native_secret_configured === true && canShare(row.provider)).map(row => row.provider));
+}
+
+const flagged = (rows, flag) => new Set(rows.filter(row => row?.[flag] === true && canShare(row.provider)).map(row => row.provider));
+
+// undefined khi không đọc được, hoặc kho không trả lời cho một nhà: lúc đó chưa biết là "không có key".
+function parseStatus(text) {
+	const rows = parseRows(text);
+	if (!rows || rows.some(row => row?.native_secret_unknown === true)) return undefined;
+	return flagged(rows, 'native_secret_configured');
 }
 
 async function ask() {
 	if (platform !== 'darwin') return unsupported();
-	// Lệnh mới nhất IDE cần: runtime không có nó thì chỉ có một phần kho.
-	const probe = await runner(['os', 'credential', 'models', '--help'], '', PROBE_TIMEOUT_MS);
+	// Cờ mới nhất IDE cần: runtime không có nó thì chỉ có một phần kho.
+	const probe = await runner(['os', 'credential', 'set', '--help'], '', PROBE_TIMEOUT_MS);
 	if (!probe) return unknown();
-	if (probe.status !== 0) return unsupported();
+	if (probe.status !== 0 || !String(probe.output).includes('--if-absent')) return unsupported();
 	const status = await runner(['os', 'credential', 'status', '--json'], '', CHANGE_TIMEOUT_MS);
 	const held = status?.status === 0 ? parseStatus(status.output) : undefined;
-	return held ? known(held) : unknown();
+	// removed: key đã bị xoá khỏi kho và chưa lưu lại; bản cũ của nó không được dùng nữa.
+	return held ? { ...known(held), removed: flagged(parseRows(status.output), 'native_secret_removed') } : unknown();
 }
 
 // Thao tác chạy lần lượt, để một lần hỏi cũ không ghi đè kết quả mới.
@@ -107,7 +116,7 @@ async function mark(local, id, yes) {
 
 async function askAndMark(local) {
 	const next = await ask();
-	for (const id of next.held) if (await local.exists(id)) await mark(local, id, true);
+	for (const id of [...next.held, ...(next.removed || [])]) if (await local.exists(id)) await mark(local, id, true);
 	publish(next);
 	return next;
 }
@@ -171,15 +180,27 @@ const migrate = (ids, local) => inTurn(async () => {
 	if (now.kind !== 'known') return ['yana-rt did not answer, nothing was moved'];
 	const failed = [];
 	for (const id of await movableNow(ids, local)) {
-		const reply = await runner(['os', 'credential', 'set', id], await local.read(id), CHANGE_TIMEOUT_MS);
-		if (reply?.status !== 0) {
+		const reply = await runner(['os', 'credential', 'set', '--if-absent', id], await local.read(id), CHANGE_TIMEOUT_MS);
+		if (reply?.status !== 0 && reply?.status !== ALREADY_STORED) {
 			failed.push(`${id}: ${failure(reply)}`);
 			continue;
 		}
-		await local.delete(id);
+		// App kia vừa lưu: giữ key của nó, bản này để lại và không dùng.
+		if (reply.status === ALREADY_STORED) await mark(local, id, true);
+		else await local.delete(id);
 		publish(known(new Set([...state.held, id])));
 	}
 	return failed;
+});
+
+const hasOldCopy = async (id, local) => local.superseded().has(id) && await local.exists(id);
+
+// Chỉ xoá bản cũ IDE không còn dùng; không đụng kho chung.
+const dropOldCopy = (id, local) => inTurn(async () => {
+	if (!await hasOldCopy(id, local)) return;
+	await local.delete(id);
+	await mark(local, id, false);
+	emitter?.fire();
 });
 
 // JSON danh sách model của chính nhà cung cấp, do yana-rt lấy bằng key đã lưu.
@@ -201,4 +222,4 @@ function use(fake, as = 'darwin') {
 	state = unknown();
 }
 
-module.exports = { canShare, current, has, refresh, save, remove, migrate, movable: movableNow, modelList, parseStatus, onDidChange, use };
+module.exports = { canShare, current, has, refresh, save, remove, hasOldCopy, dropOldCopy, migrate, movable: movableNow, modelList, parseStatus, onDidChange, use };

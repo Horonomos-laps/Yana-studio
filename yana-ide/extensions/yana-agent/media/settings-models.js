@@ -37,6 +37,7 @@
 			changeKey: 'Đổi khóa',
 			addKey: 'Thêm khóa',
 			removeKey: 'Xóa khóa',
+			deleteOldKey: 'Xóa bản khóa cũ',
 			tokenTelemetry: 'Đo lường mức dùng Token',
 			tokenSub: 'Token thực tế được ghi nhận sau mỗi lượt chat qua yana-rt.',
 			totalTokens: '{0} Tổng số token đã ghi nhận',
@@ -84,6 +85,7 @@
 			changeKey: '키 변경',
 			addKey: '키 추가',
 			removeKey: '키 삭제',
+			deleteOldKey: '이전 키 사본 삭제',
 			tokenTelemetry: '토큰 원격 측정',
 			tokenSub: 'yana-rt를 통해 IDE에서 활성 공급자 라운드에서 기록된 토큰.',
 			totalTokens: '총 {0}개 토큰 기록됨',
@@ -131,6 +133,7 @@
 			changeKey: 'Change key',
 			addKey: 'Add key',
 			removeKey: 'Remove key',
+			deleteOldKey: 'Delete old key copy',
 			tokenTelemetry: 'Token Telemetry',
 			tokenSub: 'Tokens recorded from active provider rounds in the IDE through yana-rt.',
 			totalTokens: '{0} Total Tokens Recorded',
@@ -280,6 +283,7 @@
 		if (p.requiresKey || p.id === 'custom') {
 			actions.append(button(p.keyed ? tm('changeKey') : tm('addKey'), '', () => request('setKey', { provider: p.id })));
 			if (p.keyed) actions.append(button(tm('removeKey'), 'danger', () => request('removeKey', { provider: p.id })));
+			if (p.oldCopy) actions.append(button(tm('deleteOldKey'), '', () => request('deleteOldKey', { provider: p.id })));
 		}
 		node.append(head, foot, actions);
 		node.dataset.search = `${p.id} ${p.label} ${p.company} ${p.models.map(m => `${m.id} ${m.tags.join(' ')}`).join(' ')} ${p.category || ''}`.toLowerCase();
