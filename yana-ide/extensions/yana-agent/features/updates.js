@@ -9,7 +9,7 @@ const { execFile, exec } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { binary, workspaceRoot } = require('../cli');
+const { binary } = require('../cli');
 const { getActiveLanguage } = require('./language');
 
 // The installed build's own version, stamped into product.json by scripts/merge-product.mjs. A number
@@ -256,49 +256,33 @@ async function performRuntimeUpdate(targetVersion, t) {
 	}, async (progress) => {
 		progress.report({ message: 'Compiling / updating yana-rt core...' });
 
-		const root = workspaceRoot();
 		const home = os.homedir();
 		const localBin = path.join(home, '.local', 'bin');
 		const localRt = path.join(localBin, 'yana-rt');
 
-		// 1. Kiểm tra nếu workspace hiện tại có Cargo.toml của yana-rt và đã build release target
-		let updated = false;
-		if (root) {
-			const targetReleaseBin = path.join(root, 'target', 'release', 'yana-rt');
-			if (fs.existsSync(targetReleaseBin)) {
-				try {
-					if (!fs.existsSync(localBin)) fs.mkdirSync(localBin, { recursive: true });
-					if (fs.existsSync(localRt)) fs.unlinkSync(localRt);
-					fs.copyFileSync(targetReleaseBin, localRt);
-					fs.chmodSync(localRt, 0o755);
-					updated = true;
-				} catch (err) {
-					console.error('[Yana Update] Failed to copy local release binary:', err);
-				}
-			}
-		}
-
-		// 2. Nếu chưa xong, chạy cargo install
-		if (!updated) {
-			await new Promise((resolve) => {
-				const cmd = `cargo install yana-rt --force`;
-				exec(cmd, { env: process.env, timeout: 180000 }, (error) => {
-					if (!error) {
-						// Nếu cargo install thành công vào ~/.cargo/bin/yana-rt, đồng bộ sang ~/.local/bin/yana-rt
-						const cargoBin = path.join(home, '.cargo', 'bin', 'yana-rt');
-						if (fs.existsSync(cargoBin)) {
-							try {
-								if (!fs.existsSync(localBin)) fs.mkdirSync(localBin, { recursive: true });
-								if (fs.existsSync(localRt)) fs.unlinkSync(localRt);
-								fs.copyFileSync(cargoBin, localRt);
-								fs.chmodSync(localRt, 0o755);
-							} catch {}
+		// Chỉ nhận binary do cargo cài từ crates.io. File trong thư mục đang mở không bao giờ được chép
+		// vào ~/.local/bin: app chat và IDE đều chạy file ở đó. cwd là thư mục nhà để cargo không đọc
+		// cấu hình của một dự án.
+		await new Promise((resolve) => {
+			const cmd = `cargo install yana-rt --force`;
+			exec(cmd, { cwd: home, env: process.env, timeout: 180000 }, (error) => {
+				if (!error) {
+					// Nếu cargo install thành công vào ~/.cargo/bin/yana-rt, đồng bộ sang ~/.local/bin/yana-rt
+					const cargoBin = path.join(home, '.cargo', 'bin', 'yana-rt');
+					if (fs.existsSync(cargoBin)) {
+						try {
+							if (!fs.existsSync(localBin)) fs.mkdirSync(localBin, { recursive: true });
+							if (fs.existsSync(localRt)) fs.unlinkSync(localRt);
+							fs.copyFileSync(cargoBin, localRt);
+							fs.chmodSync(localRt, 0o755);
+						} catch (err) {
+							console.error('[Yana Update] Failed to copy the installed binary:', err);
 						}
 					}
-					resolve();
-				});
+				}
+				resolve();
 			});
-		}
+		});
 
 		// Kiểm tra lại phiên bản mới sau cập nhật
 		const newVer = await getRuntimeVersion();
