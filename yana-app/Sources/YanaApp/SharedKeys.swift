@@ -55,6 +55,8 @@ struct SharedKeys {
 
 	static let notShared: Set<String> = ["custom", "9router"]
 	static let notInstalled: Int32 = 127
+	// yana-rt's exit status for `set --if-absent` when a key is already there.
+	static let alreadyStored: Int32 = 3
 	// yana-rt's own limit for a key.
 	static let maxKeyBytes = 8 * 1024
 	private static let probeTimeout: TimeInterval = 20
@@ -71,26 +73,54 @@ struct SharedKeys {
 
 	func state() -> SharedState {
 		// The newest command this app needs: a runtime without it has only part of the store.
-		guard let probe = run(["os", "credential", "models", "--help"], nil, Self.probeTimeout) else { return .unknown }
-		guard probe.status == 0 else { return .unsupported }
-		guard let reply = run(["os", "credential", "status", "--json"], nil, Self.changeTimeout), reply.status == 0,
-		      let held = Self.parseStatus(reply.output) else { return .unknown }
-		return .known(held)
+		look().state
 	}
 
+	// The state, and the providers whose key was removed from the store and not saved again.
+	private func look() -> (state: SharedState, removed: Set<String>) {
+		guard let probe = run(["os", "credential", "set", "--help"], nil, Self.probeTimeout) else { return (.unknown, []) }
+		guard probe.status == 0, String(decoding: probe.output, as: UTF8.self).contains("--if-absent") else { return (.unsupported, []) }
+		guard let reply = run(["os", "credential", "status", "--json"], nil, Self.changeTimeout), reply.status == 0,
+		      let held = Self.parseStatus(reply.output) else { return (.unknown, []) }
+		return (.known(held), Self.parseRemoved(reply.output))
+	}
+
+	// Nil when the answer cannot be read, or when the store did not answer for a provider: then "no key" is not known.
 	static func parseStatus(_ data: Data) -> Set<String>? {
 		guard let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return nil }
+		if rows.contains(where: { ($0["native_secret_unknown"] as? Bool) == true }) { return nil }
+		return flagged("native_secret_configured", in: rows)
+	}
+
+	static func parseRemoved(_ data: Data) -> Set<String> {
+		guard let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+		return flagged("native_secret_removed", in: rows)
+	}
+
+	private static func flagged(_ flag: String, in rows: [[String: Any]]) -> Set<String> {
 		let names = rows.compactMap { row -> String? in
-			(row["native_secret_configured"] as? Bool) == true ? row["provider"] as? String : nil
+			(row[flag] as? Bool) == true ? row["provider"] as? String : nil
 		}
 		return Set(names.filter(canShare))
 	}
 
 	@discardableResult
 	func refresh(_ local: LocalKeys) -> SharedState {
-		let now = state()
-		for provider in now.held where local.exists(provider) { local.supersede(provider, true) }
+		let (now, removed) = look()
+		for provider in now.held.union(removed) where local.exists(provider) { local.supersede(provider, true) }
 		return now
+	}
+
+	// An older copy this app keeps but no longer uses.
+	static func hasOldCopy(_ provider: String, local: LocalKeys) -> Bool {
+		local.superseded().contains(provider) && local.exists(provider)
+	}
+
+	// Deletes only that copy; the shared store is not touched.
+	static func deleteOldCopy(_ provider: String, local: LocalKeys) {
+		guard hasOldCopy(provider, local: local) else { return }
+		local.delete(provider)
+		local.supersede(provider, false)
 	}
 
 	func save(_ key: String, for provider: String, local: LocalKeys) -> KeyOutcome {
@@ -147,7 +177,12 @@ struct SharedKeys {
 		var failed: [String] = []
 		for provider in Self.movable(now, local: local) {
 			guard let key = local.read(provider), !key.isEmpty else { failed.append("\(provider): \(L("keys.unreadable"))"); continue }
-			if let reason = failure(run(["os", "credential", "set", provider], Data(key.utf8), Self.changeTimeout)) {
+			let reply = run(["os", "credential", "set", "--if-absent", provider], Data(key.utf8), Self.changeTimeout)
+			if reply?.status == Self.alreadyStored {
+				// Saved by the other app meanwhile: that one stays, this copy is kept and ignored.
+				local.supersede(provider, true)
+				held.insert(provider)
+			} else if let reason = failure(reply) {
 				failed.append("\(provider): \(reason)")
 			} else {
 				local.delete(provider)

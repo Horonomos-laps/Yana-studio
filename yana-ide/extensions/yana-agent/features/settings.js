@@ -83,6 +83,7 @@ const ACTIONS = {
 	syncModels: msg => syncModels(String(msg.provider)),
 	setKey: msg => isProvider(msg.provider) && vscode.commands.executeCommand('yana.setApiKey', String(msg.provider)),
 	removeKey: msg => isProvider(msg.provider) && vscode.commands.executeCommand('yana.models.removeKey', { providerId: String(msg.provider) }),
+	deleteOldKey: msg => isProvider(msg.provider) && models.deleteOldKeyCopy(String(msg.provider)),
 	pickRuntime,
 	revokeLease: msg => typeof msg.id === 'string' && vscode.commands.executeCommand('yana.governance.revokeLease', { leaseId: msg.id }),
 	useYanaTheme: () => vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Yana Dark', vscode.ConfigurationTarget.Global),
