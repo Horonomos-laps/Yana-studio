@@ -16,8 +16,8 @@ final class TourTests: XCTestCase {
 
 	func testTheGuideCoversTheNewFeatures() {
 		let ids = OnboardingTour.pages.map(\.id)
-		for id in ["chats", "voice", "shortcuts", "look", "notch", "shelf", "keys", "update"] { XCTAssertTrue(ids.contains(id), id) }
-		XCTAssertEqual(OnboardingTour.pages.filter { $0.badge != nil }.map(\.id), ["notch", "shelf", "keys", "update"])
+		for id in ["chats", "voice", "shortcuts", "look", "notch", "shelf", "wallpaper", "bridge", "keys", "update"] { XCTAssertTrue(ids.contains(id), id) }
+		XCTAssertEqual(OnboardingTour.pages.filter { $0.badge != nil }.map(\.id), ["notch", "shelf", "wallpaper", "bridge", "keys", "update"])
 	}
 
 	private func start(legacy: Bool, previous: Bool, seen: Bool) -> Int {
@@ -43,6 +43,18 @@ final class TourTests: XCTestCase {
 		XCTAssertTrue(row("tour.update.body").en.contains(row("menu.checkUpdates").en))
 		XCTAssertTrue(row("tour.keys.body").vi.contains(row("keys.share").vi))
 		XCTAssertTrue(row("tour.keys.body").vi.contains(row("keys.help").vi))
+		XCTAssertTrue(row("menu.openStudio").vi.contains("Mở Yana Studio"))
+		XCTAssertTrue(row("tour.bridge.body").vi.contains("Mở Yana Studio"))
+		XCTAssertTrue(row("tour.bridge.body").vi.contains(ShortcutAction.openStudio.defaultShortcut.display))
+	}
+
+	// The wallpaper page quotes the number of scenes; the catalog in the Studio extension is the truth.
+	func testTheWallpaperPageCountsTheScenesThatExist() throws {
+		let catalog = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+			.appendingPathComponent("../../../yana-ide/extensions/yana-agent/host/wallpaper-catalog.cjs").standardized
+		let scenes = try String(contentsOf: catalog, encoding: .utf8).components(separatedBy: "{ id: '").count - 1
+		let row = allStringRows.first { $0.key == "tour.wallpaper.body" }
+		for text in [row?.vi, row?.en, row?.ko] { XCTAssertTrue(text?.contains("\(scenes)") == true, text ?? "missing") }
 	}
 
 	func testTheShortcutsPageShowsRealDefaultsThatAreAllDistinct() {

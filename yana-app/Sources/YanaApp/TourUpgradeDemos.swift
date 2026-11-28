@@ -1,7 +1,7 @@
 import SwiftUI
 
-// The drawn demos for the notch, the file shelf, the shared keys and in-place updates. Symbols only, so they read the
-// same in every language.
+// The drawn demos for the notch, the file shelf, the wallpaper, the shared keys and in-place updates. Symbols only,
+// so they read the same in every language.
 
 // A dark notch shape that opens at the top of a small screen.
 private struct MiniNotch<Content: View>: View {
@@ -108,5 +108,100 @@ struct UpdateTourDemo: View {
 					.scaleEffect(p > 0.9 && p < 1.2 ? 0.92 : 1).opacity(progress >= 1 ? 0.35 : 1)
 			}
 		}
+	}
+}
+
+// An editor window whose backdrop moves through three real scenes (their sky and floor colors come from the Studio
+// catalog), then to the person's own picture.
+struct WallpaperTourDemo: View {
+	let t: Double
+
+	private static let scenes: [(sky: Color, floor: Color)] = [
+		(Color(red: 0.71, green: 0.85, blue: 0.93), Color(red: 0.80, green: 0.92, blue: 0.97)),   // Cloud Drift
+		(Color(red: 0.96, green: 0.87, blue: 0.91), Color(red: 0.98, green: 0.93, blue: 0.95)),   // Sakura
+		(Color(red: 0.02, green: 0.07, blue: 0.13), Color(red: 0.05, green: 0.13, blue: 0.20)),   // Aurora
+	]
+	private static let lineWidths: [CGFloat] = [120, 84, 146, 62]
+
+	var body: some View {
+		let p = phase(t, 8)
+		let own = ramp(p, 6.0, 0.5) - ramp(p, 7.6, 0.4)
+		let picked = own > 0.5 ? Self.scenes.count : min(Int(p / 2.0), Self.scenes.count - 1)
+		VStack(spacing: 12) {
+			MiniWindow {
+				ZStack {
+					ForEach(Self.scenes.indices, id: \.self) { i in
+						LinearGradient(colors: [Self.scenes[i].sky, Self.scenes[i].floor], startPoint: .top, endPoint: .bottom)
+							.opacity(i == 0 ? 1 : ramp(p, Double(i) * 2.0, 0.6) - ramp(p, 7.6, 0.4))
+					}
+					Image(systemName: "photo").font(.system(size: 40)).foregroundStyle(.white).padding(.trailing, 14).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+						.background(FB.primary).opacity(own)
+					code
+				}
+				.clipShape(RoundedRectangle(cornerRadius: 8)).padding([.horizontal, .bottom], 8)
+			}
+			.frame(width: 250, height: 150)
+			swatches(picked: picked)
+		}
+	}
+
+	private var code: some View {
+		VStack(alignment: .leading, spacing: 9) {
+			ForEach(Self.lineWidths.indices, id: \.self) { i in
+				Capsule().fill(FB.canvas.opacity(0.9)).frame(width: Self.lineWidths[i], height: 7).padding(.leading, i % 2 == 0 ? 0 : 18)
+			}
+		}
+		.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 18)
+	}
+
+	private func swatches(picked: Int) -> some View {
+		HStack(spacing: 10) {
+			ForEach(0 ... Self.scenes.count, id: \.self) { i in
+				ZStack {
+					if i < Self.scenes.count { Circle().fill(Self.scenes[i].sky) } else {
+						Circle().fill(FB.surfaceTertiary)
+						Image(systemName: "plus").font(.system(size: 11, weight: .bold)).foregroundStyle(FB.text)
+					}
+				}
+				.frame(width: 22, height: 22)
+				.overlay(Circle().stroke(i == picked ? FB.primary : FB.borderStrong, lineWidth: i == picked ? 3 : 1))
+			}
+		}
+	}
+}
+
+// Yana hands the folder to Yana Studio, which opens on it.
+struct BridgeTourDemo: View {
+	let t: Double
+	private static let travel: CGFloat = 150
+
+	var body: some View {
+		let p = phase(t, 6)
+		let move = ramp(p, 1.2, 1.4)
+		let arrived = ramp(p, 2.6, 0.4) - ramp(p, 5.4, 0.4)
+		ZStack {
+			HStack(spacing: 40) {
+				window("Yana", icon: "bubble.left.and.bubble.right.fill", lit: 1)
+				window("Studio", icon: "chevron.left.forwardslash.chevron.right", lit: 0.35 + 0.65 * arrived)
+					.overlay(alignment: .topTrailing) {
+						Image(systemName: "checkmark.circle.fill").font(.system(size: 20)).foregroundStyle(FB.successText).opacity(arrived).padding(6)
+					}
+			}
+			Image(systemName: "folder.fill").font(.system(size: 28)).foregroundStyle(FB.primary)
+				.offset(x: Self.travel * CGFloat(move) - Self.travel / 2, y: 44)
+				.opacity(ramp(p, 0.6) - ramp(p, 5.4, 0.4))
+		}
+	}
+
+	private func window(_ name: String, icon: String, lit: Double) -> some View {
+		MiniWindow {
+			VStack(spacing: 10) {
+				Text(name).font(.system(size: 13, weight: .semibold)).foregroundStyle(FB.text)
+				Image(systemName: icon).font(.system(size: 24)).foregroundStyle(FB.primary)
+				Spacer(minLength: 0)
+			}
+			.opacity(lit).padding(.top, 4)
+		}
+		.frame(width: 124, height: 150)
 	}
 }

@@ -30,6 +30,8 @@ enum OnboardingTour {
 		TourPage(id: "look", layout: .mediaLeft, tint: FB.successSubtle),
 		TourPage(id: "notch", layout: .mediaTop, tint: FB.primarySubtle, badge: "tour.new"),
 		TourPage(id: "shelf", layout: .mediaRight, tint: FB.successSubtle, badge: "tour.new"),
+		TourPage(id: "wallpaper", layout: .mediaLeft, tint: FB.primarySubtle, badge: "tour.new"),
+		TourPage(id: "bridge", layout: .mediaTop, tint: FB.successSubtle, badge: "tour.new"),
 		TourPage(id: "keys", layout: .mediaLeft, tint: FB.warningSubtle, badge: "tour.new"),
 		TourPage(id: "update", layout: .mediaTop, tint: FB.surfaceTertiary, badge: "tour.new"),
 	]

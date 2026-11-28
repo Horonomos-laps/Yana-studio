@@ -27,6 +27,8 @@ struct TourMedia: View {
 				case "look": LookDemo(t: t)
 				case "notch": NotchTourDemo(t: t)
 				case "shelf": ShelfTourDemo(t: t)
+				case "wallpaper": WallpaperTourDemo(t: t)
+				case "bridge": BridgeTourDemo(t: t)
 				case "keys": KeysTourDemo(t: t)
 				case "update": UpdateTourDemo(t: t)
 				case "store-browse": StoreBrowseDemo(t: t)
