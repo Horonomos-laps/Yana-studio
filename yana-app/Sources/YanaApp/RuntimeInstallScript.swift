@@ -4,7 +4,8 @@ import Foundation
 // panel, so the app keeps running while it works. Order matters: yana-ai (PyPI) first, then yana-rt
 // (crates.io), then the real yana-rt binary is copied over ~/.local/bin/yana-rt, because the yana-ai
 // package also declares a text launcher named yana-rt that once called itself forever (2026-09-17).
-// Same steps as Yana Studio's features/app-bridge.js, plus `yana-ai install` after the PyPI step.
+// Same steps as Yana Studio's features/app-bridge.js. `yana-ai install` is not one of them: it sets up a
+// project folder, asks a question and audits that folder, and this terminal starts in the home folder.
 
 enum RuntimeInstallScript {
 	static let text = #"""
@@ -36,9 +37,6 @@ enum RuntimeInstallScript {
 	else
 	  pipx install yana-ai
 	fi
-
-	step "yana-ai install"
-	yana-ai install
 
 	step "yana-rt (crates.io)"
 	if ! command -v cargo >/dev/null 2>&1; then
