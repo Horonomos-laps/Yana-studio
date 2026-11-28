@@ -17,10 +17,8 @@ final class AutoRunStore: ObservableObject {
 	// File edits carry no command text, so their lease needs no allow list (yana-rt keeps them in the repo).
 	static let fileCapabilities = ["file.write", "file.patch"]
 	// Commands must match an allow entry (prefix, by words) and no deny entry. An empty allow list allows nothing.
-	static let allow = ["npm test", "npm run", "pnpm test", "pnpm run", "yarn test", "yarn run",
-	                    "cargo build", "cargo test", "cargo check", "cargo clippy", "swift build", "swift test",
-	                    "pytest", "python3 -m pytest", "go build", "go test", "make", "ls", "cat", "pwd",
-	                    "git status", "git diff", "git log", "git show"]
+	static let allow = ["npm test", "cargo build", "cargo test", "cargo check", "cargo clippy", "swift build", "swift test",
+	                    "go build", "go test", "ls", "cat", "pwd", "git status", "git diff", "git log", "git show"]
 	static let deny = ["rm", "sudo", "git push", "git reset", "git clean", "curl", "wget", "ssh", "scp",
 	                   "chmod", "chown", "dd", "mv"]
 
@@ -37,11 +35,8 @@ final class AutoRunStore: ObservableObject {
 		var minutes = 60
 		var commands = true
 		var files = true
-		var extraAllow: [String] = []
 	}
 	static let minuteRange = 5 ... 480
-	static let maxExtraAllow = 20
-	static let maxEntryLength = 60
 	private static let choiceKey = "yana.auto.custom"
 
 	static var savedChoice: Choice {
@@ -51,20 +46,6 @@ final class AutoRunStore: ObservableObject {
 			return choice
 		}
 		set { if let data = try? JSONEncoder().encode(newValue) { UserDefaults.standard.set(data, forKey: choiceKey) } }
-	}
-
-	// Extra allowed commands typed by the user: trimmed, short, at most 20, and never one that starts
-	// like a blocked command (yana-rt checks the deny list first anyway; this keeps the list honest).
-	static func cleanExtraAllow(_ text: String) -> [String] {
-		let entries = text.split(whereSeparator: { $0 == "," || $0 == "\n" })
-			.map { $0.trimmingCharacters(in: .whitespaces) }
-			.filter { !$0.isEmpty && $0.count <= maxEntryLength && !$0.contains(where: \.isNewline) }
-		let allowed = entries.filter { entry in
-			let first = entry.split(separator: " ").first.map(String.init) ?? entry
-			return !deny.contains { $0 == first || entry.hasPrefix($0 + " ") || entry == $0 }
-		}
-		var seen = Set<String>()
-		return Array(allowed.filter { seen.insert($0).inserted }.prefix(maxExtraAllow))
 	}
 
 	func start(minutes: Int, folder: String) {
@@ -80,7 +61,7 @@ final class AutoRunStore: ObservableObject {
 		var ids: [String] = []
 		do {
 			if choice.commands {
-				let allow = Self.allow + choice.extraAllow
+				let allow = Self.allow
 				ids.append(try grant("command.execute", minutes: minutes, scope: allow.flatMap { ["--allow", $0] } + Self.deny.flatMap { ["--deny", $0] }))
 			}
 			if choice.files {
@@ -119,10 +100,20 @@ final class AutoRunStore: ObservableObject {
 		}
 	}
 
+	// A personal grant is kept outside the project, so a folder cannot ship one.
+	static func grantArguments(_ capability: String, minutes: Int, scope: [String]) -> [String] {
+		["lease", "grant", "--personal", "--subject", subject, "--capability", capability,
+		 "--expires-in-minutes", String(minutes), "--invocation-budget", String(budget)] + scope + ["--json"]
+	}
+
+	// What to tell the person about a failed yana-rt call.
+	static func problem(_ detail: String) -> String {
+		if detail.contains("--personal") { return L("auto.needsNewRt") }
+		return detail.contains("flock-v1") ? L("auto.notInstalledHere") : detail
+	}
+
 	private func grant(_ capability: String, minutes: Int, scope: [String]) throws -> String {
-		let args = ["lease", "grant", "--subject", Self.subject, "--capability", capability,
-		            "--expires-in-minutes", String(minutes), "--invocation-budget", String(Self.budget)] + scope + ["--json"]
-		let data = try rt(args)
+		let data = try rt(Self.grantArguments(capability, minutes: minutes, scope: scope))
 		guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let id = json["id"] as? String else {
 			throw AutoRunError.message(L("auto.grantFailed"))
 		}
@@ -151,7 +142,7 @@ final class AutoRunStore: ObservableObject {
 		process.waitUntilExit()
 		guard process.terminationStatus == 0 else {
 			let detail = errorText.trimmingCharacters(in: .whitespacesAndNewlines)
-			throw AutoRunError.message(detail.contains("flock-v1") ? L("auto.notInstalledHere") : detail)
+			throw AutoRunError.message(Self.problem(detail))
 		}
 		return data
 	}
@@ -169,7 +160,6 @@ struct AutoRunChip: View {
 	@State private var open = false
 	@State private var custom = false
 	@State private var choice = AutoRunStore.savedChoice
-	@State private var extraText = AutoRunStore.savedChoice.extraAllow.joined(separator: ", ")
 
 	private var remaining: String {
 		guard let until = store.until else { return "" }
@@ -215,7 +205,7 @@ struct AutoRunChip: View {
 		.padding(16).frame(width: 420)
 	}
 
-	// Custom: any duration, which kinds of work, and extra commands added to the allowed list.
+	// Custom: any duration and which kinds of work.
 	private var customForm: some View {
 		VStack(alignment: .leading, spacing: 10) {
 			Stepper(value: $choice.minutes, in: AutoRunStore.minuteRange, step: 5) {
@@ -223,17 +213,9 @@ struct AutoRunChip: View {
 			}
 			Toggle(L("auto.runCommands"), isOn: $choice.commands)
 			Toggle(L("auto.editFiles"), isOn: $choice.files)
-			VStack(alignment: .leading, spacing: 4) {
-				Text(L("auto.extraAllow")).font(.fbCaption).foregroundStyle(FB.textSecondary)
-				TextField(L("auto.extraAllowHint"), text: $extraText, axis: .vertical)
-					.lineLimit(1 ... 3).textFieldStyle(.roundedBorder)
-					.disabled(!choice.commands)
-			}
 			HStack {
 				Spacer()
 				FBButton(title: L("auto.startCustom"), variant: .primary) {
-					choice.extraAllow = AutoRunStore.cleanExtraAllow(extraText)
-					extraText = choice.extraAllow.joined(separator: ", ")
 					AutoRunStore.savedChoice = choice
 					store.start(choice, folder: folder)
 					if store.error == nil { open = false; custom = false }
