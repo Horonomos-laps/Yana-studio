@@ -4,11 +4,24 @@
 const vscode = require('vscode');
 const { runtimeVersion } = require('../runtime');
 const { binary, runJson } = require('../cli');
+const { studioCurrentVersion } = require('./updates');
 
 const AUDIT_WINDOW = 500; // khớp governance.js
 const REFRESH_MS = 60000; // làm mới audit mỗi phút; đọc file cục bộ nên rẻ
 
+// scripts/package.sh của app ghi số này vào product.json, nên Studio mang cùng số với Yana.
+const studioLabel = version => (version ? `$(versions) Yana Studio v${version}` : undefined);
+
 function activate(context) {
+	const studioText = studioLabel(studioCurrentVersion());
+	if (studioText) {
+		const studioItem = vscode.window.createStatusBarItem('yana.studio', vscode.StatusBarAlignment.Left, 101);
+		studioItem.name = 'Yana Studio';
+		studioItem.text = studioText;
+		studioItem.show();
+		context.subscriptions.push(studioItem);
+	}
+
 	const runtimeItem = vscode.window.createStatusBarItem('yana.runtime', vscode.StatusBarAlignment.Left, 100);
 	runtimeItem.name = 'Yana Runtime';
 	runtimeItem.command = { command: 'yana.settings.open', arguments: ['models'], title: 'Yana Settings' };
@@ -58,4 +71,4 @@ function activate(context) {
 	);
 }
 
-module.exports = { id: 'statusbar', activate };
+module.exports = { id: 'statusbar', activate, studioLabel };

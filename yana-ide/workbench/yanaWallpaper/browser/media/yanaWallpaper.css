@@ -79,6 +79,27 @@
 	background-color: transparent !important;
 }
 
+/* Giao diện "modern" của upstream tô đặc thêm các thanh trên đầu bằng selector và biến riêng. */
+.monaco-workbench.yana-wallpaper .part > .composite.title {
+	background-color: transparent !important;
+}
+
+/* Tab đang mở và ô tìm kiếm giữ một lớp rất nhạt để vẫn nhận ra. */
+.monaco-workbench.yana-wallpaper .part.editor .tabs-container > .tab > .tab-fill {
+	--modern-ui-connected-tab-current-background: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+}
+
+.monaco-workbench.yana-wallpaper .part.titlebar .command-center-center {
+	background-color: color-mix(in srgb, var(--vscode-foreground) 6%, transparent) !important;
+}
+
+/* Terminal vẽ nền trong suốt (patch 0010); lớp khung của xterm cũng không được tô đặc. */
+.monaco-workbench.yana-wallpaper .terminal-wrapper,
+.monaco-workbench.yana-wallpaper .terminal-wrapper .xterm-viewport,
+.monaco-workbench.yana-wallpaper .terminal-wrapper .xterm-scrollable-element {
+	background-color: transparent !important;
+}
+
 /* Minimap tự tô nền trên canvas riêng, nên chỉ làm mờ được cả khối. */
 .monaco-workbench.yana-wallpaper .monaco-editor .minimap {
 	opacity: 0.75;

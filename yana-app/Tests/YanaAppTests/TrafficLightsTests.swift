@@ -112,6 +112,36 @@ final class TrafficLightsPlacerTests: XCTestCase {
 		for b in buttons { XCTAssertEqual(b.layer?.affineTransform().a ?? 0, 1, accuracy: 0.001) }
 	}
 
+	// Resizing must not leave the buttons at the height the window had when they were first placed (1.1.1).
+	func testTheButtonsStayAtTheTopAfterTheWindowIsResized() throws {
+		let window = makeWindow()
+		defer { window.orderOut(nil) }
+		try XCTSkipIf(spots(window).count != 3, "no window buttons in this session")
+		TrafficLightsPlacer.apply(to: window, custom: true)
+		for size in [NSSize(width: 1300, height: 800), NSSize(width: 700, height: 450)] {
+			window.setContentSize(size)
+			TrafficLightsPlacer.apply(to: window, custom: true)
+			for (i, spot) in spots(window).enumerated() {
+				XCTAssertEqual(spot.x, TrafficLights.origin(i).x, accuracy: 1, "button \(i) x at \(size)")
+				XCTAssertEqual(spot.y, TrafficLights.origin(i).y, accuracy: 1, "button \(i) y at \(size)")
+			}
+		}
+	}
+
+	func testMacOSsLayoutComesBackAtTheTopOfAResizedWindow() throws {
+		let window = makeWindow()
+		defer { window.orderOut(nil) }
+		let before = spots(window)
+		try XCTSkipIf(before.count != 3, "no window buttons in this session")
+		TrafficLightsPlacer.apply(to: window, custom: true)
+		window.setContentSize(NSSize(width: 1300, height: 800))
+		TrafficLightsPlacer.apply(to: window, custom: false)
+		for (a, b) in zip(spots(window), before) {
+			XCTAssertEqual(a.x, b.x, accuracy: 1)
+			XCTAssertEqual(a.y, b.y, accuracy: 1)
+		}
+	}
+
 	func testPlacingTwiceGivesTheSamePlaces() throws {
 		let window = makeWindow()
 		defer { window.orderOut(nil) }

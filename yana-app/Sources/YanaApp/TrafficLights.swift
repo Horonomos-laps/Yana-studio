@@ -75,6 +75,13 @@ enum TrafficLightsPlacer {
 	}
 	private static var originals: [ObjectIdentifier: Saved] = [:]
 
+	// Measured from the window as it is now: a saved y or width goes stale as soon as the window is resized, and
+	// would leave the buttons at the old height, far down a window that was made taller.
+	private static func glue(_ container: NSView, toTopWithHeight height: CGFloat) {
+		guard let parent = container.superview else { return }
+		container.frame = NSRect(x: 0, y: parent.bounds.height - height, width: parent.bounds.width, height: height)
+	}
+
 	// With custom true the glass layout is used; with false, macOS's own.
 	static func apply(to window: NSWindow, custom: Bool) {
 		let buttons = kinds.compactMap { window.standardWindowButton($0) }
@@ -88,16 +95,17 @@ enum TrafficLightsPlacer {
 		}
 		guard let saved = originals[key] else { return }
 		if !custom {
-			container?.frame = saved.container
-			host.frame = saved.host
+			if let container { glue(container, toTopWithHeight: saved.container.height) }
+			host.frame = NSRect(x: saved.host.minX, y: saved.host.minY, width: container?.bounds.width ?? saved.host.width,
+			                    height: saved.host.height)
 			for (button, origin) in zip(buttons, saved.buttons) { button.setFrameOrigin(origin); shrink(button, to: 1) }
 			return
 		}
 		// Make the title bar tall enough to hold the lowered buttons, still glued to the top of the window.
 		let needed = TrafficLights.top + TrafficLights.size + 6
 		if let container, saved.host.height < needed {
-			container.frame = NSRect(x: saved.container.minX, y: saved.container.maxY - needed, width: saved.container.width, height: needed)
-			host.frame = NSRect(x: saved.host.minX, y: 0, width: saved.host.width, height: needed)
+			glue(container, toTopWithHeight: needed)
+			host.frame = NSRect(x: saved.host.minX, y: 0, width: container.bounds.width, height: needed)
 		}
 		for (index, button) in buttons.enumerated() {
 			let spot = TrafficLights.origin(index)

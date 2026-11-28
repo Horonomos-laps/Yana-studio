@@ -1,0 +1,64 @@
+diff --git a/src/vs/workbench/contrib/terminal/browser/xterm/xtermTerminal.ts b/src/vs/workbench/contrib/terminal/browser/xterm/xtermTerminal.ts
+index 800274db..0dff1d8a 100644
+--- a/src/vs/workbench/contrib/terminal/browser/xterm/xtermTerminal.ts
++++ b/src/vs/workbench/contrib/terminal/browser/xterm/xtermTerminal.ts
+@@ -23,6 +23,7 @@ import { LogLevel } from '../../../../../platform/log/common/log.js';
+ import { INotificationService } from '../../../../../platform/notification/common/notification.js';
+ import { MarkNavigationAddon, ScrollPosition } from './markNavigationAddon.js';
+ import { localize } from '../../../../../nls.js';
++import { isHighContrast } from '../../../../../platform/theme/common/theme.js';
+ import { IColorTheme, IThemeService } from '../../../../../platform/theme/common/themeService.js';
+ import { PANEL_BACKGROUND } from '../../../../common/theme.js';
+ import { TERMINAL_FOREGROUND_COLOR, TERMINAL_BACKGROUND_COLOR, TERMINAL_CURSOR_FOREGROUND_COLOR, TERMINAL_CURSOR_BACKGROUND_COLOR, ansiColorIdentifiers, TERMINAL_SELECTION_BACKGROUND_COLOR, TERMINAL_FIND_MATCH_BACKGROUND_COLOR, TERMINAL_FIND_MATCH_HIGHLIGHT_BACKGROUND_COLOR, TERMINAL_FIND_MATCH_BORDER_COLOR, TERMINAL_OVERVIEW_RULER_FIND_MATCH_FOREGROUND_COLOR, TERMINAL_FIND_MATCH_HIGHLIGHT_BORDER_COLOR, TERMINAL_OVERVIEW_RULER_CURSOR_FOREGROUND_COLOR, TERMINAL_SELECTION_FOREGROUND_COLOR, TERMINAL_INACTIVE_SELECTION_BACKGROUND_COLOR, TERMINAL_OVERVIEW_RULER_BORDER_COLOR } from '../../common/terminalColorRegistry.js';
+@@ -277,7 +278,7 @@ export class XtermTerminal extends Disposable implements IXtermTerminal, IDetach
+ 				kittyKeyboard: config.enableKittyKeyboardProtocol,
+ 				win32InputMode: config.enableWin32InputMode,
+ 			},
+-			allowTransparency: config.enableImages,
++			allowTransparency: config.enableImages || this._showsWallpaper(),
+ 			windowOptions: {
+ 				getWinSizePixels: true,
+ 				getCellSizePixels: true,
+@@ -306,6 +307,10 @@ export class XtermTerminal extends Disposable implements IXtermTerminal, IDetach
+ 				if (e.affectsConfiguration(TerminalSettingId.ShellIntegrationDecorationsEnabled)) {
+ 					this._updateTheme();
+ 				}
++				if (e.affectsConfiguration('yana.wallpaper.theme')) {
++					this.updateConfig();
++					this._updateTheme();
++				}
+ 			}));
+ 
+ 			this._register(this._themeService.onDidColorThemeChange(theme => this._updateTheme(theme)));
+@@ -613,7 +618,7 @@ export class XtermTerminal extends Disposable implements IXtermTerminal, IDetach
+ 		this.raw.options.scrollbar = this._getScrollbarOptions();
+ 		this.raw.options.ignoreBracketedPasteMode = config.ignoreBracketedPasteMode;
+ 		this.raw.options.rescaleOverlappingGlyphs = config.rescaleOverlappingGlyphs;
+-		this.raw.options.allowTransparency = config.enableImages;
++		this.raw.options.allowTransparency = config.enableImages || this._showsWallpaper();
+ 		updateTerminalFontRendering(this.raw, config.fontRendering);
+ 		this.raw.options.vtExtensions = {
+ 			kittyKeyboard: config.enableKittyKeyboardProtocol,
+@@ -1102,7 +1107,8 @@ export class XtermTerminal extends Disposable implements IXtermTerminal, IDetach
+ 		const selectionForegroundColor = theme.getColor(TERMINAL_SELECTION_FOREGROUND_COLOR) || undefined;
+ 
+ 		return {
+-			background: backgroundColor?.toString(),
++			// The same colour fully see-through, so contrast is still worked out against it.
++			background: (this._showsWallpaper() && !isHighContrast(theme.type) ? backgroundColor?.transparent(0) : backgroundColor)?.toString(),
+ 			foreground: foregroundColor?.toString(),
+ 			cursor: cursorColor?.toString(),
+ 			cursorAccent: cursorAccentColor?.toString(),
+@@ -1132,6 +1138,12 @@ export class XtermTerminal extends Disposable implements IXtermTerminal, IDetach
+ 		};
+ 	}
+ 
++	/** Yana: the animated wallpaper behind the workbench shows through the terminal. */
++	private _showsWallpaper(): boolean {
++		const wallpaper = this._configurationService.getValue<string | undefined>('yana.wallpaper.theme');
++		return wallpaper !== undefined && wallpaper !== 'off';
++	}
++
+ 	private _updateTheme(theme?: IColorTheme): void {
+ 		this.raw.options.theme = this.getXtermTheme(theme);
+ 	}
