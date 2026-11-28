@@ -4,7 +4,8 @@ import AppKit
 // Closing the window (the red button or ⌘W) hides it instead of destroying it, and a click on the Dock icon
 // brings it back. Without this the click does nothing: the menu bar replaces macOS's "New Window" item
 // (AppCommands.swift), and that item is what macOS uses to make a window again for an app that has none.
-// Hiding keeps the open chat too. Quit (⌘Q or the Dock menu) still ends the app.
+// Hiding keeps the open chat too. Quit (⌘Q or the Dock menu) still ends the app. What a hidden window means for the
+// Dock icon is decided in BackgroundMode.swift.
 
 
 
@@ -36,6 +37,7 @@ enum WindowKeeper {
 	@discardableResult
 	static func show() -> Bool {
 		guard let window else { return false }
+		BackgroundMode.windowShown()
 		if window.isMiniaturized { window.deminiaturize(nil) }
 		window.makeKeyAndOrderFront(nil)
 		NSApplication.shared.activate(ignoringOtherApps: true)
@@ -50,6 +52,7 @@ private final class CloseHidesWindow: NSObject, NSWindowDelegate {
 
 	func windowShouldClose(_ sender: NSWindow) -> Bool {
 		sender.orderOut(nil)
+		MainActor.assumeIsolated { BackgroundMode.windowClosed() }
 		return false
 	}
 
@@ -67,6 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		InPlaceUpdater.shared.start()
 		NotchCenter.shared.apply()
+		MenuBarController.shared.apply()
 	}
 
 	func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

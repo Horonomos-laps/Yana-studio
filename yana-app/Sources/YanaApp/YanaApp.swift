@@ -292,7 +292,7 @@ func scheduleWindowSnapshot() {
 	guard let path = ProcessInfo.processInfo.environment["YANA_SNAPSHOT"], !path.isEmpty else { return }
 	let wait = Double(ProcessInfo.processInfo.environment["YANA_SNAPSHOT_WAIT"] ?? "") ?? 5
 	DispatchQueue.main.asyncAfter(deadline: .now() + wait) {
-		guard let view = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil })?.contentView,
+		guard let view = (WindowKeeper.window ?? NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }))?.contentView,
 		      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
 			FileHandle.standardError.write(Data("snapshot: no window\n".utf8))
 			exit(1)
@@ -304,7 +304,8 @@ func scheduleWindowSnapshot() {
 			exit(1)
 		}
 		// Where the three window buttons ended up, from the window's top-left corner (to check them without a screenshot).
-		if let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }), let content = window.contentView {
+		if let window = WindowKeeper.window ?? NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }),
+		   let content = window.contentView {
 			for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
 				guard let b = window.standardWindowButton(kind) else { continue }
 				let r = b.convert(b.bounds, to: content)
@@ -352,6 +353,11 @@ struct YanaApp: App {
 		}
 		if let index = args.firstIndex(of: "--icon"), index + 2 < args.count {
 			renderIcon(to: args[index + 1], variant: args[index + 2])
+			exit(0)
+		}
+		// --stats out.png reads this Mac and draws the menu bar panel, to check it without clicking the menu bar.
+		if let index = args.firstIndex(of: "--stats"), index + 1 < args.count {
+			renderStatsPanel(to: args[index + 1])
 			exit(0)
 		}
 		if let index = args.firstIndex(of: "--render"), index + 1 < args.count {
