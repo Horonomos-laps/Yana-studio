@@ -375,6 +375,8 @@ final class ChatEngine: ObservableObject {
 		if approved, scope != .once, ask.capability == RtClient.rememberableTool, RtClient.supportsApprovalScopes {
 			payload["scope"] = scope.rawValue
 		}
+		// The runtime takes the subject from this request, never from the stored turn.
+		if AutoRunStore.shared.isOn { payload["agent_id"] = AutoRunStore.subject }
 		if let key = AppSettings.shared.apiKey(turnProvider) { payload["api_key"] = key }
 		let resumeProvider = CustomProviders.wire(for: turnProvider, builtinBase: AppSettings.shared.baseURL,
 		                                          list: CustomProviderStore.shared.items)?.provider ?? turnProvider
