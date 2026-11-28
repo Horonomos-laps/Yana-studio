@@ -42,104 +42,90 @@
 
 <table>
   <tr>
-    <td align="center" width="25%"><h3>3</h3><sub>apps: macOS, Studio<br>and IDE</sub></td>
-    <td align="center" width="25%"><h3>12</h3><sub>terminals in<br>one grid</sub></td>
+    <td align="center" width="25%"><h3>2</h3><sub>apps: Yana and<br>Yana Studio</sub></td>
+    <td align="center" width="25%"><h3>1</h3><sub>download holds<br>both apps</sub></td>
     <td align="center" width="25%"><h3>1</h3><sub>runtime for every<br>model request</sub></td>
-    <td align="center" width="25%"><h3>8 MiB</h3><sub>largest file<br>editable in place</sub></td>
+    <td align="center" width="25%"><h3>14+</h3><sub>macOS, on<br>Apple Silicon</sub></td>
   </tr>
 </table>
+
+<!-- IMAGE: hero, the Studio window with the wallpaper showing through the terminal -->
+
+## Download
+
+1. Get `Yana-<version>.dmg` from the [latest release](https://github.com/Horonomos-laps/Yana-studio/releases/latest).
+2. Open it and drag **Yana** into Applications.
+3. The first time, right-click Yana and choose **Open**, or use **System Settings → Privacy & Security → Open Anyway**.
+
+It needs macOS 14 or later on Apple Silicon. The app is ad-hoc signed and **not notarized**
+by Apple, which is why macOS asks you to confirm. Each release lists the SHA-256 of its
+files. From version 1.1.0 on, the **Update** button inside the app downloads the new
+version, checks its signature and replaces the app.
+
+## The apps
+
+One download holds two applications.
+
+| App | What it is for |
+| --- | --- |
+| **Yana** | Native SwiftUI app: chat with a model, projects, approvals, usage, the notch and the menu bar |
+| **Yana Studio** | Code editor built on Code-OSS, with the Yana panel, terminals and an animated wallpaper |
+
+- **Approvals.** Commands wait for your answer. Auto Mode allows a short list of safe commands, and keeps its permissions outside the project folder.
+- **Two apps, one setup.** Open Yana Studio from Yana on the folder you are working in. An API key saved once is stored in the macOS Keychain and used by both. Each app keeps its own chat history.
+- **Notch.** Whether Claude Code or Codex is working or waiting for you, music controls, a file shelf, clipboard history, timers and notes.
+- **Menu bar.** CPU, GPU, memory, disk and temperature, plus what Yana itself is using. Closing the window keeps Yana running there.
+- **Wallpaper.** Animated scenes or your own picture or video behind the whole editor, including the terminal.
+
+<!-- IMAGE: approval prompt -->
+<!-- IMAGE: notch -->
+
+## Status
+
+- Released for **Apple Silicon Macs only**.
+- Auto Mode needs `yana-rt` 1.5.6 or later. The commands it runs are **not isolated** from your Mac.
+- Control levels run from 1 to 5. The runtime reports how far they are enforced; levels above that only record what they would have approved.
+- Clipboard history in the notch is stored **without encryption**.
+- Temperature is read through a private Apple interface and was tried on one M4 Mac.
+- With *Open at login* on, the main window still opens.
+
+## Source layout
+
+| Directory | What it holds |
+| --- | --- |
+| [`yana-app/`](yana-app) | The native macOS app. Its updater reads this repository's `app-v*` releases. |
+| [`yana-ide/`](yana-ide) | Yana's patches, theme, wallpaper and extension applied on top of Code-OSS. It holds no upstream code. This is the editor shipped as Yana Studio. |
+| [`yana-studio/`](yana-studio) | An earlier Electron workspace. Its tests still run in CI. |
+
+The files at the root (`src/`, `Cargo.toml`, `DESIGN.md`, `UI_ENGINES.md`, `reference/`)
+are a terminal interface prototype that runs on mock data. It is not part of the app.
+
+## Build from source
+
+The macOS app:
+
+```bash
+git clone https://github.com/Horonomos-laps/Yana-studio.git
+cd Yana-studio/yana-app
+swift build
+swift test
+```
+
+For the editor, follow [`yana-ide/README.md`](yana-ide/README.md). Both apps need a
+`yana-rt` binary from [Yana-AI](https://github.com/Horonomos-laps/Yana-AI).
 
 ## The Yana ecosystem
 
 | Repository | Role |
 | --- | --- |
-| **[Yana-AI](https://github.com/Horonomos-laps/Yana-AI)** | Runtime `yana-rt`, governance rules and hooks, CLI, agents and skills |
-| **[yana-web](https://github.com/Horonomos-laps/yana-web)** | The website at yana.vutam.link, and a local web app |
-| **Yana-studio** (this repo) | Desktop apps: native macOS app, Yana Studio, Yana IDE |
+| **[Yana-AI](https://github.com/Horonomos-laps/Yana-AI)** | The runtime `yana-rt`, governance rules and hooks, the CLI, agents and skills |
+| **[yana-web](https://github.com/Horonomos-laps/yana-web)** | The website, and a web app you run on your own machine |
+| **Yana-studio** (this repository) | The macOS app and Yana Studio |
 
-The apps are the part you look at. They do not decide anything. Every model request
-goes through `yana-rt` from Yana-AI, so the permission checks are the same in every app
-and cannot be skipped by switching clients. Studio never calls a model provider from
-its UI layer.
-
-## Download
-
-Get the latest build from the [releases page](https://github.com/Horonomos-laps/Yana-studio/releases/latest)
-or from [yana.vutam.link](https://yana.vutam.link). Each release lists its own files,
-so check that your platform is there. Releases tagged `app-v*` are the native macOS
-app, and its updater reads them.
-
-> [!NOTE]
-> The macOS build is ad-hoc signed and **not notarized**, so Gatekeeper warns on first
-> launch. Yana-AI's [macOS install guide](https://github.com/Horonomos-laps/Yana-AI/blob/main/docs/MACOS_INSTALL.md)
-> shows the two official ways to open it. Verify downloads against `SHA256SUMS` when
-> a release provides it.
-
-## The apps
-
-| Directory | App | What it is |
-| --- | --- | --- |
-| [`yana-app/`](yana-app) | **Yana** for macOS | Native SwiftUI app. Its updater reads this repository's `app-v*` releases. |
-| [`yana-studio/`](yana-studio) | **Yana Studio** | Electron workspace for a real project. Windows and Linux builds come from `.github/workflows/yana-studio-desktop.yml`, the native macOS part from `.github/workflows/native-macos.yml`. |
-| [`yana-ide/`](yana-ide) | **Yana IDE** | Yana overrides on top of Code-OSS (VS Code). It holds no upstream code. |
-
-### What Yana Studio gives you
-
-| Area | What you get |
-| --- | --- |
-| **Files and editor** | Open a real folder, search filenames, edit with CodeMirror. Files up to 8 MiB are editable; larger ones open as read-only 256 KiB windows. Saves detect outside changes before overwriting. |
-| **Terminals** | Real PTY sessions in tabs, or a grid of up to 12. |
-| **Git** | Read-only status, worktrees and diffs. Stage and commit are deliberately not AI tools. |
-| **Chat** | Streamed through `yana-rt`, saved conversations, stop button, approval prompts, token usage. |
-| **Models** | Every `yana-rt` provider plus a custom OpenAI-compatible endpoint, and a local manager for Ollama, LM Studio, llama.cpp, 9Router and similar. API keys reach Rust over stdin and sit encrypted in the OS keystore, never in workspace files. |
-| **Tasks** | Backed by the real `yana-rt task` store. Marking a task done requires evidence, and `blocked` is computed by the runtime. |
-| **Design canvas** | Native canvas with components, phone and desktop screens, layers, undo and redo, and guarded AI proposals. |
-| **Governance telemetry** | What was allowed, what was blocked, and why. |
-
-Studio is a new app, not a reskin of the older Yana Desktop. It was built on a real
-workspace first, with no fake numbers or dead buttons. Per-screen status is in
-[`yana-studio/SCREEN-STATUS.md`](yana-studio/SCREEN-STATUS.md).
-
-## Build from source
-
-Studio needs Node 24 or newer and a C++ toolchain for `node-pty` (Xcode command-line
-tools on macOS; compiler, make and Python on Linux; Visual Studio C++ and the Windows
-SDK on Windows). It also needs a `yana-rt` binary built from Yana-AI.
-
-```bash
-git clone https://github.com/Horonomos-laps/Yana-AI.git
-cargo build --release --manifest-path Yana-AI/Cargo.toml    # produces yana-rt
-
-cd Yana-studio/yana-studio
-npm ci
-npm run rebuild
-npm run stage:runtime -- /absolute/path/to/Yana-AI/target/release/yana-rt
-npm start
-npm start -- --project /path/to/project    # open a project directly
-```
-
-`stage:runtime` checks that the binary answers a JSON error for empty input, copies it
-for the right OS and architecture, and records its SHA-256 in a manifest. That is a
-minimal protocol check, not an end-to-end test. Build the runtime from a current
-Yana-AI checkout: an old binary does not speak the newer protocol.
-
-## Status
-
-- **Source:** the three apps were moved here from Yana-AI. The macOS app release `app-v1.0.0` is published here. Nothing else has been released from this repository yet, and the two build workflows are new.
-- **Partial:** Studio does not yet match every screen of the earlier desktop app. Not built yet: device registry, agent sessions screen, mobile pairing, SSH and Docker execution, permission-lease UI, signed auto-update.
-- **Known limits:** the `npm run dist:*` scripts in `yana-studio/` still assume the Yana-AI directory layout, so use the workflow to build packages for now. The desktop build fails until the repository secret `YANA_GOOGLE_CLIENT_SECRET` is set in the repository settings.
-
-## Legacy: Yana Terminal prototype
-
-The root of this repository still holds an earlier terminal prototype (`src/`,
-`Cargo.toml`, `DESIGN.md`, `UI_ENGINES.md`, `reference/`). It is a Ratatui UI with mock
-data, kept to validate the interaction model. A copy lives in Yana-AI as
-`tools/yana-terminal/`. Run it with `cargo run`.
-
-## More
-
-[Yana-AI](https://github.com/Horonomos-laps/Yana-AI) · [yana-web](https://github.com/Horonomos-laps/yana-web) · [yana.vutam.link](https://yana.vutam.link)
+---
 
 Original concept, product direction, architecture and interaction design by **Vũ Văn Tâm**.
 AI tools may assist with implementation, testing, documentation and review; accepted
-changes stay under maintainer control. Licensed under [Apache 2.0](LICENSE).
+changes stay under maintainer control.
+
+[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Apache 2.0](LICENSE)
