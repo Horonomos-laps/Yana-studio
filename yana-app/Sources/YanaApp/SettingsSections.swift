@@ -229,14 +229,19 @@ struct StudioSettings: View {
 						.lineLimit(1).truncationMode(.middle)
 				}
 				LabeledContent(L("set.studioBridge")) {
-					Text(editor.devExtension == nil ? L("set.studioBridgeOff") : L("set.studioBridgeOn")).font(.fbCaption)
-						.foregroundStyle(editor.devExtension == nil ? FB.warningText : FB.successText)
+					Text(L(bridgeLabel)).font(.fbCaption)
+						.foregroundStyle(bridgeLabel == "set.studioBridgeOff" ? FB.warningText : FB.successText)
 				}
 				TextField(L("set.studioCheckout"), text: $settings.ideCheckout)
 				Button(L("ide.title")) { editor.open(folder: engine.workspace) }.disabled(editor.appURL == nil)
 				if case .failed(let why) = editor.status { SettingsNote(why) }
 			} footer: { SettingsNote(L("set.studioNote")) }
 		}
+	}
+
+	private var bridgeLabel: String {
+		if editor.hasPackagedBridge { return "set.studioBridgePackaged" }
+		return editor.devExtension == nil ? "set.studioBridgeOff" : "set.studioBridgeOn"
 	}
 }
 

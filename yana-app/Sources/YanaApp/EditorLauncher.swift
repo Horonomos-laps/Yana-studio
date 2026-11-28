@@ -8,8 +8,8 @@ import Foundation
 // Where Yana Studio comes from, first match wins:
 //   1. Yana.app/Contents/Applications/Yana Studio.app (the packaged one-app layout)
 //   2. /Applications/Yana Studio.app (installed separately)
-// Until the packaged Yana Studio ships app-bridge.js, the yana-agent copy in the Code-OSS checkout
-// (Settings: ideCheckout) is loaded with --extensionDevelopmentPath when it has the bridge.
+// Only a Yana Studio that does not ship app-bridge.js loads the yana-agent copy in the Code-OSS checkout
+// (Settings: ideCheckout) with --extensionDevelopmentPath: that flag replaces the packaged extension.
 
 @MainActor
 final class EditorLauncher: ObservableObject {
@@ -26,11 +26,23 @@ final class EditorLauncher: ObservableObject {
 		return [bundled, Self.installed].first { FileManager.default.fileExists(atPath: $0.path) }
 	}
 
-	// The yana-agent folder that has the bridge, when the bundled extension does not yet.
-	var devExtension: String? {
-		let path = URL(fileURLWithPath: AppSettings.shared.ideCheckout).appendingPathComponent("extensions/yana-agent")
-		let bridge = path.appendingPathComponent("features/app-bridge.js").path
-		return FileManager.default.fileExists(atPath: bridge) ? path.path : nil
+	var devExtension: String? { Self.devExtension(app: appURL, checkout: AppSettings.shared.ideCheckout) }
+	var hasPackagedBridge: Bool { Self.hasPackagedBridge(app: appURL) }
+
+	// The source folder's yana-agent, only when the Studio being opened has no bridge of its own.
+	nonisolated static func devExtension(app: URL?, checkout: String) -> String? {
+		guard !checkout.isEmpty, !hasPackagedBridge(app: app) else { return nil }
+		let path = URL(fileURLWithPath: checkout).appendingPathComponent("extensions/yana-agent")
+		return hasBridge(path) ? path.path : nil
+	}
+
+	nonisolated static func hasPackagedBridge(app: URL?) -> Bool {
+		guard let app else { return false }
+		return hasBridge(app.appendingPathComponent("Contents/Resources/app/extensions/yana-agent"))
+	}
+
+	nonisolated private static func hasBridge(_ extensionFolder: URL) -> Bool {
+		FileManager.default.fileExists(atPath: extensionFolder.appendingPathComponent("features/app-bridge.js").path)
 	}
 
 	// Opens Yana Studio on `folder`. If it is already running, Code-OSS hands the folder to that window.
